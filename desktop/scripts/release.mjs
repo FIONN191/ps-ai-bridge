@@ -51,6 +51,15 @@ console.log(`update.json：v${version}，${Object.keys(files).length} 个平台`
 const notesFile = path.join(OUT, `release-notes-${version}.md`);
 fs.writeFileSync(notesFile, `${notes}\n\n---\n下载：macOS（Apple 芯片）选 mac-arm64.dmg，Intel Mac 选 mac-x64.dmg，Windows 选 win-x64-setup.exe。已经装了 0.5.0 以后版本的，打开 App 会自动提示更新。\n`);
 const gh = (args) => execFileSync('gh', args, { stdio: 'inherit', cwd: REPO_ROOT });
-gh(['release', 'create', tag, '--repo', repo, '--title', tag, '--notes-file', notesFile,
+// Keep Latest unchanged until every installer and the feed are uploaded and verified.
+const revision=execFileSync('git',['rev-parse','HEAD'],{cwd:REPO_ROOT,encoding:'utf8'}).trim();
+gh(['release', 'create', tag, '--repo', repo, '--title', tag, '--notes-file', notesFile, '--draft', '--target', revision,
   ...Object.values(FILES).map((n) => path.join(OUT, n)), manifestFile]);
-console.log(`已发布：https://github.com/${repo}/releases/tag/${tag}`);
+const uploaded=JSON.parse(execFileSync('gh',['api',`repos/${repo}/releases/tags/${tag}`],{cwd:REPO_ROOT,encoding:'utf8'}));
+for(const local of [...Object.values(FILES).map(n=>path.join(OUT,n)),manifestFile]){
+  const asset=uploaded.assets.find(a=>a.name===path.basename(local));
+  if(!asset||asset.state!=='uploaded'||asset.size!==fs.statSync(local).size||asset.digest!==`sha256:${sha256(local)}`)
+    throw new Error(`上传校验失败，保留草稿且不会更新 Latest：${path.basename(local)}`);
+}
+gh(['release','edit',tag,'--repo',repo,'--draft=false','--latest']);
+console.log(`已发布并验证：https://github.com/${repo}/releases/tag/${tag}`);
