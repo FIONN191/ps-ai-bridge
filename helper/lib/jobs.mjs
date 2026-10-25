@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { config } from './config.mjs';
-import { alignOutput, makeVariant, thumbnail, CC_MODES, CC_VERSION } from './post.mjs';
+import { alignOutput, makeVariant, thumbnail, CC_MODES, CC_VERSION, TEX_VERSION } from './post.mjs';
 
 const jobs = new Map();
 const CONCURRENCY = { aistudio: 2, chatgpt: 2, flow: 1, codex: 2, agy: 2, 'gemini-api': 3, 'openai-api': 3 };
@@ -281,7 +281,7 @@ export async function variantPath(job, { cc = 'none', tex = false, t = 1 }) {
   t = Math.round(Math.min(1, Math.max(0, t)) * 20) / 20; // 5% 一档
   if (!job.inputPath || (cc === 'none' && !tex && t === 1)) return base;
   r.variants = r.variants || {};
-  const key = `${cc}${CC_VERSION[cc] ? `${CC_VERSION[cc]}` : ''}${tex ? '-tex' : ''}${t < 1 ? `-t${Math.round(t * 100)}` : ''}`;
+  const key = `${cc}${CC_VERSION[cc] ? `${CC_VERSION[cc]}` : ''}${tex ? `-tex${TEX_VERSION}` : ''}${t < 1 ? `-t${Math.round(t * 100)}` : ''}`;
   if (r.variants[key] && fs.existsSync(r.variants[key])) return r.variants[key];
   const out = await makeVariant({ inputPath: job.inputPath, basePath: base, cc, tex, t, outPath: path.join(job.dir, `v-${key}.png`) });
   r.variants[key] = out;

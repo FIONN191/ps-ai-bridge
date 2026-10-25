@@ -22,7 +22,7 @@ import { geminiApi, openaiApi } from './providers/api.mjs';
 import { flow, FLOW_MODELS, FLOW_ASPECTS } from './providers/flow.mjs';
 import { chatgpt, CHATGPT_ASPECTS } from './providers/chatgpt.mjs';
 
-const VERSION = '0.5.1';
+const VERSION = '0.5.2';
 const shortcuts = createShortcuts();
 process.on('exit', () => shortcuts.stop());
 // 桌面端托管时带 IPC 通道：桌面端退出（包括崩溃、被强退）就跟着退出

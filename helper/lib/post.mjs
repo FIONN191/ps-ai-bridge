@@ -2,8 +2,9 @@
 //  · 快速对齐：先整体对齐（缩放 + 平移），再把画面切成 10×10 块，选区外那一圈对不上的块各自微调扭过去，
 //    保证接缝能对上；选区里面（真正修改的地方）不扭，免得把修改撤回去。
 //  · 校色：全局 = 整图亮度颜色匹配（适合去杂物）；精准 = 逐像素把原图的低频颜色还回来（适合修脸这类几乎不变形的修改）；
-//    混合 = 只在和原图接近的地方校正，差别大的地方（新加的东西、去掉的杂物）和它们周围一圈都不动。
-//  · 替换纹理：把原图的高频噪点/颗粒叠回 AI 图，补回原片质感；和原图差别大的地方不叠。
+//    混合 = 只在和原图很接近的地方校正。精准和混合都不碰 AI 明显改过的地方（去掉的杂物、新加的东西）和它们周围一圈，
+//    否则会把去掉的东西以模糊的影子补回来；精准的「明显」门槛更高，AI 只是偏了点颜色的地方照样逐像素还原。
+//  · 替换纹理：把原图的高频噪点/颗粒叠回 AI 图，补回原片质感；AI 明显改过的地方和周围一圈不叠。
 //  · 强度：不是调透明度。先按块匹配算出原图→AI 图的位移场，强度 t 时两边各沿位移走一段再混合（简化版插帧），
 //    0 = 原图，100% = AI 图，中间不会有明显重影。
 import fs from 'node:fs';
@@ -294,8 +295,11 @@ function similarity(Ilo, Olo, tau = 28) {
 }
 
 export const CC_MODES = ['none', 'global', 'precise', 'mixed'];
-// 算法改过的校色模式记个版本号，旧任务缓存的结果文件就不会再被拿来用
-export const CC_VERSION = { mixed: 2 };
+// 算法改过的校色模式 / 替换纹理记个版本号，旧任务缓存的结果文件就不会再被拿来用
+export const CC_VERSION = { mixed: 3, precise: 2 };
+export const TEX_VERSION = 2;
+// 「AI 改过」的门槛（低频亮度差的尺度）：越大越多地方被当成「只是偏了颜色」照样校正
+const TAU = { mixed: 28, precise: 45, texture: 28 };
 
 // 一维最小值滤波（horizontal 为真时按行，否则按列），半径 r
 function minFilter(src, w, h, r, horizontal) {
@@ -315,18 +319,18 @@ function minFilter(src, w, h, r, horizontal) {
   return out;
 }
 
-// 混合校色的权重（0–255，和原图同尺寸）。原图模糊以后，被 AI 去掉的杂物会向外晕开约 3σ：
-// 那一圈背景 AI 图和原图本来很接近，照「接近就校正」补回原图颜色，就会把杂物的轮廓一起带回来（淡淡的残影）。
-// 所以把「AI 改过的区域」向外扩 3σ（相似度图做最小值滤波），扩到的地方也不校正，再模糊一下让过渡平滑。
+// 哪里可以拿原图的东西补回去（0–255，和原图同尺寸）：和原图接近的地方接近 255，AI 改过的地方是 0。
+// 原图模糊以后，被 AI 去掉的杂物会向外晕开约 3σ：那一圈背景 AI 图和原图本来很接近，照「接近就补」会把杂物的轮廓一起带回来（淡淡的残影），
+// 所以把「AI 改过的区域」向外扩 3σ（相似度图做最小值滤波），扩到的地方也不补，再模糊一下让过渡平滑。
 // 低频图在 1/4 尺寸上算就够了，之后放大回原尺寸
-async function mixedWeight(Ilo, Olo, W, H, sigma) {
+async function keepWeight(Ilo, Olo, W, H, sigma, tau) {
   const k = 4;
   const w = Math.max(1, Math.round(W / k));
   const h = Math.max(1, Math.round(H / k));
   const small = (buf) => sharp(buf, rawOpts(W, H)).resize(w, h, { fit: 'fill' }).raw().toBuffer();
   const [Is, Os] = await Promise.all([small(Ilo), small(Olo)]);
   const r = Math.max(1, Math.round((3 * sigma) / k));
-  const sim = minFilter(minFilter(similarity(Is, Os), w, h, r, true), w, h, r, false);
+  const sim = minFilter(minFilter(similarity(Is, Os, tau), w, h, r, true), w, h, r, false);
   const u8 = Buffer.alloc(w * h);
   for (let i = 0; i < u8.length; i++) u8[i] = Math.round(sim[i] * 255);
   const { data, info } = await sharp(u8, { raw: { width: w, height: h, channels: 1 } })
@@ -340,10 +344,10 @@ async function mixedWeight(Ilo, Olo, W, H, sigma) {
 async function localColor(I, O, W, H, mode) {
   const sigma = Math.max(2, Math.min(W, H) * 0.015);
   const [Ilo, Olo] = await Promise.all([blurRGB(I, W, H, sigma), blurRGB(O, W, H, sigma)]);
-  const weight = mode === 'mixed' ? await mixedWeight(Ilo, Olo, W, H, sigma) : null;
+  const weight = await keepWeight(Ilo, Olo, W, H, sigma, TAU[mode]);
   const out = Buffer.alloc(O.length);
   for (let i = 0, p = 0; p < O.length; i++, p += 3) {
-    const wgt = weight ? weight[i] / 255 : 1;
+    const wgt = weight[i] / 255;
     for (let c = 0; c < 3; c++) out[p + c] = clamp(Math.round(O[p + c] + wgt * (Ilo[p + c] - Olo[p + c])), 0, 255);
   }
   return out;
@@ -354,10 +358,10 @@ async function restoreTexture(I, O, W, H) {
   const fine = Math.max(0.8, Math.min(W, H) / 1400);
   const sigma = Math.max(2, Math.min(W, H) * 0.015);
   const [Ib, Ob, Ilo, Olo] = await Promise.all([blurRGB(I, W, H, fine), blurRGB(O, W, H, fine), blurRGB(I, W, H, sigma), blurRGB(O, W, H, sigma)]);
-  const sim = similarity(Ilo, Olo);
+  const weight = await keepWeight(Ilo, Olo, W, H, sigma, TAU.texture);
   const out = Buffer.alloc(O.length);
   for (let i = 0, p = 0; p < O.length; i++, p += 3) {
-    const wgt = sim[i];
+    const wgt = weight[i] / 255;
     for (let c = 0; c < 3; c++) {
       // AI 图的低频 + 原图的高频（只在和原图接近的地方）
       const hiI = I[p + c] - Ib[p + c];
