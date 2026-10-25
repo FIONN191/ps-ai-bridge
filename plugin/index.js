@@ -11,7 +11,7 @@ const MAX_REFS = 4;
 const PREF_KEY = 'ps-ai-bridge-prefs';
 const GROUPS_KEY = 'ps-ai-bridge-groups';
 
-const MODEL_LABELS = { 'nano-banana-2.1': 'Nano Banana 2.1', 'nano-banana-pro': 'Nano Banana Pro（可能收费或扣点数）', 'nano-banana-2-lite': 'Nano Banana 2 Lite' };
+const MODEL_LABELS = { 'nano-banana-2.1': 'Nano Banana 2.1', 'nano-banana-2': 'Nano Banana 2', 'nano-banana-pro': 'Nano Banana Pro', 'nano-banana-2-lite': 'Nano Banana 2 Lite' };
 const THINKING_LABELS = { Minimal: '最快', Medium: '中等', High: '最高' };
 const CC_LABELS = { none: '不校色', global: '全局校色', precise: '精准校色', mixed: '混合校色' };
 const KEEP_COMPOSITION = '\n\n要求：输出图片的构图、取景、比例和透视与图1完全一致，不要裁切、缩放或平移画面；提示里没提到的人物、服装、五官和光线都保持原样。';
@@ -476,6 +476,7 @@ async function capture(opts) {
 // ---------- 参考图 ----------
 function renderRefs() {
   $('refCount').textContent = `${refs.length}/${MAX_REFS}`;
+  $('refEmpty').style.display = refs.length ? 'none' : 'block';
   $('refList').innerHTML = refs.map((r, i) => `
     <div class="ref"><img src="${HELPER}/uploads/${r.uploadId}"><a class="ref-x" data-ref="${i}">×</a><span class="ref-n">图${i + 2}</span></div>`).join('');
 }
@@ -501,6 +502,51 @@ async function addRefFromSelection() {
     hint(errText(e), true);
     remoteLog(e.stack || '', 'error');
   }
+}
+
+// 本地图片当参考图：UXP 只把路径交给 helper，由它读图、按 EXIF 摆正、缩到 2048
+async function addRefPaths(paths) {
+  const room = MAX_REFS - refs.length;
+  if (room <= 0) return hint(`参考图最多 ${MAX_REFS} 张`, true);
+  for (const p of paths.slice(0, room)) {
+    const r = await post('/uploads/from-file', { path: p, maxSide: 2048 });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || '读不了这张图');
+    refs.push({ uploadId: d.uploadId });
+  }
+  renderRefs();
+  hint(paths.length > room ? `参考图最多 ${MAX_REFS} 张，只加了前 ${room} 张` : `已加 ${paths.length} 张参考图`);
+}
+
+async function addRefFromFile() {
+  if (refs.length >= MAX_REFS) return hint(`参考图最多 ${MAX_REFS} 张`, true);
+  try {
+    const picked = await lfs.getFileForOpening({ allowMultiple: true, types: ['jpg', 'jpeg', 'png', 'webp', 'tif', 'tiff'] });
+    const files = Array.isArray(picked) ? picked : picked ? [picked] : [];
+    const paths = files.map((f) => f.nativePath).filter(Boolean);
+    if (paths.length) await addRefPaths(paths);
+  } catch (e) {
+    hint(errText(e), true);
+  }
+}
+
+// 从访达 / 资源管理器拖进来：Photoshop 2026 起 drop 事件里有 dataTransfer.uxpEntries（带 nativePath），旧版本没有
+function bindRefDrop() {
+  const box = $('refDrop');
+  box.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    box.classList.add('over');
+  });
+  box.addEventListener('dragleave', () => box.classList.remove('over'));
+  box.addEventListener('drop', (e) => {
+    e.preventDefault();
+    box.classList.remove('over');
+    const entries = [...((e.dataTransfer && e.dataTransfer.uxpEntries) || [])];
+    const paths = entries.filter((x) => x.isFile !== false).map((x) => x.nativePath).filter(Boolean);
+    if (!paths.length) return hint('这版 Photoshop 不支持把文件拖进面板，点「上传图片」选文件', true);
+    addRefPaths(paths).catch((err) => hint(errText(err), true));
+  });
 }
 
 async function addRefFromScreenshot() {
@@ -1134,6 +1180,8 @@ function bindUI() {
   $('assist').addEventListener('click', onAssist);
 
   // 参考图
+  $('refFile').addEventListener('click', addRefFromFile);
+  bindRefDrop();
   $('refSelection').addEventListener('click', addRefFromSelection);
   $('refScreenshot').addEventListener('click', addRefFromScreenshot);
   $('refClear').addEventListener('click', () => { refs = []; renderRefs(); });

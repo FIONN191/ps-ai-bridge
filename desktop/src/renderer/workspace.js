@@ -2,7 +2,7 @@
 // 生成照样交给 helper（网页平台在后台的专用 Chrome 里跑）。原图选「Photoshop 选区」时由 PS 面板导出选区，出图后自动贴回。
 // 预设、@param 滑杆、【填空】、提示词整理沿用插件里的做法（来自夏三七「修图轮椅 V6」，GPLv3）。
 
-const MODEL_LABELS = { 'nano-banana-2.1': 'Nano Banana 2.1', 'nano-banana-pro': 'Nano Banana Pro（可能收费或扣点数）', 'nano-banana-2-lite': 'Nano Banana 2 Lite' };
+const MODEL_LABELS = { 'nano-banana-2.1': 'Nano Banana 2.1', 'nano-banana-2': 'Nano Banana 2', 'nano-banana-pro': 'Nano Banana Pro', 'nano-banana-2-lite': 'Nano Banana 2 Lite' };
 const THINKING_LABELS = { Minimal: '最快', Medium: '中等', High: '最高' };
 const KEEP_COMPOSITION = '\n\n要求：输出图片的构图、取景、比例和透视与图1完全一致，不要裁切、缩放或平移画面；提示里没提到的人物、服装、五官和光线都保持原样。';
 const MAX_REFS = 4;

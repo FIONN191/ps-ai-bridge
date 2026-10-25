@@ -91,6 +91,10 @@ input[type=text] { width: 100%; }
 
 /* 参考图 */
 .ref-list { display: flex; flex-direction: row; flex-wrap: wrap; margin-top: 4px; min-height: 4px; }
+/* 参考图区域也是拖放区：从访达 / 资源管理器拖图片进来 */
+.ref-drop { border: 1px solid var(--uxp-host-border-color); border-radius: 4px; padding: 4px 4px 0 4px; margin-top: 4px; }
+.ref-drop.over { border-color: var(--uxp-host-link-text-color, #378ef0); background-color: rgba(55, 142, 240, 0.12); }
+.ref-empty { color: var(--uxp-host-text-color-secondary); padding: 8px 2px 10px 2px; text-align: center; }
 .ref { position: relative; width: 56px; height: 56px; margin: 0 6px 6px 0; border: 1px solid var(--uxp-host-border-color); }
 .ref img { width: 56px; height: 56px; object-fit: cover; }
 .ref-x { position: absolute; right: 0; top: 0; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 11px; padding: 0 3px; cursor: pointer; }

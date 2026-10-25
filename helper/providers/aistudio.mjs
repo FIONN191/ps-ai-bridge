@@ -8,6 +8,7 @@ import { imageSize, extFromMime } from '../lib/image.mjs';
 
 export const AISTUDIO_MODELS = {
   'nano-banana-2.1': 'gemini-nano-banana-2.1',
+  'nano-banana-2': 'gemini-3.1-flash-image',
   'nano-banana-pro': 'gemini-3-pro-image',
   'nano-banana-2-lite': 'gemini-3.1-flash-lite-image',
 };
@@ -17,15 +18,20 @@ const THINKING = ['Minimal', 'Medium', 'High'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function pick(page, name, value) {
+// fallbacks：这个模型没有 value 这一档时依次试的替代值（比如 Nano Banana 2 的思考强度只有 Minimal / High）。返回实际选中的值
+async function pick(page, name, value, fallbacks = []) {
   const cb = page.getByRole('combobox', { name });
   if (!(await cb.count())) throw new Error(`页面上找不到「${name}」设置，AI Studio 可能改版了`);
-  if ((await cb.innerText()).trim() === value) return;
+  if ((await cb.innerText()).trim() === value) return value;
   await cb.dispatchEvent('click');
   const lb = page.getByRole('listbox', { name });
   await lb.waitFor({ timeout: 8000 });
-  const opt = lb.getByRole('option', { name: value, exact: true });
-  if (!(await opt.count())) {
+  let opt = null;
+  for (const v of [value, ...fallbacks]) {
+    const o = lb.getByRole('option', { name: v, exact: true });
+    if (await o.count()) { opt = o; value = v; break; }
+  }
+  if (!opt) {
     await page.keyboard.press('Escape');
     throw new Error(`「${name}」没有 ${value} 这个选项`);
   }
@@ -33,6 +39,7 @@ async function pick(page, name, value) {
   await lb.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => page.keyboard.press('Escape'));
   const now = (await cb.innerText()).trim();
   if (now !== value) throw new Error(`「${name}」没能设成 ${value}（现在是 ${now}）`);
+  return value;
 }
 
 // 页面状态：生成出的大图数量、主按钮是不是在 Stop 状态、错误提示
@@ -90,7 +97,8 @@ async function runOnce(job, { log, signal }) {
     log(`设置参数：${job.aspect} · ${job.resolution} · 思考 ${thinking}`);
     await pick(page, 'Aspect ratio', job.aspect);
     await pick(page, 'Resolution', job.resolution);
-    await pick(page, 'Thinking Level', thinking);
+    const usedThinking = await pick(page, 'Thinking Level', thinking, ['High', 'Minimal']);
+    if (usedThinking !== thinking) log(`这个模型没有「${thinking}」思考强度，改用 ${usedThinking}`);
 
     const files = [job.inputPath, ...(job.refPaths || [])].filter(Boolean);
     if (files.length) {
