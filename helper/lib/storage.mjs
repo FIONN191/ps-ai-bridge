@@ -14,6 +14,16 @@ import { listJobs } from './jobs.mjs';
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const within = (root, value) => value === root || value.startsWith(root + path.sep);
 const ACTIVE = new Set(['queued','submitting','running','processing','recovering','awaiting-selection','responding','saving','restoring','analyzing']);
+export const STORAGE_JSON_LIMITS = Object.freeze({fileBytes:128*1024*1024,totalBytes:512*1024*1024});
+const ACTIVITY_ROOTS = ['workbench/runs','workbench/batches','workbench/creative/executions','workbench/creative/proposals','assistant-workbench/plans','assistant-workbench/sessions','assistant-workbench/proposals'];
+function checkJsonBudget(rows){
+  let total=0;
+  for(const r of rows){
+    if(r.bytes>STORAGE_JSON_LIMITS.fileBytes)throw error(`完整引用检查/迁移预检受限：${r.relative} 超过单个 JSON 128 MiB 上限；状态和配额仍可使用`);
+    total+=r.bytes;
+  }
+  if(total>STORAGE_JSON_LIMITS.totalBytes)throw error('完整引用检查/迁移预检受限：JSON 总量超过 512 MiB 上限；状态和配额仍可使用');
+}
 const EXCLUDED = new Set(['storage','chrome-profile','chrome','browser-profiles','engines','logs','node_modules','.git']);
 const immutable = rel => EXCLUDED.has(rel.split(path.sep)[0]) || /^(organizer[/\\](rollbacks|trash|backups)|backups)([/\\]|$)/.test(rel);
 const error = (message, statusCode = 409) => Object.assign(new Error(message), { statusCode });
@@ -118,21 +128,31 @@ export function createStorage({dataDir=DATA_DIR,outputDir=config.outputDir,userC
     const id=crypto.randomUUID();requests.set(id,`${method} /${parts[0]||''}`);
     let released=false;return ()=>{if(!released){requests.delete(id);released=true;}};
   }
-  function metadata() {
+  // Full JSON parsing/hashing belongs to explicit reference checks and migration only.
+  function metadata(extraRows=[]) {
     checked(dataDir);
-    return inventory(dataDir,{skip:immutable}).filter(r=>r.relative.endsWith('.json')&&path.join(dataDir,r.relative)!==userConfig).map(r=>{
-      if(r.bytes>16*1024*1024)throw error(`JSON 超过 16 MiB，请先整理：${r.relative}`);
-      const file=path.join(dataDir,r.relative);return {...r,file,value:json(file),sha256:digest(file)};
-    });
+    const rows=inventory(dataDir,{skip:immutable}).filter(r=>r.relative.endsWith('.json')&&path.join(dataDir,r.relative)!==userConfig);
+    checkJsonBudget([...rows,...extraRows,...(fs.existsSync(userConfig)?[{relative:'config.json',bytes:fs.statSync(userConfig).size}]:[])]);
+    return rows.map(r=>{const file=path.join(dataDir,r.relative);return {...r,file,value:json(file),sha256:digest(file)};});
   }
-  function blockers(meta=metadata(),output=inventory(outputDir)) {
+  function activityRecord(file) {
+    // An unreadable activity record blocks migration, but must not take down /storage.
+    try {if(fs.statSync(file).size>STORAGE_JSON_LIMITS.fileBytes)throw error('活动记录过大');return json(file);}
+    catch{return {status:'unverified',storageUnverified:true};}
+  }
+  function activityMetadata() {
+    return ACTIVITY_ROOTS.flatMap(folder=>inventory(path.join(dataDir,folder)).filter(r=>r.relative.endsWith('.json')).map(r=>{
+      const relative=path.join(folder,r.relative);return {relative,value:activityRecord(path.join(dataDir,relative))};
+    }));
+  }
+  function blockers(meta=activityMetadata(),output=inventory(outputDir)) {
     const found=[];
     for(const j of getJobs())if(ACTIVE.has(j.status))found.push({kind:'job',id:j.id,status:j.status});
-    for(const r of output.filter(r=>path.basename(r.relative)==='job.json')){const j=json(path.join(outputDir,r.relative));if(ACTIVE.has(j.status))found.push({kind:'job',id:j.id,status:j.status});}
+    for(const r of output.filter(r=>path.basename(r.relative)==='job.json')){const j=activityRecord(path.join(outputDir,r.relative));if(j.storageUnverified||ACTIVE.has(j.status))found.push({kind:'job',id:j.id,status:j.status});}
     for(const r of meta) {
       if(!/^(workbench[/\\](runs|batches)|workbench[/\\]creative[/\\](executions|proposals)|assistant-workbench[/\\](plans|sessions|proposals))[/\\]/.test(r.relative))continue;
       const active=v=>v&&typeof v==='object'&&(ACTIVE.has(v.status)||Object.values(v).some(x=>x&&typeof x==='object'&&active(x)));
-      if(active(r.value))found.push({kind:r.relative.split(path.sep)[1],id:r.value.id,status:r.value.status});
+      if(r.value.storageUnverified||active(r.value))found.push({kind:r.relative.split(path.sep)[1],id:r.value.id,status:r.value.status});
     }
     for(const item of extraActivity()||[])found.push({kind:'external',...item});
     for(const r of reservations.values())found.push({kind:'quota-reservation',status:r.kind});
@@ -154,7 +174,7 @@ export function createStorage({dataDir=DATA_DIR,outputDir=config.outputDir,userC
     if(fs.existsSync(dest))throw error('目标目录已存在；请选择尚不存在的新目录，不覆盖现有文件');
     return dest;
   }
-  function quotaState(meta=metadata(),output=inventory(outputDir)) {
+  function quotaState(output=inventory(outputDir)) {
     const preview=inventory(path.join(dataDir,'workbench','preview-assets')).filter(r=>!r.relative.endsWith('.json'));
     // Retouch reserves only final derived PNGs; source/reference/intermediate/metadata files are protected and excluded.
     preview.push(...inventory(path.join(dataDir,'workbench','retouch')).filter(r=>['output.png','layer.png'].includes(path.basename(r.relative))));
@@ -168,7 +188,7 @@ export function createStorage({dataDir=DATA_DIR,outputDir=config.outputDir,userC
     return {kind,estimatedBytes:bytes,usedBytes:used,reservedBytes:reserved,limitBytes:limit,allowed:!limit||used+reserved+bytes<=limit,excessBytes:limit?Math.max(0,used+reserved+bytes-limit):0};
   }
   function cleanupProposal() {
-    const meta=metadata(),output=inventory(outputDir),q=quotaState(meta,output),candidates=[],protectedFiles=[];
+    const meta=metadata(),output=inventory(outputDir),q=quotaState(output),candidates=[],protectedFiles=[];
     const references=[];
     const collect=v=>{if(typeof v==='string')references.push(v);else if(v&&typeof v==='object')for(const x of Object.values(v))collect(x);};
     // Ignore only each preview's own derived-output pointers; cross-preview inputs still pin files.
@@ -189,11 +209,11 @@ export function createStorage({dataDir=DATA_DIR,outputDir=config.outputDir,userC
     return {createdAt:Date.now(),quota:q,candidates,protectedFiles,protectedCheckpointBytes:q.checkpointBytes,reclaimableBytes:candidates.reduce((n,x)=>n+x.bytes,0),automaticDeletion:false,note:'这里只提供清理建议，不删除或移动文件。所有检查点和源图片受保护。'};
   }
   function status() {
-    const j=readJournal();const meta=metadata(),out=inventory(outputDir);
-    return {outputDir,configuredOutputDir:fs.existsSync(userConfig)?json(userConfig).outputDir||outputDir:outputDir,guardMounted:mounted,busy,progress,blockedReason:pending(),requiresRestart:Boolean(j&&['committed','rolled-back','failed-rolled-back'].includes(j.status)&&outputDir!==(j.status==='committed'?j.destination:j.source)),active:blockers(meta,out),quota:quotaState(meta,out),migration:j?{id:j.id,status:j.status,source:j.source,destination:j.destination,fileCount:j.files.length,manifestPath:path.join(at(j.id),'manifest.json'),canRollback:!['rolled-back','failed-rolled-back'].includes(j.status)}:null};
+    const j=readJournal();const out=inventory(outputDir);
+    return {outputDir,configuredOutputDir:fs.existsSync(userConfig)?json(userConfig).outputDir||outputDir:outputDir,guardMounted:mounted,busy,progress,blockedReason:pending(),requiresRestart:Boolean(j&&['committed','rolled-back','failed-rolled-back'].includes(j.status)&&outputDir!==(j.status==='committed'?j.destination:j.source)),active:blockers(undefined,out),quota:quotaState(out),migration:j?{id:j.id,status:j.status,source:j.source,destination:j.destination,fileCount:j.files.length,manifestPath:path.join(at(j.id),'manifest.json'),canRollback:!['rolled-back','failed-rolled-back'].includes(j.status)}:null};
   }
   function preflight(destination) {
-    baseCheck();const dest=validateDestination(destination),meta=metadata(),files=inventory(outputDir);idle(meta,files);
+    baseCheck();const dest=validateDestination(destination),files=inventory(outputDir),meta=metadata(files.filter(r=>r.relative.endsWith('.json')));idle(meta,files);
     const changes=[];
     for(const r of meta){const next=rewrite(r.value,outputDir,dest,[configuredOutput]);if(JSON.stringify(next)!==JSON.stringify(r.value))changes.push({relative:r.relative,before:r.sha256,bytes:Buffer.byteLength(JSON.stringify(next,null,2))});}
     for(const r of files.filter(r=>r.relative.endsWith('.json')))rewrite(json(path.join(outputDir,r.relative)),outputDir,dest,[configuredOutput]);
@@ -207,7 +227,7 @@ export function createStorage({dataDir=DATA_DIR,outputDir=config.outputDir,userC
     return {token,source:outputDir,destination:dest,fileCount:files.length,bytes,metadataFiles:changes.length,requiredDestinationBytes,requiredDataBytes,originalsPreserved:true,requiresRestart:true,expiresAt:plan.createdAt+15*60*1000,excludedDataAreas:[...EXCLUDED,'organizer/rollbacks','organizer/trash','organizer/backups','backups']};
   }
   const verifyInputs = plan => {
-    if(fingerprint({files:inventory(outputDir),directories:directoryPaths(outputDir)})!==plan.outputFingerprint||digest(userConfig)!==plan.configHash||JSON.stringify(metadata().map(r=>({relative:r.relative,sha256:r.sha256})))!==JSON.stringify(plan.metadata))throw error('预检后文件或配置发生变化，请重新预检');
+    if(fingerprint({files:inventory(outputDir),directories:directoryPaths(outputDir)})!==plan.outputFingerprint||digest(userConfig)!==plan.configHash||JSON.stringify(metadata(plan.files.filter(r=>r.relative.endsWith('.json'))).map(r=>({relative:r.relative,sha256:r.sha256})))!==JSON.stringify(plan.metadata))throw error('预检后文件或配置发生变化，请重新预检');
   };
   async function rollbackJournal(j,automatic=false) {
     // Check every target before restoring any one; never overwrite unrelated changes.
@@ -245,7 +265,7 @@ export function createStorage({dataDir=DATA_DIR,outputDir=config.outputDir,userC
       }
       progress={stage:'validating',completed:journal.files.length,total:plan.files.length};verifyInputs(plan);idle();
       for(const f of journal.files)if(await fileHash(path.join(outputDir,f.path))!==f.sourceSha256||await fileHash(path.join(stage,f.path))!==f.sha256)throw error('复制期间内容发生变化，迁移未提交');
-      const meta=metadata();
+      const meta=metadata(plan.files.filter(r=>r.relative.endsWith('.json')));
       const planned=meta.map(r=>({file:r.file,value:rewrite(r.value,outputDir,plan.destination,[configuredOutput])})).filter((r,i)=>JSON.stringify(r.value)!==JSON.stringify(meta[i].value));
       planned.push({file:userConfig,value:{...(fs.existsSync(userConfig)?json(userConfig):{}),outputDir:plan.destination}}); // Configuration commits LAST.
       for(const [i,c] of planned.entries()) {

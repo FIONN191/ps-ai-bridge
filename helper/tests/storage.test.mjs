@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import vm from 'node:vm';
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'psai-storage-'));
 process.env.PS_AI_BRIDGE_DATA_DIR=path.join(base,'global-data');fs.mkdirSync(process.env.PS_AI_BRIDGE_DATA_DIR);
-const {createStorage,storageRequestGuard,assertStorageQuota,reserveStorageQuota}=await import('../lib/storage.mjs');
+const {createStorage,storageRequestGuard,assertStorageQuota,reserveStorageQuota,STORAGE_JSON_LIMITS}=await import('../lib/storage.mjs');
 const {config}=await import('../lib/config.mjs');
 const {atomicJson}=await import('../lib/store.mjs');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -132,6 +132,51 @@ test('exported quota hooks reject real writes before creation and count held res
  const dest=path.join(globalData,'workbench','preview-assets','new','output.png');
  assert.throws(()=>{assertStorageQuota('preview',6);write(dest,'123456');},/配额/);assert.equal(fs.existsSync(dest),false);
  const release=reserveStorageQuota('preview',4);assert.throws(()=>assertStorageQuota('preview',2),/配额/);release();assertStorageQuota('preview',4);write(dest,'1234');assert.throws(()=>assertStorageQuota('preview',2),/配额/);
+});
+
+test('large inline-reference presets cannot break status, quota checks, reservations or real preview writes',async()=>{
+ const f=fixture(),preset=path.join(f.data,'presets','p_msg2dbh7_r4nuzw.json');
+ write(preset,{id:'p_msg2dbh7_r4nuzw',title:'large reference',references:[{dataUrl:'data:image/png;base64,'+Buffer.alloc(13*1024*1024,65).toString('base64')}]});
+ assert.ok(fs.statSync(preset).size>16*1024*1024);
+ const originalHash=hash(fs.readFileSync(preset)),read=fs.readFileSync;let presetReads=0;
+ fs.readFileSync=function(file,...args){if(String(file).includes('p_msg2dbh7_r4nuzw.json')){presetReads++;throw new Error('must not read presets for status or quota');}return read.call(this,file,...args);};
+ try{
+  const state=await f.storage.route('GET',['storage']);assert.equal(state.active.length,0);
+  assert.equal(f.storage.quotaPreflight('preview',4).allowed,true);
+  const release=f.storage.reserveQuota('preview',4);
+  try{f.storage.assertQuota('preview',4);write(path.join(f.data,'workbench','retouch','small','output.png'),'1234');}finally{release();}
+  assert.equal((await f.storage.route('GET',['storage'])).quota.previewBytes,4);
+  assert.equal(presetReads,0);
+ }finally{fs.readFileSync=read;}
+ // Full migration explicitly scans the same >16 MiB JSON and preserves its embedded bytes.
+ const migrated=await migration(f);assert.equal(migrated.status,'committed');assert.equal(hash(fs.readFileSync(preset)),originalHash);
+});
+
+test('quota accounting never parses unrelated, job, run or preview JSON contents',async()=>{
+ const f=fixture();write(path.join(f.data,'presets','broken.json'),'malformed unrelated JSON');
+ write(path.join(f.jobDir,'job.json'),'malformed job JSON');write(f.dependent,'malformed run JSON');
+ write(path.join(f.data,'workbench','retouch','r','preview.json'),'malformed preview JSON');write(path.join(f.data,'workbench','retouch','r','output.png'),'123');
+ const read=fs.readFileSync;let reads=0;
+ fs.readFileSync=function(file,...args){if(String(file).endsWith('.json')){reads++;throw new Error('quota should only stat managed image files');}return read.call(this,file,...args);};
+ try{assert.equal(f.storage.quotaPreflight('preview',1).usedBytes,3);f.storage.assertQuota('checkpoint',1);f.storage.reserveQuota('preview',1)();assert.equal(reads,0);}finally{fs.readFileSync=read;}
+ const state=await f.storage.route('GET',['storage']);assert.ok(state.active.some(x=>x.status==='unverified'));assert.equal(state.quota.previewBytes,3);
+ await assert.rejects(()=>f.post('preflight',{destination:f.destination}),/JSON/);
+});
+
+test('migration reports individual and aggregate JSON budgets before parsing oversized files; storage/quota stay usable',async()=>{
+ for(const aggregate of [false,true]){
+  const f=fixture(),presetRoot=path.join(f.data,'presets');fs.mkdirSync(presetRoot);
+  const count=aggregate?Math.floor(STORAGE_JSON_LIMITS.totalBytes/STORAGE_JSON_LIMITS.fileBytes)+1:1;
+  for(let i=0;i<count;i++){const fd=fs.openSync(path.join(presetRoot,`large-${i}.json`),'w');try{fs.ftruncateSync(fd,STORAGE_JSON_LIMITS.fileBytes+(aggregate?0:1));}finally{fs.closeSync(fd);}}
+  const read=fs.readFileSync;let reads=0;
+  fs.readFileSync=function(file,...args){if(String(file).includes(`${path.sep}presets${path.sep}`)){reads++;throw new Error('budget must be checked before JSON read');}return read.call(this,file,...args);};
+  try{
+   assert.equal((await f.storage.route('GET',['storage'])).active.length,0);
+   await f.post('quota',{previewLimitBytes:1024,checkpointLimitBytes:1024});f.storage.assertQuota('preview',8);
+   await assert.rejects(()=>f.post('preflight',{destination:f.destination}),e=>e.statusCode===409&&e.message.includes(aggregate?'512 MiB':'128 MiB')&&e.message.includes('状态和配额仍可使用'));
+   assert.equal(reads,0);assert.equal(fs.existsSync(f.destination),false);assert.equal(JSON.parse(read(f.userConfig)).outputDir,f.source);
+  }finally{fs.readFileSync=read;}
+ }
 });
 
 test('storage UI is syntax valid, CSP-compatible, manual only, with no main/preload dependency',()=>{
