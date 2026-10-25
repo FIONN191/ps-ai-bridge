@@ -7,8 +7,10 @@ import { app, net, shell } from 'electron';
 import { EventEmitter, once } from 'node:events';
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
+import {pipeline} from 'node:stream/promises';
 import fs from 'node:fs';
 import path from 'node:path';
+import { handoffWindowsUpdate, previousInstallOutcome } from './update-handoff.mjs';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'));
 // PS_AI_BRIDGE_UPDATE_FEED：测试时指到本地的 update.json
@@ -56,6 +58,8 @@ export class Updater extends EventEmitter {
     this.writeSettings = writeSettings;
     this.log = log;
     this.manifest = null;
+    this.updateDirectory = path.join(app.getPath('userData'), 'updates');
+    this.recovery = previousInstallOutcome(this.updateDirectory, app.getVersion());
     // status：idle / disabled / checking / latest / available / downloading / installing / manual / error
     // prompt：要不要弹「发现新版本」（跳过的版本、点过「以后再说」的不弹）
     // latestPlugin：最新一版桌面端带的 PS 插件版本
@@ -68,9 +72,10 @@ export class Updater extends EventEmitter {
   }
 
   async check({ manual = false } = {}) {
+    if(this.recovery){const r=this.recovery;this.recovery=null;return this.set({status:'error',error:r.error,installerPath:r.installer||'',logPath:r.log||'',prompt:true,recovery:true});}
     if (!app.isPackaged && !process.env.PS_AI_BRIDGE_UPDATE_FEED) return this.set({ status: 'disabled' });
     if (['downloading', 'installing'].includes(this.state.status)) return;
-    this.set({ status: 'checking', error: '' });
+    this.set({ status: 'checking', error: '', recovery:false });
     try {
       // net.fetch 走 Chromium 的网络栈，会用系统代理（访问 GitHub 往往要靠它）
       const r = await net.fetch(FEED, { cache: 'no-store' });
@@ -99,59 +104,67 @@ export class Updater extends EventEmitter {
   }
 
   async install() {
+    if(['downloading','installing'].includes(this.state.status))return;
     const file = this.manifest?.files?.[PLATFORM];
     if (!file) throw new Error('没有可用的新版本');
     this.set({ status: 'downloading', percent: 0, error: '', prompt: true });
-    const dest = path.join(app.getPath('temp'), path.basename(new URL(file.url).pathname));
+    const dest = path.join(this.updateDirectory, path.basename(new URL(file.url).pathname));
     try {
+      fs.mkdirSync(this.updateDirectory,{recursive:true});
       const r = await net.fetch(file.url);
       if (!r.ok) throw new Error(`下载失败：HTTP ${r.status}`);
       const total = Number(r.headers.get('content-length')) || file.size || 0;
       const hash = crypto.createHash('sha256');
-      const out = fs.createWriteStream(dest);
-      let got = 0;
-      let shown = -1;
-      for await (const chunk of r.body) {
-        hash.update(chunk);
-        if (!out.write(chunk)) await once(out, 'drain');
-        got += chunk.length;
-        const percent = total ? Math.floor((got / total) * 100) : 0;
-        if (percent !== shown) { shown = percent; this.set({ percent }); }
-      }
-      out.end();
-      await once(out, 'close');
+      let got = 0, shown = -1;
+      const updater=this;
+      await pipeline(r.body,async function*(source){
+        for await(const chunk of source){
+          hash.update(chunk);got+=chunk.length;
+          const percent=total?Math.min(100,Math.floor(got/total*100)):0;
+          if(percent!==shown){shown=percent;updater.set({percent});}
+          yield chunk;
+        }
+      },fs.createWriteStream(dest));
+      if(file.size && got!==file.size)throw new Error('安装包大小不符，请重新下载');
       if (file.sha256 && hash.digest('hex') !== file.sha256) throw new Error('下载的安装包校验不对（可能没下完整），请重试');
     } catch (e) {
-      fs.rmSync(dest, { force: true });
+      try {fs.rmSync(dest, { force: true });} catch {}
       this.set({ status: 'error', error: e.message, prompt: true });
       return;
     }
     this.set({ status: 'installing', percent: 100 });
     this.log(`[桌面端] 新版本 ${this.state.latest} 已下载，开始安装`);
-    if (process.platform === 'darwin') this.installMac(dest);
-    else this.installWin(dest);
+    this.set({installerPath:dest});
+    try {
+      if (process.platform === 'darwin') await this.installMac(dest);
+      else await this.installWin(dest);
+    } catch(e) {this.log(`[桌面端] 更新未启动：${e.message}`);this.set({status:'error',error:e.message,prompt:true});}
   }
 
-  installMac(dmg) {
+  async installMac(dmg) {
     const appPath = path.resolve(app.getPath('exe'), '..', '..', '..');
     let writable = appPath.endsWith('.app') && !appPath.includes('/AppTranslocation/') && !appPath.startsWith('/Volumes/');
     try { fs.accessSync(path.dirname(appPath), fs.constants.W_OK); fs.accessSync(appPath, fs.constants.W_OK); } catch { writable = false; }
     if (!writable) {
-      shell.openPath(dmg);
+      const error=await shell.openPath(dmg);if(error)throw new Error(error);
       return this.set({ status: 'manual' });
     }
     const script = path.join(app.getPath('temp'), 'ps-ai-bridge-update.sh');
     fs.writeFileSync(script, MAC_SCRIPT, { mode: 0o755 });
-    spawn('/bin/bash', [script, String(process.pid), dmg, appPath], { detached: true, stdio: 'ignore' }).unref();
+    const child=spawn('/bin/bash', [script, String(process.pid), dmg, appPath], { detached: true, stdio: 'ignore' });
+    await once(child,'spawn');child.unref();
     app.quit();
   }
 
-  installWin(exe) {
-    // 等 3 秒再运行安装程序：先让旧版和本机服务退干净，安装程序就不会提示「程序正在运行」
-    const q = (s) => `'${s.replace(/'/g, "''")}'`;
-    spawn('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', `Start-Sleep -Seconds 3; Start-Process -FilePath ${q(exe)}`], {
-      detached: true, stdio: 'ignore', windowsHide: true,
-    }).unref();
+  async openInstaller() {
+    if(!this.state.installerPath || !fs.existsSync(this.state.installerPath))throw new Error('安装包不可用，请通过 GitHub 下载');
+    const error=await shell.openPath(this.state.installerPath);if(error)throw new Error(error);
+  }
+
+  async installWin(exe) {
+    const result=await handoffWindowsUpdate({installer:exe,executable:app.getPath('exe'),version:this.state.latest,directory:this.updateDirectory});
+    this.set({logPath:result.log});
+    this.log('[桌面端] 安装助手已就绪，退出旧版后安装');
     app.quit();
   }
 }

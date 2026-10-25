@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>任务进度</title>
+<link rel="stylesheet" href="floating.css">
+</head>
+<body>
+<header><strong>任务进度</strong><button id="home">回工作台</button><button id="close" aria-label="关闭浮动任务卡">关闭</button></header>
+<p id="status" role="status" aria-live="polite">正在读取当前任务…</p>
+<main id="jobs"></main>
+<footer id="scope">最近 200 条任务 · 尚未更新</footer>
+<script src="floating.js"></script>
+</body>
+</html>

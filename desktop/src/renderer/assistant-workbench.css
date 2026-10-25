@@ -1,0 +1,40 @@
+.aw { padding: 20px; overflow: auto; }
+.aw [hidden] { display: none !important; }
+.aw-heading, .aw-toolbar, .aw-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.aw-heading { justify-content: space-between; }
+.aw-heading h2 { margin: 0 0 6px; }
+.aw-heading p, .aw-muted, .aw small { color: var(--mute); }
+.aw-nav { margin: 16px 0; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.aw-nav button[aria-pressed="true"] { background: var(--notice); color: var(--fg); border-color: var(--accent); }
+.aw-toolbar { margin: 12px 0; }
+.aw label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 5px 0; }
+.aw input, .aw select { max-width: 100%; min-width: 140px; }
+.aw textarea { display: block; width: 100%; box-sizing: border-box; margin: 10px 0; resize: vertical; }
+.aw-messages { max-height: 52vh; min-height: 150px; overflow: auto; padding: 4px; }
+.aw-message, .aw-record { padding: 16px; margin: 10px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--fg); }
+.aw-user { margin-left: 24px; background: var(--notice); }
+.aw-assistant { margin-right: 24px; }
+.aw pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.55; max-height: 480px; overflow: auto; }
+.aw-record h4 { margin: 0 0 10px; font-size: 15px; }
+.aw-compose { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; }
+.aw-error { color: var(--err); padding: 8px; border-left: 3px solid var(--err); }
+.aw-images { display: flex; gap: 8px; }
+.aw-images img { width: 72px; height: 72px; object-fit: contain; background: #15171c; border-radius: 6px; }
+.aw-preview { display: block; max-width: min(100%, 600px); max-height: 420px; object-fit: contain; margin: 12px 0; }
+.aw-steps { padding-left: 24px; }
+.aw-steps li { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.aw-steps pre { background: var(--bg); color: var(--fg); padding: 10px; font-family: monospace; font-size: 12px; }
+.aw-citation { padding: 8px 0; }
+.aw-source { background: var(--bg); color: var(--fg); padding: 16px; }
+.aw summary { cursor: pointer; }
+.aw button:disabled { opacity: .5; cursor: default; }
+.aw button:focus-visible, .aw select:focus-visible, .aw textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 720px) { .aw { padding: 12px; } .aw-toolbar { align-items: stretch; } .aw-toolbar label, .aw-toolbar input { width: 100%; } .aw-user, .aw-assistant { margin-left: 0; margin-right: 0; } }
+
+/* Override manager.css's fixed dark inputs in both system and organizer themes. */
+#tab-assistant input:not([type=checkbox]):not([type=range]), #tab-assistant select, #tab-assistant textarea { color: var(--fg); background: var(--card); border-color: var(--line); }
+.aw input::placeholder, .aw textarea::placeholder { color: var(--mute); opacity: 1; }
+.aw input[type=checkbox] { min-width: 0; width: auto; accent-color: var(--accent); }
+.aw-batch-targets { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 12px 0; }
+.aw-batch-targets label { display: flex; color: var(--fg); }
+.aw pre, .aw-citation { user-select: text; }

@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { pinyin } from 'pinyin-pro';
 import { ROOT } from './config.mjs';
 import { DATA_DIR } from './paths.mjs';
-import { atomicJson } from './store.mjs';
+import { atomicJson, readJson as readStrictJson } from './store.mjs';
 
 // 分类沿用 V6 的人体剪影分区
 export const CATEGORIES = [
@@ -35,6 +35,47 @@ const FACTORY_DIR = path.join(ROOT, 'presets', 'factory');
 export const USER_DIR = path.join(DATA_DIR, 'presets');
 const TRASH_DIR = path.join(USER_DIR, '.trash');
 const STARS_FILE = path.join(USER_DIR, '_stars.json');
+const CATEGORIES_FILE = path.join(USER_DIR, '_categories.json');
+const MOVE_JOURNAL = path.join(USER_DIR, '.move-transaction.json');
+const BUILTIN_CATEGORIES = CATEGORIES.map(c => ({ ...c }));
+
+// Keep the exported array live for the existing /presets response and PS panel.
+export function listCategories() {
+  const state = readStrictJson(CATEGORIES_FILE, { revision: 0, categories: [] });
+  if (!Number.isInteger(state.revision) || !Array.isArray(state.categories)) throw new Error('分类文件损坏');
+  CATEGORIES.splice(0, CATEGORIES.length, ...BUILTIN_CATEGORIES, ...state.categories);
+  CAT_IDS.clear(); CATEGORIES.forEach(c => CAT_IDS.add(c.id));
+  return { revision: state.revision, categories: CATEGORIES.map(c => ({ ...c, builtin: BUILTIN_CATEGORIES.some(b => b.id === c.id) })) };
+}
+
+export function saveCategory({ id, name, expectedRevision }) {
+  const state = listCategories();
+  if (expectedRevision !== state.revision) throw new Error('分类已被其他窗口修改，请刷新');
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 80) throw new Error('分类名称应为 1–80 字');
+  if (id && !state.categories.some(c => c.id === id && !c.builtin)) throw new Error('只能改名已有的自定义分类');
+  if (state.categories.some(c => c.id !== id && c.name === name.trim())) throw new Error('分类名称已存在');
+  const custom = state.categories.filter(c => !c.builtin).map(({ id, name }) => ({ id, name }));
+  const category = { id: id || `cat_${crypto.randomUUID()}`, name: name.trim() };
+  const i = custom.findIndex(c => c.id === id);
+  if (i < 0) custom.push(category); else custom[i] = category;
+  atomicJson(CATEGORIES_FILE, { schemaVersion: 1, revision: state.revision + 1, categories: custom });
+  cache = null;
+  return { ...listCategories(), category };
+}
+
+// A committed journal is rolled forward before any preset read. This makes a
+// multi-file bulk move recoverable even if the helper stops between renames.
+function recoverMove() {
+  const tx = readStrictJson(MOVE_JOURNAL, null);
+  if (!tx) return;
+  if (!Array.isArray(tx.writes)) throw new Error('预设移动事务损坏');
+  for (const { file, value } of tx.writes) {
+    const target = path.resolve(USER_DIR, file);
+    if (!target.startsWith(`${path.resolve(USER_DIR)}${path.sep}`)) throw new Error('预设移动路径无效');
+    atomicJson(target, value);
+  }
+  fs.unlinkSync(MOVE_JOURNAL); cache = null;
+}
 
 let cache = null;
 
@@ -102,6 +143,7 @@ function normalizeFile(file, factory) {
         category: CAT_IDS.has(it.category) ? it.category : 'other',
         content,
         refImages: Array.isArray(it.refImages) ? it.refImages.filter((r) => typeof r === 'string' && r.length > 100) : [],
+        referenceSources: Array.isArray(it.referenceSources) ? it.referenceSources : [],
         starred: Boolean(it.starred),
         revision: Number(it.revision) || 1,
         updatedAt: Number(it.updatedAt) || 0,
@@ -116,6 +158,8 @@ function normalizeFile(file, factory) {
 }
 
 function load() {
+  recoverMove();
+  listCategories();
   if (cache) return cache;
   fs.mkdirSync(USER_DIR, { recursive: true });
   const stars = readJson(STARS_FILE, {});
@@ -154,11 +198,11 @@ export function listPresets() {
 export function getPreset(id) {
   const p = load().get(id);
   if (!p) return null;
-  return { ...summary(p), content: p.content, params: parseParams(p.content), fills: parseFills(p.content), refImages: p.refImages };
+  return { ...summary(p), content: p.content, params: parseParams(p.content), fills: parseFills(p.content), refImages: p.refImages, referenceSources: p.referenceSources || [] };
 }
 
 const clean = p => ({ schemaVersion: 1, id: p.id, title: p.title, category: p.category,
-  content: p.content, refImages: p.refImages || [], starred: Boolean(p.starred),
+  content: p.content, refImages: p.refImages || [], referenceSources: p.referenceSources || [], starred: Boolean(p.starred),
   kind: p.kind || 'prompt', revision: p.revision || 1, updatedAt: p.updatedAt || Date.now() });
 const slug = id => crypto.createHash('sha256').update(String(id)).digest('hex');
 const revisionDir = id => path.join(USER_DIR, '.revisions', slug(id));
@@ -179,10 +223,12 @@ function writeUser(p) {
   cache = null;
 }
 
-export function savePreset({ id, title, category, content, refImages, expectedRevision, kind }) {
+export function savePreset({ id, title, category, content, refImages, referenceSources, expectedRevision, kind }) {
+  cache = null; // Compare revisions with disk, including writes by another window.
   if (typeof title !== 'string' || !title.trim() || typeof content !== 'string' || !content.trim()) throw new Error('预设要有名字和内容');
   if (title.length > 200 || content.length > 1024 * 1024) throw new Error('预设名字或内容过长');
   if (refImages !== undefined && (!Array.isArray(refImages) || refImages.some(x => typeof x !== 'string'))) throw new Error('参考图格式错误');
+  if (referenceSources !== undefined && (!Array.isArray(referenceSources) || referenceSources.some(x => !x || typeof x !== 'object') || JSON.stringify(referenceSources).length > 128 * 1024)) throw new Error('参考图来源格式错误');
   const existing = id ? load().get(id) : null;
   if (id && !existing) throw new Error('预设已删除，请另存副本');
   if (expectedRevision != null && existing && Number(expectedRevision) !== (existing.revision || 1)) throw new Error('预设已被其他窗口修改，请重新打开后再编辑');
@@ -191,6 +237,7 @@ export function savePreset({ id, title, category, content, refImages, expectedRe
   const p = { ...(own ? existing : {}), id: own ? id : `u_${crypto.randomUUID()}`,
     title: title.trim(), category: CAT_IDS.has(category) ? category : existing?.category || 'other', content,
     refImages: refImages ?? existing?.refImages ?? [], starred: own ? existing.starred : false,
+    referenceSources: referenceSources ?? (refImages === undefined ? existing?.referenceSources || [] : []),
     kind: kind || existing?.kind || 'prompt', factory: false,
     revision: own ? (existing.revision || 1) + 1 : 1, updatedAt: Date.now() };
   writeUser(p);
@@ -198,16 +245,21 @@ export function savePreset({ id, title, category, content, refImages, expectedRe
 }
 
 export function setStar(id, starred) {
+  cache = null;
   const p = load().get(id);
   if (!p) throw new Error('没有这个预设');
   if (p.factory) {
     const stars = readJson(STARS_FILE, {});
     stars[id] = Boolean(starred);
     atomicJson(STARS_FILE, stars); cache = null;
-  } else writeUser({ ...p, starred: Boolean(starred) });
+  } else {
+    atomicJson(path.join(revisionDir(id), `${p.revision || 1}.json`), clean(p));
+    writeUser({ ...p, starred: Boolean(starred), revision: (p.revision || 1) + 1, updatedAt: Date.now() });
+  }
 }
 
 export function deletePreset(id) {
+  cache = null;
   const p = load().get(id);
   if (!p) throw new Error('没有这个预设');
   if (p.factory) throw new Error('出厂预设不能删，可以复制后编辑');
@@ -251,12 +303,16 @@ export function restoreRevision(id, revision) {
 
 export function exportPresets(ids) {
   if (!Array.isArray(ids) || !ids.length) throw new Error('先选择要导出的预设');
-  return { format: 'ps-ai-bridge-presets', schemaVersion: 1, exportedAt: Date.now(), presets: ids.map(id => {
+  const presets = ids.map(id => {
     const p = load().get(id); if (!p) throw new Error(`找不到预设：${id}`); return clean(p);
-  }) };
+  });
+  const used = new Set(presets.map(p => p.category));
+  return { format: 'ps-ai-bridge-presets', schemaVersion: 1, exportedAt: Date.now(), presets,
+    categories: listCategories().categories.filter(c => !c.builtin && used.has(c.id)).map(({ id, name }) => ({ id, name })) };
 }
 
 export function previewImport(raw) {
+  if (raw?.categories !== undefined && (!Array.isArray(raw.categories) || raw.categories.length > 500 || raw.categories.some(c => !c || typeof c.id !== 'string' || !/^[\w-]{1,100}$/.test(c.id) || typeof c.name !== 'string' || !c.name.trim() || c.name.length > 80) || new Set(raw.categories.map(c => c.id)).size !== raw.categories.length)) throw new Error('预设包分类格式错误');
   const items = Array.isArray(raw) ? raw : Array.isArray(raw?.presets) ? raw.presets : [raw];
   if (items.length > 5000) throw new Error('一次最多导入 5000 个预设');
   const have = [...load().values()];
@@ -276,9 +332,17 @@ export function importPack(raw, preview = false) {
   if (preview) return { report };
   const items = Array.isArray(raw) ? raw : Array.isArray(raw?.presets) ? raw.presets : [raw];
   const added = [];
+  const categories = new Map();
+  const needed = new Set(report.filter(r => !r.duplicate && !r.errors.length).map(r => items[r.index].category));
+  for (const c of raw?.categories || []) if (needed.has(c.id)) {
+    const current = listCategories();
+    const match = current.categories.find(x => x.name === c.name.trim());
+    const category = match || saveCategory({ name: c.name, expectedRevision: current.revision }).category;
+    categories.set(c.id, category.id);
+  }
   for (const r of report) if (!r.duplicate && !r.errors.length) {
     const { id, ...p } = items[r.index];
-    added.push(savePreset({ ...p, id: undefined }).id);
+    added.push(savePreset({ ...p, id: undefined, category: categories.get(p.category) || p.category }).id);
   }
   return { added: added.length, ids: added, skipped: report.filter(r => r.duplicate).length, rejected: report.filter(r => r.errors.length).length, report };
 }
@@ -291,4 +355,94 @@ export function importFolder(dir) {
     for (const p of normalizeFile(path.join(dir, f), false)) items.push(clean(p));
   }
   return importPack(items);
+}
+
+// Caller must supply every selected record's revision; factory records are never
+// silently copied or mutated by a bulk move.
+export function bulkMovePresets({ ids, category, expectedRevisions }) {
+  cache = null;
+  const all = load();
+  if (!CAT_IDS.has(category)) throw new Error('目标分类不存在');
+  if (!Array.isArray(ids) || !ids.length || ids.length > 5000 || new Set(ids).size !== ids.length) throw new Error('请选择不同的个人预设');
+  const records = ids.map(id => {
+    const p = all.get(id);
+    if (!p || p.factory) throw new Error('批量移动只支持已有个人预设，请先复制出厂预设');
+    if (expectedRevisions?.[id] !== (p.revision || 1)) throw new Error('预设已被其他窗口修改，请刷新');
+    return p;
+  });
+  // Validate all records before creating the transaction or writing any data.
+  const files = new Map(), writes = [], now = Date.now();
+  for (const p of records) {
+    if (!p.file.endsWith('.json')) throw new Error('请先保存文本预设为个人 JSON 预设，再批量移动');
+    if (!files.has(p.file)) {
+      const raw = readStrictJson(p.file, null);
+      if (!raw) throw new Error('预设文件损坏');
+      files.set(p.file, { raw, normalized: normalizeFile(p.file, false) });
+    }
+    const file = files.get(p.file), next = clean({ ...p, category, revision: (p.revision || 1) + 1, updatedAt: now });
+    const siblings = Array.isArray(file.raw) ? file.raw : Array.isArray(file.raw.presets) ? file.raw.presets : null;
+    if (siblings) siblings[file.normalized.findIndex(x => x.id === p.id)] = next;
+    else file.raw = next;
+    writes.push({ file: path.relative(USER_DIR, path.join(revisionDir(p.id), `${p.revision || 1}.json`)), value: clean(p) });
+  }
+  for (const [file, { raw }] of files) writes.push({ file: path.relative(USER_DIR, file), value: raw });
+  atomicJson(MOVE_JOURNAL, { schemaVersion: 1, writes });
+  recoverMove();
+  return { presets: ids.map(getPreset) };
+}
+
+const fieldFile = id => path.join(USER_DIR, '.field-history', `${slug(id)}.json`);
+export function getFieldHistory(id) {
+  if (!getPreset(id)) throw new Error('预设不存在');
+  return readStrictJson(fieldFile(id), { schemaVersion: 1, revision: 0, entries: [] });
+}
+
+// Histories are separate from content revisions: using a preset does not edit it.
+// Values are keyed by the declared field name, never by the current UI index.
+export function recordFieldHistory({ id, expectedRevision, expectedPresetRevision, params = {}, fills = {} }) {
+  cache = null;
+  const p = getPreset(id);
+  if (!p) throw new Error('预设不存在');
+  if (expectedPresetRevision !== p.revision) throw new Error('预设已被其他窗口修改，请重新打开');
+  const history = getFieldHistory(id);
+  if (expectedRevision !== history.revision) throw new Error('字段历史已被其他窗口修改，请刷新');
+  if (!params || typeof params !== 'object' || Array.isArray(params) || !fills || typeof fills !== 'object' || Array.isArray(fills)) throw new Error('字段格式错误');
+  const numeric = Object.create(null), text = Object.create(null);
+  for (const [name, value] of Object.entries(params)) {
+    const field = p.params.find(f => f.name === name);
+    if (!field || typeof value !== 'number' || !Number.isFinite(value) || value < field.min || value > field.max) throw new Error(`参数超出范围：${name}`);
+    const steps = (value - field.min) / field.step;
+    if (Math.abs(steps - Math.round(steps)) > 1e-6 && value !== field.value) throw new Error(`参数步长不符：${name}`);
+    numeric[name] = value;
+  }
+  for (const [name, value] of Object.entries(fills)) {
+    if (!p.fills.some(f => f.name === name) || typeof value !== 'string' || value.length > 4000 || /】/.test(value)) throw new Error(`填空内容无效：${name}`);
+    text[name] = value;
+  }
+  const entry = { id: crypto.randomUUID(), usedAt: Date.now(), presetRevision: p.revision, params: numeric, fills: text };
+  const signature = x => JSON.stringify([Object.entries(x.params).sort(), Object.entries(x.fills).sort()]);
+  history.entries = [entry, ...history.entries.filter(x => signature(x) !== signature(entry))].slice(0, 30);
+  history.revision++;
+  atomicJson(fieldFile(id), history);
+  return history;
+}
+
+// Resolve by callback so replacement values such as "$&" remain literal text.
+export function applyPresetFields(id, { params = {}, fills = {} } = {}) {
+  const p = getPreset(id);
+  if (!p) throw new Error('预设不存在');
+  let content = p.content;
+  for (const [name, value] of Object.entries(params)) {
+    const field = p.params.find(f => f.name === name);
+    if (!field || typeof value !== 'number' || !Number.isFinite(value) || value < field.min || value > field.max) throw new Error(`参数超出范围：${name}`);
+    const key = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    content = content.replace(new RegExp(`("?@param:${key}"\\s*:\\s*)-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?`, 'gi'), (_, prefix) => prefix + value);
+  }
+  content = content.replace(/【填空:([^=】]+?)(?:=([^】]*))?】/g, (match, name) => {
+    if (!Object.hasOwn(fills, name)) return match;
+    const value = fills[name];
+    if (typeof value !== 'string' || value.length > 4000 || /】/.test(value)) throw new Error(`填空内容无效：${name}`);
+    return `【填空:${name}=${value}】`;
+  });
+  return { content, modified: content !== p.content };
 }

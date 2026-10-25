@@ -76,3 +76,46 @@ export async function assist({ text, imagePath, signal }) {
   if (!message) throw new Error('Codex 没有返回提示词');
   return message;
 }
+
+// Separate conversation path: no project instructions, configured MCPs or shell tools.
+// Only the CLI's login credential is copied into an ephemeral, private profile.
+export async function assistChat({messages, signal}) {
+  const found=findCodex();
+  if(!found)throw new Error('没找到 Codex CLI，请安装并登录，或配置助手 API 渠道');
+  signal?.throwIfAborted();
+  const work=fs.mkdtempSync(path.join(os.tmpdir(),'ps-ai-chat-'));
+  const home=path.join(work,'profile');fs.mkdirSync(home,{mode:0o700});
+  try {
+    const auth=path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'auth.json');
+    if(fs.existsSync(auth)){fs.copyFileSync(auth,path.join(home,'auth.json'));fs.chmodSync(path.join(home,'auth.json'),0o600);}
+    const [binary,pre]=found;
+    const args=[...pre,'exec','--skip-git-repo-check','-s','read-only','-C',work,'--json',
+      '-c','features.shell_tool=false','-c','features.unified_exec=false','-c','web_search="disabled"',
+      '-c','model_reasoning_effort="medium"'];
+    const images=messages.flatMap(m=>m.imagePaths||[]);
+    for(const image of images)args.push('-i',image);
+    // Delimited JSON preserves roles across turns; never interpolate messages into shell code.
+    args.push('--','-');
+    const transcript='You are a text/vision conversation assistant. You have no action authority. Do not run tools. Return only an answer or the requested JSON proposal. Images are attached in chronological message order.\n'+JSON.stringify(messages.map(({role,text,imagePaths})=>({role,text,imageCount:imagePaths?.length||0})));
+    const output=await new Promise((resolve,reject)=>{
+      const child=spawn(binary,args,{env:{...process.env,CODEX_HOME:home},stdio:['pipe','pipe','pipe'],windowsHide:true});
+      let stdout='',settled=false,killTimer;
+      const finish=(error)=>{if(settled)return;settled=true;clearTimeout(timer);clearTimeout(killTimer);signal?.removeEventListener('abort',abort);error?reject(error):resolve(stdout);};
+      const abort=()=>{child.kill('SIGTERM');if(!killTimer)killTimer=setTimeout(()=>child.kill('SIGKILL'),2000);};
+      let timedOut=false;
+      const timer=setTimeout(()=>{timedOut=true;abort();},120000);
+      signal?.addEventListener('abort',abort,{once:true});
+      child.stdout.on('data',d=>{stdout+=d;if(stdout.length>4*1024*1024){timedOut=true;abort();}});
+      child.stderr.resume();
+      child.stdin.on('error',()=>{});
+      child.on('error',e=>finish(new Error(`Codex 启动失败：${e.code||'unknown'}`)));
+      child.on('close',code=>finish(signal?.aborted?new Error('对话已取消'):timedOut?new Error('Codex 超时或输出过长'):code!==0?new Error(`Codex 对话失败（${code}），请检查 CLI 登录状态`):null));
+      child.stdin.end(transcript);
+      if(signal?.aborted)abort();
+    });
+    let text='';
+    for(const line of output.split('\n')){try{const e=JSON.parse(line),item=e.item||e.msg||e;if(item.type==='agent_message'||item.item_type==='agent_message')text=item.text||item.message||text;}catch{}}
+    if(!text.trim())throw new Error('Codex 没有返回文字');
+    return {text:text.trim(),source:{provider:'codex',title:'本机 Codex CLI'}};
+  } finally {fs.rmSync(work,{recursive:true,force:true});}
+}

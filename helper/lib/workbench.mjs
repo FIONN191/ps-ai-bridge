@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
+import { assertStorageQuota } from './storage.mjs';
 import { DATA_DIR } from './paths.mjs';
 import { atomicJson, readJson, recordId } from './store.mjs';
 import { useUpload, saveUpload, createJob, getJob, listJobs, cancelJob, appliedVariant, variantPath, createLocalResult } from './jobs.mjs';
@@ -29,7 +30,7 @@ export function createWorkbench({ providers, capabilities }) {
         const active = b.items.find(x => x.status === 'running');
         if (active) {
           const j = getJob(active.jobId);
-          if (j && ['queued','running'].includes(j.status)) continue;
+          if (j && ['queued','running','awaiting-selection'].includes(j.status)) continue;
           active.status = j?.status === 'done' ? 'done' : 'error'; active.error = j?.error || (!j ? '任务记录不存在，未自动重新提交' : null);
           save('batches', b);
         }
@@ -41,7 +42,7 @@ export function createWorkbench({ providers, capabilities }) {
           if (!j) {
             const uploadId = saveUpload(fs.readFileSync(next.inputPath), 'image/png');
             const refUploadIds = (b.refPaths || []).map(p => saveUpload(fs.readFileSync(p), 'image/png'));
-            j = createJob({ ...b.options, aspect: next.aspect, refUploadIds, uploadId, groupId: b.id, meta: { ...b.options.meta, title: next.name, origin: 'batch', batchId: b.id, batchItemId: next.id, attempt: next.attempt, projectId: b.projectId || null } }, providers, capabilities);
+            j = createJob({ ...b.options, ...next.options, aspect: next.aspect, refUploadIds, uploadId, groupId: b.id, meta: { ...b.options.meta, title: next.name, origin: 'batch', batchId: b.id, batchItemId: next.id, attempt: next.attempt, projectId: b.projectId || null, captureId:next.captureId||null } }, providers, capabilities);
           }
           next.jobId = j.id; next.status = 'running';
         } catch(e) { next.status = 'error'; next.error = e.message; }
@@ -71,7 +72,9 @@ export function createWorkbench({ providers, capabilities }) {
             const choices = capabilities[body.options.provider]?.aspects || ['1:1'];
             const ratio = a => { const [w,h] = a.split(':').map(Number); return w/h; };
             const aspect = body.options.aspect === 'auto' ? choices.reduce((a,b) => Math.abs(Math.log(ratio(a)/(size.width/size.height))) < Math.abs(Math.log(ratio(b)/(size.width/size.height))) ? a : b) : body.options.aspect || '1:1';
-            items.push({ id: itemId, name: String(x.name || '图片').slice(0, 200), inputPath, aspect, status: 'pending', attempt: 1 });
+            if(x.options&&(!providers[x.options.provider||body.options.provider]||!String(x.options.prompt||body.options.prompt).trim()))throw new Error('队列项的平台或提示词无效');
+            const itemOptions=x.options?{provider:x.options.provider||body.options.provider,model:String(x.options.model||body.options.model||''),prompt:String(x.options.prompt||body.options.prompt)}:null;
+            items.push({ captureId:typeof x.captureId==='string'?x.captureId:null,options:itemOptions,id: itemId, name: String(x.name || '图片').slice(0, 200), inputPath, aspect, status: 'pending', attempt: 1 });
           }
           // Pin references as well so a paused batch survives upload expiry.
           const refPaths = [];
@@ -79,10 +82,24 @@ export function createWorkbench({ providers, capabilities }) {
           return save('batches', { id, title: String(body.title || '照片批处理').slice(0, 200), status: 'paused', items, refPaths, options: { ...body.options, refUploadIds: [] }, createdAt: Date.now(), projectId: body.projectId || null });
         }
         const b = readJson(file('batches', parts[1]), null); if (!b) throw new Error('队列不存在');
+        if(parts[2]==='item'){
+          const item=b.items.find(i=>i.id===body.itemId);if(!item||item.status!=='pending'||b.status==='running')throw new Error('只能编辑暂停队列中未提交的项目');
+          const next={...(item.options||{}),...(body.options||{}),...(body.prompt!==undefined?{prompt:body.prompt}:{})};
+          const provider=next.provider||b.options.provider;if(!providers[provider])throw new Error('平台不存在');
+          if(!String(next.prompt||b.options.prompt||'').trim())throw new Error('提示词不能为空');
+          if(body.options){const aspect=body.options.aspect;if(aspect==='auto')throw new Error('逐项参数请选择明确比例');if(!(capabilities[provider]?.aspects||['1:1']).includes(aspect))throw new Error('此平台不支持所选比例');item.aspect=aspect;}
+          item.options={provider,prompt:String(next.prompt||b.options.prompt).slice(0,100000),model:String(next.model||b.options.model||'').slice(0,200),resolution:String(next.resolution||b.options.resolution||'2K'),thinking:String(next.thinking||b.options.thinking||'High')};
+          return save('batches',b);
+        }
         if (parts[2] === 'start') { if (b.status === 'cancelled') throw new Error('队列已取消，请创建新队列'); b.status = 'running'; b.note = ''; }
         else if (parts[2] === 'pause') b.status = 'paused';
         else if (parts[2] === 'cancel') { b.status = 'cancelled'; for (const i of b.items) { if (i.status === 'running') cancelJob(i.jobId); if (['pending','running'].includes(i.status)) i.status = 'cancelled'; } }
-        else if (parts[2] === 'retry') { for (const i of b.items) if (i.status === 'error') { i.status = 'pending'; i.attempt++; i.jobId = null; i.error = null; } b.status = 'paused'; }
+        else if (parts[2] === 'retry') {
+          const unresolved=b.items.filter(i=>i.status==='error'&&getJob(i.jobId)?.upstream&&getJob(i.jobId)?.status!=='done');
+          if(unresolved.length)throw new Error('队列含已有上游任务，请先到「候选与恢复」核对和恢复；不会重新提交这些项目');
+          for(const i of b.items)if(i.status==='error'){const j=getJob(i.jobId);if(j?.status==='done'){i.status='done';i.error=null;}else{i.status='pending';i.attempt++;i.jobId=null;i.error=null;}}
+          b.status='paused';
+        }
         else throw new Error('未知队列操作');
         return save('batches', b);
       }
@@ -92,7 +109,7 @@ export function createWorkbench({ providers, capabilities }) {
         const old = readJson(file('projects', id), null);
         if (!body.title?.trim()) throw new Error('请输入项目名称');
         const states = ['todo','working','done','rework','archived'];
-        return save('projects', { id, title: body.title.trim().slice(0,200), notes: String(body.notes || '').slice(0,100000), state: states.includes(body.state) ? body.state : 'todo', due: String(body.due || '').slice(0,20), jobIds: (body.jobIds || old?.jobIds || []).filter(id => typeof id === 'string').slice(0,10000), createdAt: old?.createdAt || Date.now() });
+        return save('projects', { ...(old||{}), id, title: body.title.trim().slice(0,200), notes: String(body.notes || '').slice(0,100000), state: states.includes(body.state) ? body.state : 'todo', due: String(body.due || '').slice(0,20), jobIds: (body.jobIds || old?.jobIds || []).filter(id => typeof id === 'string').slice(0,10000), createdAt: old?.createdAt || Date.now() });
       }
       if (parts[0] === 'tools') {
         if (parts[1] === 'save-preview') {
@@ -131,6 +148,7 @@ export function createWorkbench({ providers, capabilities }) {
             for(let i=3;i<blur.data.length;i+=4) blur.data[i] = Math.round(blur.data[i]*glow);
             buffer = await sharp(buffer).composite([{ input: blur.data, raw: blur.info, blend: 'screen' }]).png().toBuffer();
           }
+          assertStorageQuota('preview',buffer.length+fs.statSync(src).size);
           const previewId = crypto.randomUUID(), dir = path.join(root, 'preview-assets', previewId);
           fs.mkdirSync(dir, { recursive: true });
           const sourcePath = path.join(dir, `input${path.extname(src)}`), outputPath = path.join(dir, 'output.png');

@@ -23,6 +23,7 @@ const TARGETS = {
 const hidden = (src) => path.basename(src).startsWith('.');
 
 function stagePlugin() {
+  fs.copyFileSync(path.join(REPO,'plugin','shared-settings.js'),path.join(DESKTOP,'src','renderer','shared-settings.js'));
   fs.copyFileSync(path.join(REPO, 'plugin', 'api-settings.js'), path.join(DESKTOP, 'src', 'renderer', 'api-settings.js'));
   const dir = path.join(STAGE, 'plugin');
   fs.rmSync(dir, { recursive: true, force: true });

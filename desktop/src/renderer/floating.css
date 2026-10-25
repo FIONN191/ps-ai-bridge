@@ -1,0 +1,6 @@
+:root { color-scheme:light dark; --bg:#f6f6f4; --card:#fff; --fg:#1d1d1b; --line:#ddd; --mute:#686863; --bad:#b3261e; --ok:#1f7a4a; }
+@media(prefers-color-scheme:dark){:root{--bg:#161615;--card:#222220;--fg:#ecebe6;--line:#3a3a35;--mute:#aaa99f;--bad:#ff8a80;--ok:#5cc28b;}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:12px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;height:100vh;display:flex;flex-direction:column}
+header{display:flex;gap:6px;align-items:center;padding:10px;border-bottom:1px solid var(--line)}header strong{margin-right:auto;font-size:13px}
+button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:5px 7px;cursor:pointer}button:focus-visible{outline:2px solid #8f78ff}
+#status{padding:0 10px;color:var(--mute)}main{flex:1;overflow:auto;padding:0 10px}article{border:1px solid var(--line);border-radius:7px;padding:9px;margin-bottom:8px;background:var(--card);overflow-wrap:anywhere}article p{margin:3px 0}article small{color:var(--mute)}.error{color:var(--bad)!important}.done{color:var(--ok)}footer{padding:7px 10px;border-top:1px solid var(--line);color:var(--mute);font-size:11px}

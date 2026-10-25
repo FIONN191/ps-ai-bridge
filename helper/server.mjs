@@ -9,6 +9,17 @@ import { DATA_DIR } from './lib/paths.mjs';
 import { captureRegion } from './lib/screenshot.mjs';
 import { normalizeImage } from './lib/image.mjs';
 import * as bridge from './lib/bridge.mjs';
+import sharp from 'sharp';
+import {storageRoutes,storageRequestGuard,assertStorageQuota} from './lib/storage.mjs';
+import {createOrganizer} from './lib/organizer.mjs';
+import {createCreative} from './lib/creative.mjs';
+import {createAssistantWorkbench} from './lib/assistant-workbench.mjs';
+import {libraryRoutes} from './lib/library.mjs';
+import {forge,forgeRoutes,modelTools,modelToolsRoutes} from './providers/forge.mjs';
+import {candidateRoutes} from './lib/jobs.mjs';
+import {retouchRoutes} from './lib/retouch.mjs';
+import {sharedSettings} from './lib/shared-settings.mjs';
+import {regionRoutes,regionFile,regionRecord} from './lib/regions.mjs';
 import { accountStatus, openLogin } from './lib/accounts.mjs';
 import { getPrefs, updatePrefs } from './lib/prefs.mjs';
 import { createJob, getJob, listJobs, cancelJob, publicJob, saveUpload, loadHistory, variantPath, ensureThumb, appliedVariant, recordPlacement, useUpload } from './lib/jobs.mjs';
@@ -28,7 +39,7 @@ import { runninghub, runninghubRoutes } from './providers/runninghub.mjs';
 import { comfyui, comfyRoutes } from './providers/comfyui.mjs';
 import { chatgpt, CHATGPT_ASPECTS } from './providers/chatgpt.mjs';
 
-const VERSION = '0.6.3';
+const VERSION = '0.7.0';
 // 和 helper 一起分发的插件版本（桌面端里在 resources/plugin，源码版是仓库里的 plugin/）。PS 面板拿它和自己的版本比，旧了就提示更新
 const BUNDLED_PLUGIN = (() => {
   try { return JSON.parse(fs.readFileSync(path.join(ROOT, '..', 'plugin', 'manifest.json'), 'utf8')).version; } catch { return null; }
@@ -38,11 +49,13 @@ process.on('exit', () => shortcuts.stop());
 // 桌面端托管时带 IPC 通道：桌面端退出（包括崩溃、被强退）就跟着退出
 if (process.send) process.on('disconnect', () => process.exit(0));
 
-const providers = { aistudio, codex, agy, 'gemini-api': geminiApi, 'openai-api': openaiApi, chatgpt, flow, comfyui, runninghub };
+const providers = { aistudio, codex, agy, 'gemini-api': geminiApi, 'openai-api': openaiApi, chatgpt, flow, comfyui, runninghub, forge, 'model-tools':modelTools };
 
 // 给插件的平台能力表：比例「自动」时插件按这里的列表挑最接近选区的比例
 const GPT_ASPECTS = ['1:1', '2:3', '3:2', '3:4', '4:3', '9:16', '16:9'];
 const capabilities = {
+  forge: {aspects:['1:1','2:3','3:2','3:4','4:3','9:16','16:9']},
+  'model-tools': {aspects:['1:1','2:3','3:2','3:4','4:3','9:16','16:9']},
   runninghub: { aspects: ['1:1', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9'], resolutions: ['1K', '2K', '4K'] },
   comfyui: { aspects: ['1:1', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9'], resolutions: ['1K', '2K', '4K'] },
   aistudio: { models: Object.keys(AISTUDIO_MODELS), aspects: AISTUDIO_ASPECTS, resolutions: ['1K', '2K', '4K'], thinking: ['Minimal', 'Medium', 'High'] },
@@ -55,26 +68,6 @@ const capabilities = {
 };
 
 registerChannels(providers, capabilities);
-
-function pruneCheckpoints(root) {
-  const max = (Number(config.checkpointMaxGB) || 20) * 1024 ** 3;
-  const files = [];
-  for (const day of fs.readdirSync(root)) {
-    const dir = path.join(root, day);
-    if (!fs.statSync(dir).isDirectory()) continue;
-    for (const f of fs.readdirSync(dir)) {
-      const p = path.join(dir, f);
-      const st = fs.statSync(p);
-      files.push({ p, size: st.size, t: st.mtimeMs });
-    }
-  }
-  let total = files.reduce((a, f) => a + f.size, 0);
-  for (const f of files.sort((a, b) => a.t - b.t)) {
-    if (total <= max) break;
-    fs.unlinkSync(f.p);
-    total -= f.size;
-  }
-}
 
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${config.port}`, `localhost:${config.port}`]);
 
@@ -103,7 +96,36 @@ const server = http.createServer(async (req, res) => {
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     const parts = url.pathname.split('/').filter(Boolean);
+    const releaseStorage=storageRequestGuard(req.method,parts);res.once('finish',releaseStorage);res.once('close',releaseStorage);
 
+    const extraRoutes={storage:storageRoutes,library:libraryRoutes,forge:forgeRoutes,'model-tools':modelToolsRoutes,candidates:(m,p,b)=>candidateRoutes(m,p,b,providers),organizer:(m,p,b)=>organizer.route(m,p,b,url.searchParams),creative:creative.route,'assistant-workbench':assistantWorkbench.route};
+    if(extraRoutes[parts[0]]) {
+      const result=await extraRoutes[parts[0]](req.method,parts,req.method==='GET'?{}:JSON.parse((await readBody(req)).toString()||'{}'));
+      if(result?.buffer && result.type)return send(res,200,result.buffer,result.type);
+      if(result?.file && result.contentType)return send(res,200,fs.readFileSync(result.file),result.contentType);
+      return send(res,200,result);
+    }
+    if (req.method==='GET' && parts[0]==='jobs' && parts[2]==='mask-raw') {
+      const j=getJob(parts[1]);if(!j?.result)throw new Error('结果不存在');
+      const width=Number(url.searchParams.get('width')),height=Number(url.searchParams.get('height'));
+      if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width*height>40000000)throw new Error('蒙版目标尺寸无效');
+      const file=await variantPath(j,appliedVariant(j)),meta=await sharp(file).metadata();
+      let image=sharp(file).resize(width,height,{fit:'fill'});
+      if(url.searchParams.get('mode')==='luma')image=image.removeAlpha().greyscale();else {if(!meta.hasAlpha)throw new Error('该结果没有透明通道，请明确选择灰度模式');image=image.extractChannel('alpha');}
+      return send(res,200,await image.raw().toBuffer(),'application/octet-stream');
+    }
+    if(parts[0]==='retouch')return send(res,200,await retouchRoutes(req.method,parts,JSON.parse((await readBody(req)).toString()||'{}')));
+    if(url.pathname==='/shared-settings')return send(res,200,sharedSettings(req.method,req.method==='GET'?{}:JSON.parse((await readBody(req,16384)).toString()||'{}')));
+    if (parts[0] === 'regions') {
+      if (req.method === 'GET' && parts.length === 3) { const r=await regionFile(parts[1],parts[2]); if(r.bounds)res.setHeader('x-mask-bounds',JSON.stringify(r.bounds)); return send(res,200,r.buffer,r.type); }
+      return send(res,200,await regionRoutes(req.method,parts,req.method==='GET'?{}:JSON.parse((await readBody(req)).toString()||'{}')));
+    }
+    if (url.pathname === '/masks/raw' && req.method === 'POST') {
+      const width=Number(url.searchParams.get('width')),height=Number(url.searchParams.get('height'));
+      if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width*height>40000000)throw new Error('蒙版尺寸无效');
+      const buffer=await readBody(req,40000000);if(buffer.length!==width*height)throw new Error('蒙版像素数量不一致');
+      const png=await sharp(buffer,{raw:{width,height,channels:1}}).png().toBuffer();return send(res,200,{uploadId:saveUpload(png,'image/png')});
+    }
     if (parts[0] === 'runs') return send(res, 200, await runs.route(req.method, parts, req.method === 'GET' ? {} : JSON.parse((await readBody(req)).toString() || '{}')));
 
     if (parts[0] === 'api-channels') return send(res, 200, await channelRoutes(req.method, parts, req.method === 'GET' ? {} : JSON.parse((await readBody(req, 1024 * 1024)).toString() || '{}')));
@@ -129,7 +151,8 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/bridge/result' && req.method === 'POST') return send(res, 200, { ok: bridge.settle(JSON.parse((await readBody(req, 1024 * 1024)).toString() || '{}')) });
     if (url.pathname === '/bridge/ps' && req.method === 'POST') {
       const cmd = JSON.parse((await readBody(req, 1024 * 1024)).toString() || '{}');
-      if (!['generate', 'paste'].includes(cmd.type)) return send(res, 400, { error: `未知指令：${cmd.type}` });
+      if (!['generate', 'paste','documents','capture-region','paste-bound','apply-mask','select-subject','locate-region'].includes(cmd.type)) return send(res, 400, { error: `未知指令：${cmd.type}` });
+      if (['paste-bound','locate-region'].includes(cmd.type)) { const c=regionRecord(cmd.captureId); if(c.kind!=='capture')throw new Error('目标不是原始捕获'); cmd.target=c.target; cmd.rect=c.rect; cmd.mask=c.mask; }
       return send(res, 200, await bridge.request(cmd));
     }
 
@@ -220,7 +243,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // ---- 检查点：插件生成时存的整张画布 PNG，超过容量上限从最旧的删 ----
+    // 检查点保留原文件；超过配额时停止新增，由用户明确整理。
     if (parts[0] === 'checkpoints') {
       const root = path.join(config.outputDir, '_checkpoints');
       if (req.method === 'POST') {
@@ -230,8 +253,8 @@ const server = http.createServer(async (req, res) => {
         const day = d.toISOString().slice(0, 10).replace(/-/g, '');
         fs.mkdirSync(path.join(root, day), { recursive: true });
         const file = path.join(root, day, `${doc}-${d.toTimeString().slice(0, 8).replace(/:/g, '')}.png`);
+        assertStorageQuota('checkpoint',buf.length);
         fs.writeFileSync(file, buf);
-        pruneCheckpoints(root);
         return send(res, 200, { path: file });
       }
       const list = [];
@@ -330,7 +353,7 @@ const server = http.createServer(async (req, res) => {
 
     send(res, 404, { error: 'not found' });
   } catch (e) {
-    send(res, 400, { error: e?.message || String(e) });
+    send(res, Number.isInteger(e?.statusCode) && e.statusCode >= 400 && e.statusCode <= 599 ? e.statusCode : 400, { error: e?.message || String(e) });
   }
 });
 
@@ -343,6 +366,9 @@ server.on('error', (e) => {
 const restored = loadHistory();
 const workbench = createWorkbench({ providers, capabilities });
 const runs = createRuns({ providers, capabilities });
+const organizer=createOrganizer({bridge});
+const creative=createCreative({providers,capabilities,runs});
+const assistantWorkbench=createAssistantWorkbench({providers,capabilities,bridge});
 
 server.listen(config.port, '127.0.0.1', () => {
   if (restored) console.log(`已读回 ${restored} 个历史任务（检查点）`);

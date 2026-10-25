@@ -8,6 +8,8 @@ const mb = (bytes) => (bytes ? `${Math.round(bytes / 1024 / 1024)} MB` : '');
 
 function renderUpdate(s) {
   upState = s;
+  if(s.recovery)upRetry='check';
+  $('upOpenInstaller').hidden=!(s.status==='error'&&s.installerPath);
   // 设置页的版本行
   const text = $('updateText');
   const label = {
@@ -40,7 +42,7 @@ function renderUpdate(s) {
       ? '下载好了。App 会先退出，换成新版本后几秒内自动重新打开。'
       : '下载好了。安装程序马上打开，装完会自动重新打开 App。',
     manual: '安装包已经打开：把 PS AI Bridge 拖到「应用程序」文件夹替换旧版（提示时选「替换」），然后重新打开。先退出旧版，替换才不会失败。',
-    error: s.error,
+    error: s.error + (s.logPath ? `\n安装日志：${s.logPath}` : ''),
   }[s.status];
   $('upMsg').hidden = !msg;
   $('upMsg').textContent = msg || '';
@@ -70,3 +72,14 @@ $('checkUpdate').addEventListener('click', () => action(async () => {
 
 window.bridge.onUpdate(renderUpdate);
 window.bridge.updateState().then(renderUpdate);
+
+function githubDownload() {
+  const version=upState?.latest;
+  const url=/^\d+\.\d+\.\d+$/.test(version||'')
+    ? `https://github.com/FIONN191/ps-ai-bridge/releases/tag/v${version}`
+    : 'https://github.com/FIONN191/ps-ai-bridge/releases/latest';
+  return window.bridge.openExternalHTTPS(url);
+}
+$('upGithub').addEventListener('click',()=>action(githubDownload));
+$('githubUpdateDownload').addEventListener('click',()=>action(githubDownload));
+$('upOpenInstaller').addEventListener('click',()=>action(()=>window.bridge.openUpdateInstaller()));

@@ -59,3 +59,7 @@
 .api-editor input:focus, .api-editor select:focus { outline: 1px solid #9175ff; }
 .api-editor option { background: #292929; color: #eee; }
 @media (max-width: 720px) { .api-editor { grid-template-columns: 1fr; } }
+.region-thumb { max-width:180px;max-height:120px;object-fit:contain;display:block;margin:10px 0;background:repeating-conic-gradient(#333 0% 25%,#252525 0% 50%) 0 0/16px 16px; }
+.topbar .tabs { overflow-x:auto; flex-shrink:1; min-width:150px; }
+.topbar .tabs .tab-btn { white-space:nowrap; }
+.retouch-images {display:grid;grid-template-columns:1fr 1fr;gap:8px;}.retouch-images figure{margin:0;min-width:0}.retouch-images canvas{width:100%;cursor:crosshair;touch-action:none;background:#161616}.retouch-images figcaption{font-size:12px;color:#aaa;overflow-wrap:anywhere}.tool-preview{max-width:100%;max-height:480px;object-fit:contain}

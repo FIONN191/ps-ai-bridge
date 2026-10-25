@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { HelperProcess, loginShellPath } from './helper-process.mjs';
 import { createInstaller, isPhotoshopRunning } from './plugin-installer.mjs';
 import { Updater } from './updater.mjs';
+import { createOrganizerDesktop } from './organizer-desktop.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ASSETS = path.join(here, '..', 'assets');
@@ -28,6 +29,7 @@ let helper = null;
 let installer = null;
 let updater = null;
 let startHidden = false;
+let organizerDesktop = null;
 
 const readSettings = () => {
   try { return { customRoots: [], ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) }; } catch { return { customRoots: [] }; }
@@ -60,6 +62,7 @@ function createWindow() {
     webPreferences: { preload: path.join(here, 'preload.cjs') },
   });
   if (process.platform !== 'darwin') win.removeMenu();
+  organizerDesktop?.attachWindow(win);
   win.loadFile(path.join(here, 'renderer', 'index.html'));
   win.once('ready-to-show', () => { if (!startHidden) win.show(); });
   // 页面里的外部链接用系统浏览器打开
@@ -162,10 +165,10 @@ const helperUrl = (p) => {
   if (typeof p !== 'string' || !p.startsWith('/')) throw new Error(`bad helper path: ${p}`);
   return `http://127.0.0.1:${PORT}${p}`;
 };
-async function helperApi(method, p, body) {
+async function helperApi(method, p, body, { signal } = {}) {
   const post = method !== 'GET';
   const r = await fetch(helperUrl(p), {
-    method,
+    method, signal,
     headers: post ? { 'x-ps-ai-bridge': '1', 'content-type': 'application/json' } : {},
     body: post ? JSON.stringify(body || {}) : undefined,
   }).catch(() => { throw new Error('本机服务没有运行'); });
@@ -177,6 +180,7 @@ async function helperApi(method, p, body) {
 const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'tif', 'tiff', 'gif', 'avif', 'bmp'];
 
 function registerIpc() {
+  organizerDesktop.registerIpc();
   ipcMain.handle('state', () => collectState());
   ipcMain.handle('pack:open', async () => {
     const r = await dialog.showOpenDialog(win, { title: '选择 JSON 文件', filters: [{ name: 'JSON', extensions: ['json'] }], properties: ['openFile'] });
@@ -261,6 +265,7 @@ function registerIpc() {
   ipcMain.handle('update:state', () => updater.state);
   ipcMain.handle('update:check', async () => { await updater.check({ manual: true }); return updater.state; });
   ipcMain.handle('update:install', () => updater.install());
+  ipcMain.handle('update:open-installer', () => updater.openInstaller());
   ipcMain.handle('update:skip', () => updater.skip());
   ipcMain.handle('update:dismiss', () => updater.dismiss());
   ipcMain.handle('update:quit', () => app.quit());
@@ -280,7 +285,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', showWindow);
   app.on('activate', showWindow);
-  app.on('before-quit', () => { quitting = true; });
+  app.on('before-quit', () => { quitting = true; organizerDesktop?.dispose(); });
   app.on('will-quit', (e) => {
     if (!helper?.child) return;
     e.preventDefault();
@@ -315,6 +320,8 @@ async function start() {
     send('update', s);
     if (win && !win.isDestroyed()) win.setProgressBar(s.status === 'downloading' ? s.percent / 100 : -1);
   });
+  organizerDesktop = createOrganizerDesktop({ getWindow: () => win, onNotificationClick: showWindow, fetchJobs: signal => helperApi('GET','/jobs',undefined,{signal}), log: message => helper.log(message) });
+  organizerDesktop.restore();
   registerIpc();
   createTray();
   createWindow();

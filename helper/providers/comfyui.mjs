@@ -2,10 +2,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import sharp from 'sharp';
 import { DATA_DIR } from '../lib/paths.mjs';
 import { atomicJson, readJson, recordId } from '../lib/store.mjs';
-import { persist } from '../lib/jobs.mjs';
+import { persist, downloadCandidates } from '../lib/jobs.mjs';
 const root=path.join(DATA_DIR,'comfyui');
 const settingsFile=path.join(root,'connection.json');
 const settings=()=>readJson(settingsFile,{url:'http://127.0.0.1:8188',key:'',enabled:false});
@@ -24,10 +23,12 @@ function checkMapping(prompt,mapping){
 async function request(c,p,{method='GET',body,signal,form=false}={}){
  const headers=c.key?{authorization:`Bearer ${c.key}`} : {};
  if(body&&!form)headers['content-type']='application/json';
- const r=await fetch(c.url.replace(/\/$/,'')+p,{method,headers,body:body?(form?body:JSON.stringify(body)):undefined,signal:signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(15000)});
+ signal?.throwIfAborted();
+ let r;try{r=await fetch(c.url.replace(/\/$/,'')+p,{method,redirect:'error',headers,body:body?(form?body:JSON.stringify(body)):undefined,signal:signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(15000)});}catch{throw new Error(signal?.aborted?'已取消':'ComfyUI 连接失败，请核对服务地址');}
  if(!r.ok)throw new Error(`ComfyUI ${r.status}，检查服务地址、认证和节点配置`);
  return r;
 }
+async function json(response){try{return await response.json();}catch{throw new Error('ComfyUI 返回无效数据，请在服务端核对');}}
 export async function comfyRoutes(method,parts,body){
  if(parts[0]!=='comfyui')return undefined;
  const c=settings();
@@ -38,7 +39,7 @@ export async function comfyRoutes(method,parts,body){
   const next={url:u.href.replace(/\/$/,''),key:body.clearKey?'':body.key||c.key,enabled:body.enabled===true};atomicJson(settingsFile,next);return publicSettings(next);
  }
  if(parts[1]==='test'){
-  const start=Date.now();const stats=await(await request(c,'/system_stats')).json();return {ok:true,latency:Date.now()-start,devices:(stats.devices||[]).map(x=>({name:x.name,type:x.type,vram_total:x.vram_total}))};
+  const start=Date.now();const stats=await json(await request(c,'/system_stats'));return {ok:true,latency:Date.now()-start,devices:(stats.devices||[]).map(x=>({name:x.name,type:x.type,vram_total:x.vram_total}))};
  }
  if(parts[1]==='save'){
   validateWorkflow(body.prompt);const mapping=body.mapping||[];checkMapping(body.prompt,mapping);
@@ -48,7 +49,7 @@ export async function comfyRoutes(method,parts,body){
   atomicJson(path.join(root,'workflows',`${w.id}.json`),w);return w;
  }
  if(parts[1]==='inspect'){
-  validateWorkflow(body.prompt);const info=await(await request(c,'/object_info')).json();
+  validateWorkflow(body.prompt);const info=await json(await request(c,'/object_info'));
   const missing=[],invalid=[];
   for(const[id,node]of Object.entries(body.prompt)){
    const spec=info[node.class_type];if(!spec){missing.push({id,type:node.class_type});continue;}
@@ -63,6 +64,7 @@ export const comfyui={
  label:'ComfyUI · 自有工作流',
  async status(){const c=settings(),ws=workflows();return {available:c.enabled&&ws.length>0,note:!c.enabled?'未启用连接':!ws.length?'请先导入工作流':'',models:ws.map(w=>w.id),modelLabels:Object.fromEntries(ws.map(w=>[w.id,w.title]))};},
  async run(job,{log,signal}){
+  if(job.upstream)throw new Error('已有上游提交记录，请恢复已有任务或人工核对，不能再次提交');
   const c=settings(),w=workflows().find(w=>w.id===job.model);if(!c.enabled||!w)throw new Error('ComfyUI 连接或工作流不存在');
   const prompt=structuredClone(w.prompt);checkMapping(prompt,w.mapping);
   if(job.inputPath&&!w.mapping.some(m=>m.source==='image'))throw new Error('工作流没有映射原图入口，已停止以免原图被忽略');
@@ -70,7 +72,7 @@ export const comfyui={
   const uploaded=new Map();
   async function upload(file){if(!file)throw new Error('映射需要的原图或参考图不存在');if(uploaded.has(file))return uploaded.get(file);
    const form=new FormData();form.append('image',new Blob([fs.readFileSync(file)]),`psai-${crypto.randomUUID()}.png`);form.append('type','input');
-   const r=await(await request(c,'/upload/image',{method:'POST',body:form,form:true,signal})).json();if(!r.name)throw new Error('ComfyUI 未返回上传文件名');const name=r.subfolder?`${r.subfolder}/${r.name}`:r.name;uploaded.set(file,name);return name;
+   const r=await json(await request(c,'/upload/image',{method:'POST',body:form,form:true,signal}));if(!r.name)throw new Error('ComfyUI 未返回上传文件名');const name=r.subfolder?`${r.subfolder}/${r.name}`:r.name;uploaded.set(file,name);return name;
   }
   const [rw,rh]=job.aspect.split(':').map(Number);const side=job.resolution==='4K'?4096:job.resolution==='1K'?1024:2048;
   for(const m of w.mapping){let v=m.value;
@@ -83,36 +85,55 @@ export const comfyui={
    prompt[m.node].inputs[m.field]=v;
   }
   // Record submission intent before the network request. A timeout must not trigger a blind retry.
-  job.upstream={kind:'comfyui',url:c.url,clientId:crypto.randomUUID(),state:'submitting',workflowId:w.id};persist(job);
+  job.upstream={kind:'comfyui',url:c.url,clientId:crypto.randomUUID(),state:'submitting',workflowId:w.id,outputNode:w.outputNode||'',title:w.title};persist(job);
   log('ComfyUI：提交工作流');
-  const data=await(await request(c,'/prompt',{method:'POST',body:{prompt,client_id:job.upstream.clientId},signal})).json();
-  if(!data.prompt_id)throw new Error(`工作流校验失败：${JSON.stringify(data.node_errors||data.error||{}).slice(0,700)}`);
+  const data=await json(await request(c,'/prompt',{method:'POST',body:{prompt,client_id:job.upstream.clientId},signal}));
+  if(typeof data.prompt_id!=='string'||!/^[a-zA-Z0-9_-]{1,200}$/.test(data.prompt_id))throw new Error('工作流提交未返回有效任务 ID，请核对服务端节点和模型');
   job.upstream.taskId=data.prompt_id;job.upstream.state='submitted';persist(job);
   log(`ComfyUI：等待任务 ${data.prompt_id}`);
-  try{
-   for(let i=0;i<2400;i++){
-    signal.throwIfAborted();
-    const history=await(await request(c,`/history/${encodeURIComponent(data.prompt_id)}`,{signal})).json();const item=history[data.prompt_id];
-    if(item?.status?.status_str==='error')throw new Error('ComfyUI 执行失败，请检查工作流节点和模型');
-    if(item?.outputs){
-     const outputs=w.outputNode?[[w.outputNode,item.outputs[w.outputNode]]]:Object.entries(item.outputs);
-     const images=outputs.flatMap(([node,out])=>(out?.images||[]).map(image=>({node,...image}))).filter(x=>x.type==='output');
-     if(images.length){
-      job.upstream.outputs=images;persist(job);
-      if(images.length!==1)throw new Error(`工作流返回 ${images.length} 张图片，请指定单图输出节点或将批次设为 1；结果保留在 ComfyUI`);
-      const image=images[0],q=new URLSearchParams({filename:image.filename,subfolder:image.subfolder||'',type:image.type||'output'});
-      const r=await request(c,`/view?${q}`,{signal});const buffer=Buffer.from(await r.arrayBuffer());
-      const output=path.join(job.dir,'result-comfyui.png');const info=await sharp(buffer).png().toFile(output);
-      job.upstream.state='downloaded';persist(job);return {path:output,width:info.width,height:info.height,source:`ComfyUI · ${w.title}`};
-     }
-     if(item.status?.completed)throw new Error('工作流已完成，但选定节点没有图像输出');
-    }
-    await pause(signal);
-   }
-   throw new Error('ComfyUI 一小时内未完成，请按任务 ID 在服务端核对');
-  }catch(e){
-   if(signal.aborted){await request(c,'/queue',{method:'POST',body:{delete:[data.prompt_id]}}).catch(()=>{});log('已停止本地等待并移除待执行项；若服务端已经运行，请在 ComfyUI 中停止此任务');}
-   throw e;
-  }
+  return pollComfy(job,{c,log,signal,cancelRemote:true});
+ },
+ async resume(job,{log,signal}){
+  const c=settings();
+  if(job.upstream?.kind!=='comfyui'||typeof job.upstream.taskId!=='string'||!/^[a-zA-Z0-9_-]{1,200}$/.test(job.upstream.taskId))throw new Error('没有可恢复的 ComfyUI 任务 ID');
+  if(c.url!==job.upstream.url)throw new Error('ComfyUI 地址已改变，请恢复原连接后查询已有任务');
+  return pollComfy(job,{c,log,signal,cancelRemote:false});
  },
 };
+
+async function pollComfy(job,{c,log,signal,cancelRemote}){
+ const taskId=job.upstream.taskId;
+ // Old checkpoints can use their saved workflow, but never resubmit it.
+ const w=workflows().find(w=>w.id===job.upstream.workflowId);
+ const outputNode=job.upstream.outputNode??w?.outputNode??'';
+ try{
+  for(let i=0;i<2400;i++){
+   signal.throwIfAborted();
+   const history=await json(await request(c,`/history/${encodeURIComponent(taskId)}`,{signal})),item=history[taskId];
+   if(item?.status?.status_str==='error')throw new Error('ComfyUI 执行失败，请检查工作流节点和模型');
+   // History can contain partial outputs before completion; do not freeze a partial batch.
+   if(item?.outputs&&item.status?.completed!==false){
+    const outputs=outputNode?[[outputNode,item.outputs[outputNode]]]:Object.entries(item.outputs);
+    const images=outputs.flatMap(([node,out])=>(out?.images||[]).map(image=>({node,...image}))).filter(x=>x.type==='output');
+    if(images.length){
+     job.upstream.outputs=images.slice(0,16).map(({node,filename,subfolder,type})=>({node,filename,subfolder,type}));persist(job);
+     return await downloadCandidates(job,images, image=>{
+      const q=new URLSearchParams({filename:image.filename,subfolder:image.subfolder||'',type:'output'});
+      return request(c,`/view?${q}`,{signal});
+     },{signal,source:`ComfyUI · ${job.upstream.title||w?.title||'已有任务'}`});
+    }
+    if(item.status?.completed)throw new Error('工作流已完成，但选定节点没有图像输出');
+   }
+   await pause(signal);
+  }
+  throw new Error('ComfyUI 一小时内未完成，请按任务 ID 在服务端核对');
+ }catch(e){
+  if(signal.aborted){
+   if(cancelRemote){await request(c,'/queue',{method:'POST',body:{delete:[taskId]}}).catch(()=>{});log('已停止本地等待并移除待执行项；若服务端已经运行，请在 ComfyUI 中停止此任务');}
+   else log('已停止本地恢复，未修改上游任务');
+   throw new Error('已取消');
+  }
+  // Network/image decoders may include URLs or response contents in their errors.
+  throw new Error(`ComfyUI 查询或下载失败；已有任务 ID 已保留，请核对服务和输出限制${/超过.*限制/.test(e.message)?'（候选图超过大小限制）':''}`);
+ }
+}

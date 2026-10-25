@@ -1,6 +1,6 @@
 // AI 生图贴回：选区/图层 → 导出 → 交给本机 helper 生图 → 结果放进「生成组」贴回原位置。
 // 预设格式、@param 滑杆、【填空】、剪影分区、贴回羽化的思路来自夏三七「修图轮椅 V6」（GPLv3），见 README。
-const { app, core, action, constants } = require('photoshop');
+const { app, core, action, constants, imaging } = require('photoshop');
 const uxp = require('uxp');
 
 const lfs = uxp.storage.localFileSystem;
@@ -84,7 +84,7 @@ function savePrefs() {
   try { localStorage.setItem(PREF_KEY, JSON.stringify(p)); } catch {}
 }
 function saveGroups() {
-  const slim = groups.slice(0, 30).map((g) => ({ ...g, jobs: g.jobs.map((j) => ({ id: j.id, status: j.status, error: j.error, layerId: j.layerId, placed: j.placed, appliedKey: j.appliedKey, providerLabel: j.providerLabel, placeError: j.placeError })) }));
+  const slim = groups.slice(0, 30).map((g) => ({ ...g, jobs: g.jobs.map((j) => ({ id: j.id, status: j.status, error: j.error, recoverable: j.recoverable, layerId: j.layerId, placed: j.placed, appliedKey: j.appliedKey, providerLabel: j.providerLabel, placeError: j.placeError })) }));
   try { localStorage.setItem(GROUPS_KEY, JSON.stringify(slim)); } catch {}
 }
 
@@ -715,6 +715,7 @@ async function placeJob(g, job) {
   const v = appliedOf(g);
   const file = await writeResult(job, v);
   await core.executeAsModal(async (ctl) => {
+    if(g.session) regionBridge.bound({session:g.session,docId:g.docId,width:g.docWidth,height:g.docHeight});
     const doc = app.documents.find((d) => d.id === g.docId);
     if (!doc) throw new Error('原文档已经关闭，结果在 helper 控制台里');
     if (app.activeDocument.id !== doc.id) app.activeDocument = doc;
@@ -745,6 +746,7 @@ async function applyVariant(g, job, v = appliedOf(g)) {
   const file = await writeResult(job, v);
   await core.executeAsModal(async (ctl) => {
     const doc = app.documents.find((d) => d.id === g.docId);
+    if(g.session)regionBridge.bound({session:g.session,docId:g.docId,width:g.docWidth,height:g.docHeight});
     const old = doc && findLayer(doc, job.layerId);
     if (!old) throw new Error('原图层或文档已关闭，请从历史重新贴回');
     if (app.activeDocument.id !== doc.id) app.activeDocument = doc;
@@ -786,10 +788,11 @@ async function commitGroup(g) {
 }
 
 async function dropChannelIfDone(g) {
-  if (!g.chanName || g.jobs.some((j) => j.status !== 'error' && !j.placed)) return;
+  if (!g.chanName || g.jobs.some((j) => (j.status !== 'error' || j.recoverable) && !j.placed)) return;
   const name = g.chanName;
   g.chanName = null;
   await core.executeAsModal(async () => {
+    if(g.session) regionBridge.bound({session:g.session,docId:g.docId,width:g.docWidth,height:g.docHeight});
     const doc = app.documents.find((d) => d.id === g.docId);
     if (!doc) return;
     if (app.activeDocument.id !== doc.id) app.activeDocument = doc;
@@ -827,6 +830,7 @@ async function selectVariant(g, jobId) {
 async function revealVariant(g, jobId) {
   const job = g.jobs.find((j) => j.id === jobId);
   await core.executeAsModal(async () => {
+    if(g.session) regionBridge.bound({session:g.session,docId:g.docId,width:g.docWidth,height:g.docHeight});
     const doc = app.documents.find((d) => d.id === g.docId);
     if (!doc) throw new Error('原文档已经关闭');
     app.activeDocument = doc;
@@ -851,6 +855,7 @@ function renderGroups() {
     const thumbs = g.jobs.map((j, i) => {
       const sel = g.selected === j.id ? ' selected' : '';
       if (j.status === 'done') return `<div class="thumb${sel}${j.placed ? '' : ' unplaced'}" data-g="${g.id}" data-j="${j.id}" title="${esc(j.providerLabel || g.providerLabel)} · 单击用这张，双击跳到文档"><img src="${HELPER}/jobs/${j.id}/thumb"><span class="tn">${i + 1}</span>${j.placed ? '' : `<span class="tstat">${j.placeError ? '点击重试' : '点击传回'}</span>`}</div>`;
+      if (j.status === 'awaiting-selection') return `<div class="thumb pending" title="请在 PS AI Bridge 桌面端的候选与恢复中选择一张，选择后才会自动贴回"><span class="tn">${i + 1}</span><span class="tstat">待选择候选图</span></div>`;
       const text = j.status === 'error' ? '失败' : (j.stage || '排队中').replace(/^生成中…\s*/, '');
       return `<div class="thumb pending${j.status === 'error' ? ' err' : ''}" title="${esc(j.error || j.stage || '')}"><span class="tn">${i + 1}</span><span class="tstat">${esc(text.slice(0, 14))}</span></div>`;
     }).join('');
@@ -863,6 +868,7 @@ function renderGroups() {
       <div class="job-top"><span class="small">${esc(groupProviderText(g))} · ${g.aspect}${g.resolution ? ' · ' + g.resolution : ''} · ${doneN}/${g.jobs.length}</span><span class="small">${esc(g.docName)}</span></div>
       <div class="job-prompt">${esc(g.title)}</div>
       <div class="thumbs">${thumbs}</div>
+      ${g.jobs.some(j => j.status === 'awaiting-selection') ? '<div class="job-stage">请到 PS AI Bridge 桌面端「候选与恢复」选择一张，选择前不会贴回。</div>' : ''}
       ${errs.length ? `<div class="job-stage error">${esc(errs[0])}</div>` : ''}
       <div class="slider-row"><span class="small slider-label">强度</span><sp-slider min="0" max="100" step="5" value="${st}" data-strength="${g.id}"></sp-slider><span class="small slider-val">${st}%</span></div>
       <div class="job-actions">
@@ -900,15 +906,19 @@ function bindGroupControls() {
 async function pollGroups() {
   for (const g of groups) {
     for (const job of g.jobs) {
-      if (job.placed || job.status === 'error' || job.polling) continue;
+      if (job.placed || (job.status === 'error' && job.recoverable === false) || job.polling) continue;
       if (job.status === 'done' && !g.autoReturn) continue; // 不自动传回：等用户点缩略图
       job.polling = true;
       try {
         if (job.status !== 'done') {
-          const s = await (await fetch(`${HELPER}/jobs/${job.id}`)).json();
+          const response = await fetch(`${HELPER}/jobs/${job.id}`);
+          if (!response.ok) throw new Error('任务状态暂不可读');
+          const s = await response.json();
           job.stage = s.stage;
           job.status = s.status;
           job.error = s.error;
+          job.recoverable = Boolean(['comfyui', 'runninghub'].includes(s.provider) && s.upstream?.taskId);
+          if (s.status === 'awaiting-selection') job.stage = '请到桌面端「候选与恢复」选择一张';
           job.providerLabel = (health && health.providers[s.provider] || {}).label || s.provider;
         }
         if (job.status === 'done' && !job.placed && g.autoReturn && !job.placeError) {
@@ -942,7 +952,7 @@ async function onGroupsClick(e) {
   const act = t.getAttribute('data-act');
   if (act === 'apply') return commitGroup(g);
   if (act === 'cancel') {
-    for (const j of g.jobs) if (j.status === 'queued' || j.status === 'running') await post(`/jobs/${j.id}/cancel`).catch(() => {});
+    for (const j of g.jobs) if (['queued', 'running', 'awaiting-selection'].includes(j.status)) await post(`/jobs/${j.id}/cancel`).catch(() => {});
   } else if (act === 'remove') {
     groups.splice(groups.indexOf(g), 1);
     renderGroups();
@@ -966,9 +976,9 @@ async function renderHistory() {
 }
 
 // 历史结果贴到当前选区（没有选区就贴到原来记下的位置/整张画布）
-async function pasteHistory(jobId) {
+async function pasteHistory(jobId, boundContext = null) {
   const s = await (await fetch(`${HELPER}/jobs/${jobId}`)).json();
-  const ctx = await core.executeAsModal(async () => {
+  const ctx = boundContext || await core.executeAsModal(async () => {
     const doc = app.activeDocument;
     if (!doc) throw new Error('先打开一张图');
     const sel = await selectionBounds(doc.id);
@@ -981,6 +991,7 @@ async function pasteHistory(jobId) {
     }
     return { docId: doc.id, docName: doc.title, layerId: doc.activeLayers[0] ? doc.activeLayers[0].id : null, rect: sel ? fitRect(base, ratio, doc.width, doc.height) : base, chanName, selShort: sel ? Math.min(sel.right-sel.left, sel.bottom-sel.top) : 0 };
   }, { commandName: 'AI 生图：读取位置' });
+  if(boundContext){const prior=groups.find(g=>g.captureId===ctx.captureId&&g.session===ctx.session&&g.docId===ctx.docId&&g.jobs.some(j=>j.id===jobId&&j.placed));if(prior){const doc=app.documents.find(d=>d.id===ctx.docId),job=prior.jobs.find(j=>j.id===jobId);if(doc&&findLayer(doc,job.layerId))return;}}
   const g = {
     id: `h${Date.now()}`, ...ctx, title: s.prompt.slice(0, 40), providerLabel: (health && health.providers[s.provider] || {}).label || s.provider, aspect: s.aspect, resolution: s.resolution,
     jobs: [{ id: s.id, status: 'done', providerLabel: (health && health.providers[s.provider] || {}).label || s.provider }], cc: s.applied?.variant?.cc || s.post?.cc || 'none', tex: Boolean(s.applied?.variant?.tex), strength: (s.applied?.variant?.t ?? 1) * 100, applied: { cc: s.applied?.variant?.cc || s.post?.cc || 'none', tex: Boolean(s.applied?.variant?.tex), strength: (s.applied?.variant?.t ?? 1) * 100 }, autoReturn: true, raster: $('returnAs').value === 'raster', color: $('groupColor').value, shrink: Number($('shrink').value) || 0, blur: Number($('blur').value) || 0,
@@ -989,6 +1000,7 @@ async function pasteHistory(jobId) {
   renderGroups();
   await pollGroups();
   if (g.jobs[0].placeError) throw new Error(g.jobs[0].placeError);
+  if(g.jobs[0].placed&&s.meta?.parameters?.blend){await core.executeAsModal(async()=>{const doc=app.documents.find(d=>d.id===g.docId);const layer=doc&&findLayer(doc,g.jobs[0].layerId);if(!layer)throw new Error('贴回图层已失效');const modes={screen:constants.BlendMode.SCREEN,add:constants.BlendMode.LINEARDODGE,'soft-light':constants.BlendMode.SOFTLIGHT,normal:constants.BlendMode.NORMAL};layer.blendMode=modes[s.meta.parameters.blend]||constants.BlendMode.NORMAL;},{commandName:'AI：应用独立光效混合'});}
 }
 
 // ---------- 生成 ----------
@@ -1012,15 +1024,19 @@ async function startGeneration(o = {}) {
     maskWithSelection: $('maskWithSelection').checked,
     maxSide: resolution === '4K' ? 3072 : 2048,
   });
+  let durableCapture=null;
+  const originDoc=app.documents.find(d=>d.id===ctx.docId);
+  if(originDoc && ctx.rect.left>=0 && ctx.rect.top>=0 && ctx.rect.right<=originDoc.width && ctx.rect.bottom<=originDoc.height && originDoc.width*originDoc.height<=40000000)durableCapture=await regionBridge.execute({type:'capture-region',target:{session:regionBridge.session,docId:originDoc.id,width:originDoc.width,height:originDoc.height,name:originDoc.title},rect:ctx.rect,useSelection:$('maskWithSelection').checked,title:originDoc.title});
+  else remoteLog('原图尺寸或扩展画布超出区域存储范围，此任务重开文档后需重新选区贴回');
   const uploadId = ctx.bytes ? await uploadBytes(ctx.bytes) : undefined;
   const useFallback = o.fallback != null ? o.fallback : $('fallback').checked;
   const fallbacks = useFallback
-    ? Object.entries(health.providers).filter(([k, p]) => k !== providerKey && p.available && !/api$/.test(k)).map(([k]) => k)
+    ? Object.entries(health.providers).filter(([k, p]) => k !== providerKey && p.available && ['aistudio','flow','chatgpt','codex','agy'].includes(k)).map(([k]) => k)
     : [];
   // 组名用预设名（调过参数也算这个预设），没有预设就用提示词开头
   const title = (o.title || (o.prompt == null && currentPreset ? currentPreset.title : rawPrompt.replace(/\s+/g, ' '))).slice(0, 40);
   const g = {
-    id: `g${Date.now()}`, docId: ctx.docId, docName: ctx.docName, layerId: ctx.layerId, rect: ctx.rect, chanName: ctx.chanName,
+    id: `g${Date.now()}`, session:regionBridge.session, docWidth:app.documents.find(d=>d.id===ctx.docId)?.width, docHeight:app.documents.find(d=>d.id===ctx.docId)?.height, docId: ctx.docId, docName: ctx.docName, layerId: ctx.layerId, rect: ctx.rect, chanName: ctx.chanName,
     selShort: ctx.selShort, shrink: Number($('shrink').value), blur: Number($('blur').value), cc: $('cc').value,
     tex: $('tex').checked, strength: 100, autoReturn: $('autoReturn').checked, raster: $('returnAs').value === 'raster', color: $('groupColor').value,
     title, providerLabel: (health.providers[providerKey] || {}).label || providerKey, aspect: ctx.aspect, resolution, jobs: [],
@@ -1037,7 +1053,7 @@ async function startGeneration(o = {}) {
     fallbacks,
     post: { align: $('align').checked, cc: $('cc').value },
     groupId: g.id,
-    meta: { docName: ctx.docName, rect: ctx.rect, focus: ctx.focus, title, origin: o.origin || 'ps' },
+    meta: { captureId:durableCapture?.id||null, target:durableCapture?.target||null, docName: ctx.docName, rect: ctx.rect, focus: ctx.focus, title, origin: o.origin || 'ps' },
   };
   for (let i = 0; i < count; i++) {
     const r = await post('/jobs', { ...body, sound: $('sound').checked && i === count - 1 });
@@ -1066,10 +1082,13 @@ async function onGenerate() {
   }
 }
 
+const regionBridge = require('./region-bridge.js')({app,core,action,constants,imaging,lfs,formats,HELPER,HEADERS,post,tempFile,uploadBytes,pasteHistory,restoreSelectionAfter});
+
 // 桌面端发来的指令（helper 转交）：用 PS 选区当原图在桌面端生成，或把桌面端里的一张结果贴到当前选区
 async function runCommand(cmd) {
   let reply;
   try {
+    if(cmd.expiresAt && Date.now()>cmd.expiresAt)throw new Error('指令已超时，未执行；请重新发起');
     if (cmd.type === 'generate') {
       const r = await startGeneration({ ...(cmd.options || {}), origin: 'desktop' });
       hint(`桌面端提交了 ${r.jobIds.length} 张：区域 ${r.width}×${r.height}，比例 ${r.aspect}。出图后自动贴回。`);
@@ -1079,7 +1098,7 @@ async function runCommand(cmd) {
       hint('已把桌面端选的结果贴到当前选区');
       reply = { ok: true };
     } else {
-      reply = { ok: false, error: `未知指令：${cmd.type}` };
+      reply = { ok: true, result: await regionBridge.execute(cmd) };
     }
   } catch (err) {
     hint(errText(err), true);
@@ -1284,6 +1303,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 本机快捷键：Carbon 注册，仅 PS 前台 + 面板会话在线时有效。
 const shortcutSession = 'ps_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+let bridgeCommandQueue=Promise.resolve();
 let shortcutPolling = false;
 let shortcutLoaded = false;
 async function shortcutRequest(route, body) {
@@ -1304,7 +1324,7 @@ async function pollShortcut() {
     if (!shortcutLoaded) { $('shortcutValue').value = state.shortcut; $('shortcutEnabled').checked = state.enabled; shortcutLoaded = true; }
     showShortcutState(state);
     // 桌面端的指令不等它做完，轮询照常继续（心跳断了快捷键会被释放）
-    if (state.command) runCommand(state.command);
+    if (state.command) bridgeCommandQueue=bridgeCommandQueue.then(()=>runCommand(state.command)).catch(e=>remoteLog(errText(e),'error'));
     if (state.fire && !$('generate').disabled) { remoteLog('快捷键已收到：' + state.shortcut); await onGenerate(); }
   } catch (e) { $('shortcutStatus').textContent = '快捷键未连接：' + e.message; }
   finally { shortcutPolling = false; }
@@ -1316,3 +1336,7 @@ function initShortcuts() {
   });
   pollShortcut(); setInterval(pollShortcut, 300);
 }
+
+document.addEventListener('DOMContentLoaded',()=>{
+const sharedSettingSync=require('./shared-settings.js')({request:async(method,p,b)=>{const r=await fetch(HELPER+p,{method,headers:{...HEADERS,'content-type':'application/json'},...(b?{body:JSON.stringify(b)}:{})});const d=await r.json();if(!r.ok)throw new Error(d.error);return d;},ready:()=>!!health,onProvider:refreshOptions,onError:e=>remoteLog('共享设置：'+errText(e),'error')});
+});

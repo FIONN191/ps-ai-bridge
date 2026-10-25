@@ -1,0 +1,19 @@
+.model-tools-card { min-width: 0; }
+.model-tools-card textarea { box-sizing: border-box; width: 100%; min-height: 7rem; resize: vertical; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; line-height: 1.5; }
+.model-tools-card pre, #engineCatalog, #engineTrash { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24rem; overflow: auto; font-size: 12px; }
+.model-tools-card .row { flex-wrap: wrap; }
+.model-tools-card .row .field { flex: 1; min-width: 120px; }
+.model-tools-card details { margin: 10px 0; }
+.model-tools-card [role="status"]:empty { display: none; }
+.engine-trash-item { margin-block: 8px; }
+.mt-preview { position: relative; min-height: 120px; margin-top: 12px; overflow: hidden; border-radius: 8px; background: repeating-conic-gradient(#292e36 0% 25%, #363d48 0% 50%) 50% / 16px 16px; }
+.mt-preview canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+.mt-preview canvas.mt-disabled { cursor: not-allowed; }
+.mt-preview #mtEmpty { position: absolute; inset: 40% 12px auto; text-align: center; pointer-events: none; }
+.mt-point-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.mt-point-list .mt-positive { border-color: #249c68; }
+.mt-point-list .mt-negative { border-color: #df6279; }
+.mt-parts { display: grid; grid-template-columns: minmax(0, 1fr) 48px 48px; gap: 7px 10px; align-items: center; margin-block: 10px; }
+.mt-parts input { justify-self: center; }
+.mt-parts small { opacity: .7; }
+#mtBindingSupport { overflow-wrap: anywhere; }

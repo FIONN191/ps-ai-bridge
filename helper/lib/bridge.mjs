@@ -37,7 +37,7 @@ export function request(cmd, timeoutMs = 120000) {
       reject(new Error('Photoshop 没有响应（可能有对话框开着，或正在执行别的操作）'));
     }, timeoutMs);
     waiting.set(id, { resolve, reject, timer });
-    pending.push({ ...cmd, id });
+    pending.push({ ...cmd, id, expiresAt: Date.now()+timeoutMs });
   });
 }
 

@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import sharp from 'sharp';
 import {DATA_DIR} from './paths.mjs';
 import {atomicJson,readJson,recordId} from './store.mjs';
-import {useUpload,saveUpload,createJob,getJob,listJobs,cancelJob,variantPath,appliedVariant,createLocalResult} from './jobs.mjs';
+import {useUpload,saveUpload,createJob,getJob,listJobs,cancelJob,variantPath,appliedVariant,createLocalResult,canRecoverJob} from './jobs.mjs';
 import {planTiles,mergeTiles} from './tiles.mjs';
 
 export function createRuns({providers,capabilities}) {
@@ -18,17 +18,23 @@ export function createRuns({providers,capabilities}) {
     if(busy)return;busy=true;
     try {for(const r of list().filter(r=>r.status==='running')){
       try {
-        const active=r.steps.find(s=>s.status==='running');
+        const active=r.steps.find(s=>['running','awaiting-selection','awaiting-recovery'].includes(s.status));
         if(active){
           const job=getJob(active.jobId);
           if(job&&['running','queued'].includes(job.status))continue;
+          if(job?.status==='awaiting-selection'){
+            if(active.status!=='awaiting-selection'){active.status='awaiting-selection';r.note='请在候选与恢复中明确选择此步结果，后续步骤尚未提交';save(r);}continue;
+          }
+          if(canRecoverJob(job,providers)){
+            active.status='awaiting-recovery';r.status='paused';r.note='请在候选与恢复中恢复已有任务，然后继续流程；不会重新提交';save(r);continue;
+          }
           if(!job||job.status!=='done'){
             active.status='error';active.error=job?.error||'任务不存在，需要人工核对';r.status='needs-attention';save(r);continue;
           }
           // Pin the exact completed version. Later manual edits cannot silently change downstream inputs.
           active.outputPath=path.join(folder(r.id),`${active.id}-output.png`);
           await sharp(await variantPath(job,appliedVariant(job))).png().toFile(active.outputPath);
-          active.status='done';active.finishedAt=Date.now();save(r);
+          active.status='done';active.finishedAt=Date.now();r.note='';save(r);
           if(r.reviewEach && r.steps.some(s=>s.status==='pending')){r.status='paused';r.note='此步完成，查看结果后点击继续';save(r);continue;}
         }
         const next=r.steps.find(s=>s.status==='pending');
@@ -96,9 +102,16 @@ export function createRuns({providers,capabilities}) {
     // Serialize controls with the tick's asynchronous file writes, so pause/cancel cannot be overwritten.
     while(busy)await new Promise(resolve=>setTimeout(resolve,20));
     const r=readJson(path.join(folder(parts[1]),'run.json'),null);if(!r)throw new Error('流程不存在');
+    // A recovered job can outlive an older run checkpoint that recorded it as failed.
+    // Reattach that same job rather than resetting its step and charging for another submission.
+    if(['start','retry'].includes(parts[2]))for(const s of r.steps)if(s.status==='error'){
+      const job=getJob(s.jobId);
+      if(job&&['done','running','queued','awaiting-selection'].includes(job.status)){s.status='running';s.error=null;}
+      else if(canRecoverJob(job,providers)){s.status='awaiting-recovery';s.error=null;}
+    }
     if(parts[2]==='start'){if(['cancelled','done'].includes(r.status))throw new Error('流程已结束');if(r.steps.some(s=>s.status==='error'))throw new Error('请先核对失败步骤，再重试');r.status='running';r.note='';}
     else if(parts[2]==='pause')r.status='paused';
-    else if(parts[2]==='cancel'){r.status='cancelled';for(const s of r.steps){if(s.status==='running')cancelJob(s.jobId);if(['running','pending'].includes(s.status))s.status='cancelled';}}
+    else if(parts[2]==='cancel'){r.status='cancelled';for(const s of r.steps){if(['running','awaiting-selection','awaiting-recovery'].includes(s.status))cancelJob(s.jobId);if(['running','pending','awaiting-selection','awaiting-recovery'].includes(s.status))s.status='cancelled';}}
     else if(parts[2]==='retry'){
       if(body.verified!==true)throw new Error('请先核对外部服务中失败任务的实际状态，避免重复执行');
       if(r.status==='cancelled')throw new Error('已取消的流程不能重新提交');

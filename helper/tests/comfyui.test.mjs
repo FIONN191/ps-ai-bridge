@@ -8,13 +8,13 @@ import sharp from 'sharp';
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'psai-comfy-'));process.env.PS_AI_BRIDGE_DATA_DIR=dir;
 const {comfyRoutes,comfyui,validateWorkflow}=await import('../providers/comfyui.mjs');
 const buf=await sharp({create:{width:8,height:12,channels:3,background:'red'}}).png().toBuffer();
-let submitted=null;
+let submitted=null,count=1,requests=[],malformed=false;
 const server=http.createServer(async(req,res)=>{
- const chunks=[];for await(const c of req)chunks.push(c);
+ requests.push({url:req.url,method:req.method});const chunks=[];for await(const c of req)chunks.push(c);
  res.setHeader('content-type','application/json');
  if(req.url==='/upload/image')return res.end(JSON.stringify({name:'source.png',subfolder:'',type:'input'}));
- if(req.url==='/prompt'){submitted=JSON.parse(Buffer.concat(chunks));return res.end(JSON.stringify({prompt_id:'remote-one'}));}
- if(req.url==='/history/remote-one')return res.end(JSON.stringify({'remote-one':{outputs:{'3':{images:[{filename:'result.png',subfolder:'',type:'output'}]}},status:{completed:true}}}));
+ if(req.url==='/prompt'){if(malformed)return res.end('invalid test-secret response');submitted=JSON.parse(Buffer.concat(chunks));return res.end(JSON.stringify({prompt_id:'remote-one'}));}
+ if(req.url==='/history/remote-one')return res.end(JSON.stringify({'remote-one':{outputs:{'3':{images:Array.from({length:count},(_,i)=>({filename:`result-${i}.png`,subfolder:'',type:'output'}))}},status:{completed:true}}}));
  if(req.url.startsWith('/view?'))return res.end(buf);
  if(req.url==='/system_stats')return res.end(JSON.stringify({devices:[{name:'test'}]}));
  res.statusCode=404;res.end('{}');
@@ -36,5 +36,31 @@ test('ComfyUI uploads and maps the image and prompt, persists task ID, downloads
 test('workflow canvas JSON and invalid mapping fail before execution',async()=>{
  assert.throws(()=>validateWorkflow({nodes:[]}),/API/);
  await assert.rejects(()=>post('save',{title:'bad',prompt,mapping:[{node:'999',field:'x',source:'image'}]}),/映射/);
+});
+test('multiple ComfyUI images are checkpointed and resume only polls/downloads the persisted task',async()=>{
+ count=2;const w=(await comfyRoutes('GET',['comfyui'],{})).workflows[0];
+ const target=path.join(dir,'multiple');fs.mkdirSync(target);
+ const job={id:'multi',dir:target,provider:'comfyui',model:w.id,prompt:'edit',refPaths:[],aspect:'1:1',resolution:'1K'};
+ // The workflow image input is optional when there is no local source.
+ job.inputPath=path.join(dir,'input.png');
+ const signal=new AbortController().signal;
+ const out=await comfyui.run(job,{signal,log:()=>{}});
+ assert.equal(out.candidates.length,2);assert.equal(job.result,undefined);
+ assert.equal(job.candidatesReady,true);
+ const before=requests.length;
+ const result=await comfyui.resume(job,{signal,log:()=>{}});
+ assert.equal(result.candidates.length,2);assert.deepEqual(requests.slice(before),[{url:'/history/remote-one',method:'GET'}]);
+ await assert.rejects(()=>comfyui.run(job,{signal,log:()=>{}}),/再次提交/);
+ await assert.rejects(()=>comfyui.resume({...job,upstream:{...job.upstream,url:'http://changed.example'}},{signal,log:()=>{}}),/地址已改变/);
+ const abort=new AbortController();abort.abort();const n=requests.length;
+ await assert.rejects(()=>comfyui.resume(job,{signal:abort.signal,log:()=>{}}),/已取消/);
+ assert.equal(requests.length,n);
+});
+test('malformed ComfyUI submission does not leak response credentials or invent a task ID',async()=>{
+ malformed=true;const w=(await comfyRoutes('GET',['comfyui'],{})).workflows[0],target=path.join(dir,'malformed');fs.mkdirSync(target);
+ const job={id:'malformed',dir:target,model:w.id,inputPath:path.join(dir,'input.png'),refPaths:[],prompt:'edit',aspect:'1:1'};
+ await assert.rejects(()=>comfyui.run(job,{signal:new AbortController().signal,log:()=>{}}),e=>!e.message.includes('test-secret')&&e.message.includes('无效数据'));
+ assert.equal(job.upstream.state,'submitting');assert.equal(job.upstream.taskId,undefined);
+ assert.ok(!fs.readFileSync(path.join(target,'job.json'),'utf8').includes('test-secret'));
 });
 test.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));fs.rmSync(dir,{recursive:true,force:true});});

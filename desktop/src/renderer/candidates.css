@@ -1,0 +1,14 @@
+#tab-candidates .candidate-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+#tab-candidates .candidate-card {
+  margin: 0;
+  max-width: 260px;
+}
+#tab-candidates .candidate-image {
+  max-width: 240px;
+  max-height: 220px;
+  object-fit: contain;
+}

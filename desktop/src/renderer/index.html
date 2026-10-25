@@ -7,6 +7,12 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="workspace.css">
 <link rel="stylesheet" href="manager.css">
+<link rel="stylesheet" href="candidates.css">
+<link rel="stylesheet" href="library.css">
+<link rel="stylesheet" href="creative.css">
+<link rel="stylesheet" href="model-tools.css">
+<link rel="stylesheet" href="organizer.css">
+<link rel="stylesheet" href="assistant-workbench.css">
 </head>
 <body>
 <nav class="topbar">
@@ -76,7 +82,8 @@
       <label class="field" id="thinkingField"><span class="lbl">思考强度</span><select id="thinking"></select></label>
       <label class="field"><span class="lbl">张数</span><select id="count"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
     </div>
-    <label class="check"><input type="checkbox" id="fallback" checked> 失败自动换平台</label>
+    <label class="check"><input type="checkbox" id="fallback" checked> 失败自动换网页 / CLI 平台</label>
+    <label class="check"><input type="checkbox" id="sound" checked> 任务提示音（完成 / 失败 / 待选图）</label>
     <p class="small-note acc-warn" id="providerNote" hidden></p>
 
     <div class="gen-actions">
@@ -174,6 +181,7 @@
     <div class="version-row">
       <span id="updateText" class="mute">自动检查更新</span>
       <button id="checkUpdate">检查更新</button>
+      <button class="link" id="githubUpdateDownload">GitHub 下载</button>
     </div>
     <label class="check"><input type="checkbox" id="openAtLogin"> 开机时自动启动（只在后台运行）</label>
     <div class="actions">
@@ -283,6 +291,8 @@
     <div class="up-progress" id="upProgress" hidden><div class="up-bar"><i id="upBar"></i></div><span id="upPct"></span></div>
     <p class="up-msg" id="upMsg" hidden></p>
     <div class="modal-actions">
+      <button class="link" id="upGithub">GitHub 下载</button>
+      <button id="upOpenInstaller" hidden>打开已下载安装包</button>
       <button class="link" id="upSkip">跳过这个版本</button>
       <span class="spacer"></span>
       <button id="upLater">以后再说</button>
@@ -386,6 +396,17 @@
 <script src="runs.js"></script>
 <script src="api-settings.js"></script>
 <script src="channels.js"></script>
+<script src="regions.js"></script>
+<script src="retouch.js"></script>
+<script src="shared-settings.js"></script>
+<script src="shared-settings-init.js"></script>
+<script src="library.js"></script>
+<script src="creative.js"></script>
+<script src="model-tools.js"></script>
+<script src="organizer.js"></script>
+<script src="storage.js"></script>
+<script src="assistant-workbench.js"></script>
+<script src="candidates.js"></script>
 <script src="accounts.js"></script>
 <script src="updates.js"></script>
 </body>

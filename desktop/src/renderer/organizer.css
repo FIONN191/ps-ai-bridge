@@ -1,0 +1,52 @@
+/* Organizer only adds layout overrides; native transparency belongs to BrowserWindow IPC. */
+:root[data-org-theme="dark"] { --bg:#161615; --card:#1f1f1d; --fg:#ecebe6; --mute:#9b9a93; --line:#33332f; --ok:#5cc28b; --err:#ff8a80; --accent:#8f78ff; --notice:#26213d; }
+:root[data-org-theme="light"] { --bg:#f6f6f4; --card:#fff; --fg:#1d1d1b; --mute:#6b6b66; --line:#e3e2dd; --ok:#1f7a4a; --err:#b3261e; --accent:#5b3fd6; --notice:#f1edff; }
+.org-page { padding:16px 20px 30px; max-width:1500px; margin:auto; }
+.org-page[hidden] { display:none!important; }
+.org-page > .card { margin:0 0 14px; }
+.org-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:10px 0; }
+.org-toolbar h2 { margin-right:auto; align-self:center; }
+.org-page label { display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--mute); }
+.org-page label:has(input[type="checkbox"]) { flex-direction:row; align-items:center; color:var(--fg); }
+.org-page input:not([type="checkbox"]), .org-page select, .org-page textarea { font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:8px; max-width:100%; }
+.org-page textarea { width:100%; resize:vertical; user-select:text; }
+.org-page :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.org-page .org-list { display:grid; gap:6px; max-height:480px; overflow:auto; margin:12px 0; }
+.org-page article { padding:10px 0; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
+.org-list article { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.org-list article > div:first-child { min-width:0; }
+.org-list small { display:block; color:var(--mute); user-select:text; }
+.org-message { min-height:1.5em; color:var(--mute); overflow-wrap:anywhere; }
+.org-message.err { color:var(--err); }
+.org-page pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:280px; overflow:auto; user-select:text; }
+.org-preview { display:block; max-width:100%; max-height:480px; object-fit:contain; margin:12px auto; background:repeating-conic-gradient(#8882 0% 25%,transparent 0% 50%) 0/18px 18px; }
+.org-preview[hidden] { display:none; }
+.org-page details { border-top:1px solid var(--line); padding-top:14px; margin-top:14px; }
+.org-page summary { cursor:pointer; }
+.org-calendar { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px; margin-top:12px; }
+.org-calendar > strong { padding:6px; text-align:center; color:var(--mute); }
+.org-day { border:1px solid var(--line); border-radius:6px; min-height:75px; padding:6px; overflow-wrap:anywhere; }
+.org-day > span { display:block; font-size:12px; color:var(--mute); }
+.org-day button { display:block; width:100%; font-size:11px; padding:3px; text-align:left; margin-top:3px; }
+.org-today { border-color:var(--accent); background:var(--notice); }
+:root[data-org-mode="compact"] .org-page { max-width:900px; padding:8px; }
+:root[data-org-mode="compact"] .card { padding:10px; }
+:root[data-org-mode="compact"] .org-list article { padding:6px 0; }
+:root[data-org-mode="compact"] header { padding:8px; }
+:root[data-org-mode="compact"] .org-preview { max-height:300px; }
+@media(max-width:650px) { .org-page { padding:8px; } .org-list article { flex-wrap:wrap; } .org-day { min-height:55px; padding:3px; } .org-toolbar label { flex:1 1 130px; } }
+/* Reserve the native view's entire width, including at renderer-only zoom. */
+body.org-reference-open { margin-right:var(--org-reference-width,0px); }
+body.org-reference-open .viewer, body.org-reference-open .modal { right:var(--org-reference-width,0px); }
+body.org-reference-open .tab.work { grid-template-columns:minmax(240px,42%) minmax(0,1fr); }
+.org-page { width:100%; min-width:0; overflow-y:auto; }
+.topbar .tabs:has([data-tab="organizer"]) { min-width:0; overflow-x:auto; flex-shrink:1; }
+.topbar:has(.org-reference-toolbar:not([hidden])) { gap:6px; }
+.org-reference-toolbar { display:flex; flex:none; gap:6px; align-items:center; white-space:nowrap; font-size:11px; }
+.org-reference-toolbar[hidden] { display:none; }
+.org-page button[aria-busy="true"] { opacity:.6; cursor:progress; }
+.topbar .tab-btn { white-space:nowrap; flex-shrink:0; }
+.topbar .tabs:has([data-tab="organizer"]) { scrollbar-width:none; }
+body.org-reference-open .topbar { flex-wrap:wrap; height:auto; min-height:48px; padding:6px 12px; }
+body.org-reference-open .topbar .tabs { order:1; flex:1 0 100%; }
+body.org-reference-open .topbar .link, body.org-reference-open .topbar .status { white-space:nowrap; }

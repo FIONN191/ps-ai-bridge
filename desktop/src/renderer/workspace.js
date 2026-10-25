@@ -42,6 +42,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- 顶栏标签 ----------
 function showTab(name) {
+  if(!document.getElementById(`tab-${name}`))return; // Dynamic modules may not have mounted yet.
   for (const b of document.querySelectorAll('.tab-btn')) b.classList.toggle('active', b.dataset.tab === name);
   for (const pane of document.querySelectorAll('.tab[id^="tab-"]')) pane.hidden = pane.id !== `tab-${name}`;
   document.dispatchEvent(new CustomEvent('workspace-tab', { detail: name }));
@@ -49,6 +50,7 @@ function showTab(name) {
   if (name === 'work') refreshJobs();
 }
 for (const b of document.querySelectorAll('.tab-btn')) b.addEventListener('click', () => showTab(b.dataset.tab));
+document.addEventListener('DOMContentLoaded',()=>{try{const saved=localStorage.getItem(TAB_KEY);if(saved)showTab(saved);}catch{}});
 
 // ---------- 平台和选项 ----------
 function fillSelect(sel, items, value) {
@@ -331,14 +333,14 @@ async function generate() {
       // 原图比例和出图比例基本一致时才做快速对齐，否则两张图对不上
       const align = Boolean(input) && Math.abs(Math.log(ratioOf(aspect) / ratio)) < 0.03;
       const fallbacks = opts.fallback
-        ? Object.entries(h.providers).filter(([k, p]) => k !== provider && p.available && !/api$/.test(k)).map(([k]) => k)
+        ? Object.entries(h.providers).filter(([k, p]) => k !== provider && p.available && ['aistudio','flow','chatgpt','codex','agy'].includes(k)).map(([k]) => k)
         : [];
       const body = {
         provider, model: opts.model, prompt: buildPrompt(raw, Boolean(input), refUploadIds.length, keep), aspect,
         resolution: opts.resolution || '2K', thinking: opts.thinking || 'High', uploadId: input?.uploadId, refUploadIds, fallbacks,
         post: { align, cc: 'none' }, groupId: `d${Date.now()}`, meta: { origin: 'desktop', title, fileName: input?.name || null },
       };
-      for (let i = 0; i < count; i++) await api('POST', '/jobs', body);
+      for (let i = 0; i < count; i++) await api('POST', '/jobs', {...body,sound:$('sound').checked && i===count-1});
       genHint(`已提交 ${count} 张，比例 ${aspect}`);
     }
     refreshJobs();
@@ -425,9 +427,10 @@ function renderGroups() {
   }
   $('groups').innerHTML = groups.map((g) => {
     const j0 = g.jobs[0];
-    const busy = g.jobs.some((j) => j.status === 'queued' || j.status === 'running');
+    const busy = g.jobs.some((j) => ['queued', 'running', 'awaiting-selection'].includes(j.status));
     const thumbs = g.jobs.map((j, i) => {
       if (j.status === 'done') return `<button class="thumb" data-g="${esc(g.id)}" data-j="${esc(j.id)}" title="${esc(providerLabel(j.provider))}"><img src="${url(`/jobs/${j.id}/thumb`)}" alt=""><span class="n">${i + 1}</span></button>`;
+      if (j.status === 'awaiting-selection') return `<button class="thumb pending" data-review-candidates="${esc(j.id)}" title="打开候选与恢复，选择一张后继续"><span>待选择候选图</span><small>点击查看并选择</small></button>`;
       if (j.status === 'error') return `<div class="thumb failed" title="${esc(j.error)}"><span>失败</span><small>${esc(j.error)}</small></div>`;
       return `<div class="thumb pending"><div class="spin"></div><span>${esc(j.stage || '排队中')}</span></div>`;
     }).join('');
@@ -471,13 +474,14 @@ async function rerun(jobs) {
 }
 
 $('groups').addEventListener('click', (e) => {
+  if (e.target.closest('[data-review-candidates]')) return showTab('candidates');
   const thumb = e.target.closest('.thumb[data-j]');
   if (thumb) return openViewer(thumb.dataset.g, thumb.dataset.j);
   const g = groupsOf(work.jobs).find((x) => x.id === (e.target.dataset.cancel || e.target.dataset.rerun));
   if (!g) return;
   if (e.target.dataset.cancel) {
     action(async () => {
-      for (const j of g.jobs) if (j.status === 'queued' || j.status === 'running') await api('POST', `/jobs/${j.id}/cancel`);
+      for (const j of g.jobs) if (['queued', 'running', 'awaiting-selection'].includes(j.status)) await api('POST', `/jobs/${j.id}/cancel`);
       refreshJobs();
     });
   } else {

@@ -14,7 +14,7 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 // ---------- 读写 ----------
 async function rgb(file, W, H) {
-  return sharp(file).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  return sharp(file).resize(W, H, { fit: 'fill' }).toColourspace('srgb').removeAlpha().raw().toBuffer();
 }
 const rawOpts = (W, H) => ({ raw: { width: W, height: H, channels: 3 } });
 async function blurRGB(buf, W, H, sigma) {
@@ -61,28 +61,34 @@ function sampleField(f, u, v) {
 }
 
 // dst(x) = src(x + k·d(x))，双线性采样
-function warp(src, W, H, field, k = 1) {
-  const dst = Buffer.alloc(W * H * 3);
+function warp(src, W, H, field, k = 1, channels = 3) {
+  const dst = Buffer.alloc(W * H * channels);
   for (let y = 0; y < H; y++) {
     const v = H > 1 ? y / (H - 1) : 0;
     for (let x = 0; x < W; x++) {
       const d = sampleField(field, W > 1 ? x / (W - 1) : 0, v);
-      const dx = d[0];
-      const dy = d[1];
-      const sx = clamp(x + k * dx, 0, W - 1.001);
-      const sy = clamp(y + k * dy, 0, H - 1.001);
-      const x0 = Math.floor(sx);
-      const y0 = Math.floor(sy);
-      const ax = sx - x0;
-      const ay = sy - y0;
-      const p00 = (y0 * W + x0) * 3;
-      const p10 = p00 + 3;
-      const p01 = p00 + W * 3;
-      const p11 = p01 + 3;
-      const o = (y * W + x) * 3;
-      for (let c = 0; c < 3; c++) {
-        dst[o + c] = (src[p00 + c] * (1 - ax) + src[p10 + c] * ax) * (1 - ay) + (src[p01 + c] * (1 - ax) + src[p11 + c] * ax) * ay;
+      // RGBA uses transparent samples beyond the image; RGB keeps legacy edge extension.
+      const sx = channels === 4 ? x + k * d[0] : clamp(x + k * d[0], 0, W - 1);
+      const sy = channels === 4 ? y + k * d[1] : clamp(y + k * d[1], 0, H - 1);
+      const x0 = Math.floor(sx), y0 = Math.floor(sy), ax = sx - x0, ay = sy - y0;
+      const o = (y * W + x) * channels;
+      let alpha = 0, red = 0, green = 0, blue = 0;
+      for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 2; xx++) {
+        const px = channels === 4 ? x0 + xx : Math.min(W - 1, x0 + xx);
+        const py = channels === 4 ? y0 + yy : Math.min(H - 1, y0 + yy);
+        if (px < 0 || py < 0 || px >= W || py >= H) continue;
+        const p = (py * W + px) * channels;
+        const weight = (xx ? ax : 1 - ax) * (yy ? ay : 1 - ay);
+        // Interpolate associated colours, then unpremultiply once. Invisible RGB
+        // must not bleed into a soft edge when a transparent image moves.
+        const a = channels === 4 ? src[p + 3] / 255 : 1;
+        alpha += a * weight;
+        red += src[p] * a * weight; green += src[p + 1] * a * weight; blue += src[p + 2] * a * weight;
       }
+      if (alpha > 0) {
+        dst[o] = Math.round(red / alpha); dst[o + 1] = Math.round(green / alpha); dst[o + 2] = Math.round(blue / alpha);
+      }
+      if (channels === 4) dst[o + 3] = Math.round(alpha * 255);
     }
   }
   return dst;
@@ -230,13 +236,17 @@ export async function alignOutput(inputPath, outputPath, focus, outPath) {
       const m = matchBlock(I, O, w, h, cx, cy, half, radius, [gdx, gdy]);
       if (m.gain > 0.08) { ldx = (m.dx - gdx) * wgt; ldy = (m.dy - gdy) * wgt; localTiles++; }
     }
-    field.dx[gy * field.gw + gx] = (gdx + ldx) / k;
-    field.dy[gy * field.gw + gx] = (gdy + ldy) / k;
+    field.dx[gy * field.gw + gx] = (gdx + ldx) * W / w;
+    field.dy[gy * field.gw + gx] = (gdy + ldy) * H / h;
   }
   smoothField(field, 1);
   const applied = globalOn || localTiles > 0;
   if (!applied) return { applied: false, path: outputPath };
-  await savePNG(warp(Obuf, W, H, field), W, H, outPath);
+  if (meta.hasAlpha) {
+    // Keep RGBA together: extractChannel(alpha) is one channel, never RGB.
+    const rgba = await sharp(outputPath).toColourspace('srgb').ensureAlpha().raw().toBuffer();
+    await sharp(warp(rgba, W, H, field, 1, 4), { raw: { width: W, height: H, channels: 4 } }).png().toFile(outPath);
+  } else await savePNG(warp(Obuf, W, H, field), W, H, outPath);
   return { applied: true, scale: G.s, shift: { x: G.tx / w, y: G.ty / h }, localTiles, path: outPath };
 }
 

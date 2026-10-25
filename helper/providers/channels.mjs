@@ -20,7 +20,7 @@ const GRSMODELS = {
  'grs-gpt': ['gpt-image-2', 'gpt-image-2-vip', 'gpt-image-2.5', 'gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'],
 };
 const defaultState = () => ({ schema: 1, revision: 0, assistId: '', profiles: ['momo', 'grs'].map(kind => ({ id: kind, kind, title: CHANNEL_PRESETS[kind].title, url: CHANNEL_PRESETS[kind].urls[0], protocol: CHANNEL_PRESETS[kind].protocol, model: CHANNEL_PRESETS[kind].model, models: kind === 'grs' ? GRSMODELS['grs-banana'] : [], textModel: '', key: '', enabled: true })) });
-const settings = () => readJson(file, defaultState());
+const settings = () => {const state=readJson(file, defaultState());return {...state,profiles:state.profiles.map(p=>({modelLabels:{},hiddenModels:[],...p,concurrency:Number.isInteger(p.concurrency)&&p.concurrency>=1&&p.concurrency<=4?p.concurrency:1}))};};
 const safeProfile = ({key, ...p}) => ({...p, hasKey: !!key});
 const imageModel = id => /image|banana|imagen|flux|dall-e|sdxl|stable-diffusion/i.test(id);
 const modelId = v => {const s = String(v || '').trim().replace(/^models\//, ''); if (s.length > 200 || /[\s?#\\]/.test(s)) throw new Error('模型 ID 无效'); return s;};
@@ -57,6 +57,25 @@ async function balance(c) {
  catch(e){if(e.status===404||e.status===405)throw new Error('此渠道不支持 New API 额度查询，请到服务商控制台查看');throw e;}
 }
 let syncRegistry=()=>{};
+// Display preferences are profile-local; provider requests still use the original IDs.
+function modelSettings(body,old,models,model) {
+ const has=name=>Object.prototype.hasOwnProperty.call(body,name);
+ const concurrency=has('concurrency')?body.concurrency:old?.concurrency??1;
+ if(!Number.isInteger(concurrency)||concurrency<1||concurrency>4)throw new Error('每套配置的并发数必须是 1–4 的整数');
+ const known=new Set(models), labels=has('modelLabels')?body.modelLabels:old?.modelLabels||{};
+ if(!labels||typeof labels!=='object'||Array.isArray(labels)||![Object.prototype,null].includes(Object.getPrototypeOf(labels)))throw new Error('模型显示名称必须是 ID 到名称的对象');
+ const modelLabels=Object.create(null);
+ for(const [id,label]of Object.entries(labels)) {
+  if(!known.has(id)){if(has('modelLabels'))throw new Error('显示名称包含未列出的模型 ID');continue;}
+  if(typeof label!=='string'||label.length>100||/[\u0000-\u001f\u007f]/.test(label))throw new Error('模型显示名称须为不超过 100 字符的单行文字');
+  if(label.trim())modelLabels[id]=label.trim();
+ }
+ const hidden=has('hiddenModels')?body.hiddenModels:old?.hiddenModels||[];
+ if(!Array.isArray(hidden)||hidden.length>2000||hidden.some(id=>typeof id!=='string'||(has('hiddenModels')&&!known.has(id))))throw new Error('隐藏模型必须是已列出模型 ID 的数组');
+ const hiddenModels=[...new Set(hidden.filter(id=>known.has(id)))];
+ if(model&&hiddenModels.includes(model))throw new Error('默认模型不能隐藏；请先选择另一个可见的默认模型');
+ return {concurrency,modelLabels,hiddenModels};
+}
 export async function channelRoutes(method, parts, body={}) {
  const state=settings(), action=parts[1];
  if(method==='GET'&&!action)return {...state,profiles:state.profiles.filter(p=>!p.deleted).map(safeProfile),presets:CHANNEL_PRESETS};
@@ -74,7 +93,8 @@ export async function channelRoutes(method, parts, body={}) {
   if(key.length>4096||/[\r\n]/.test(key))throw new Error('API Key 格式无效');
   const model=modelId(body.model), textModel=modelId(body.textModel);
   const models=[...new Set([model,...(Array.isArray(body.models)?body.models:old?.models||[])].map(modelId).filter(Boolean))].slice(0,2000);
-  const p={id:old?.id||crypto.randomUUID(),kind:body.kind,title:String(body.title||CHANNEL_PRESETS[body.kind].title).trim().slice(0,100),url,protocol:body.protocol,model,models,textModel,key:body.clearKey?'':key||old?.key||'',enabled:body.enabled!==false,updatedAt:Date.now()};
+  const preferences=modelSettings(body,old,models,model);
+  const p={id:old?.id||crypto.randomUUID(),kind:body.kind,title:String(body.title||CHANNEL_PRESETS[body.kind].title).trim().slice(0,100),url,protocol:body.protocol,model,models,...preferences,textModel,key:body.clearKey?'':key||old?.key||'',enabled:body.enabled!==false,updatedAt:Date.now()};
   if(body.useForAssist&&(!textModel||!p.key||!p.enabled))throw new Error('复用 AI 帮写需要启用配置、保存 Key 并填写文本/视觉模型 ID');
   state.profiles=state.profiles.filter(x=>x.id!==p.id).concat(p);
   if(body.useForAssist)state.assistId=p.id;else if(state.assistId===p.id)state.assistId='';
@@ -91,13 +111,13 @@ export async function channelRoutes(method, parts, body={}) {
 }
 const ASPECTS=['1:1','2:3','3:2','3:4','4:3','9:16','16:9','4:5','5:4','21:9'];
 const sizes={'1:1':'1024x1024','2:3':'1024x1536','3:2':'1536x1024'};
-function caps(c){const gpt=['images','grs-gpt'].includes(c.protocol);return {aspects:gpt?Object.keys(sizes):ASPECTS,...(!gpt?{resolutions:['1K','2K','4K']}:{}),models:[...new Set([c.model,...c.models].filter(Boolean))],defaultModel:c.model,family:gpt?'gpt':'banana'};}
+function caps(c){const gpt=['images','grs-gpt'].includes(c.protocol);return {aspects:gpt?Object.keys(sizes):ASPECTS,...(!gpt?{resolutions:['1K','2K','4K']}:{}),models:[...new Set([c.model,...c.models].filter(id=>id&&!c.hiddenModels.includes(id)))],modelLabels:{...c.modelLabels},defaultModel:c.model,concurrency:c.concurrency,family:gpt?'gpt':'banana'};}
 function connection(c){if(!c.enabled||!c.key||!c.model||c.deleted)throw new Error('请在 API 设置启用配置、填写 Key 和默认模型');return {...c};}
 export function registerChannels(providers, capabilities) {
  syncRegistry=()=>{
   for(const c of settings().profiles) {
    const id=`api-${c.id}`, cp=caps(c);capabilities[id]=cp;
-   providers[id]={label:`${cp.family==='gpt'?'GPT Image':'Nano Banana'} · ${c.title}`,async status(){return {...cp,hidden:!!c.deleted,available:!!(c.enabled&&c.key&&c.model&&!c.deleted),note:!c.enabled?'未启用':!c.key?'未填 Key':!c.model?'请选择默认模型':''};},prepare(job){const pinned=connection(c);job.model=modelId(job.model||pinned.model);snapshots.set(job,pinned);job.apiProfile={id:c.id,title:c.title,url:c.url,protocol:c.protocol};},async run(job,ctx){const pinned=snapshots.get(job)||connection(c);return runChannel(pinned,job,ctx);}};
+   providers[id]={concurrency:c.concurrency,label:`${cp.family==='gpt'?'GPT Image':'Nano Banana'} · ${c.title}`,async status(){return {...cp,hidden:!!c.deleted,available:!!(c.enabled&&c.key&&c.model&&!c.deleted),note:!c.enabled?'未启用':!c.key?'未填 Key':!c.model?'请选择默认模型':''};},prepare(job){const pinned=connection(c);job.model=modelId(job.model||pinned.model);snapshots.set(job,pinned);job.apiProfile={id:c.id,title:c.title,url:c.url,protocol:c.protocol};},async run(job,ctx){const pinned=snapshots.get(job)||connection(c);return runChannel(pinned,job,ctx);}};
   }
  };syncRegistry();
 }
@@ -148,4 +168,24 @@ export async function channelAssist({text,imagePath,signal}) {
  const content=[{type:'text',text:`你是专业修图提示词助手。把用户需求写成明确、可执行的中文图像编辑提示词；保持未要求修改的构图、身份、背景和光影，只输出提示词。用户需求：${text}`}];
  if(imagePath){const img=await imageData(imagePath);content.push({type:'image_url',image_url:{url:`data:${img.mimeType};base64,${img.data}`}});}
  try {const r=await request(c,'/v1/chat/completions',{body:{model:c.textModel,messages:[{role:'user',content}],stream:false},signal,timeout:120000});const answer=r.choices?.[0]?.message?.content;if(typeof answer!=='string'||!answer.trim())throw new Error('推理接口没有返回文字');return answer.trim();}catch(e){throw new Error(scrub(e.message,c));}
+}
+
+// Conversation endpoint; the existing single-shot prompt helper stays unchanged.
+export async function channelChat({messages, signal}) {
+ const s=settings(); if(!s.assistId)return null;
+ const c={...findProfile(s.assistId,s)};
+ if(!c.enabled||!c.key||!c.textModel)throw new Error('请启用助手渠道并填写 Key 和文本/视觉模型 ID');
+ const turns=[];
+ for(const m of messages){
+  if(!['system','user','assistant'].includes(m.role)||typeof m.text!=='string')throw new Error('对话消息格式错误');
+  const content=[{type:'text',text:m.text}];
+  for(const imagePath of m.imagePaths||[]){const img=await imageData(imagePath);content.push({type:'image_url',image_url:{url:`data:${img.mimeType};base64,${img.data}`}});}
+  turns.push({role:m.role,content:content.length===1?m.text:content});
+ }
+ try {
+  const r=await request(c,'/v1/chat/completions',{body:{model:c.textModel,messages:turns,stream:false},signal,timeout:120000});
+  const answer=r.choices?.[0]?.message?.content;
+  if(typeof answer!=='string'||!answer.trim())throw new Error('推理接口没有返回文字');
+  return {text:answer.trim(),source:{provider:'channel',id:c.id,title:c.title,model:c.textModel}};
+ }catch(e){throw new Error(scrub(e.message,c));}
 }

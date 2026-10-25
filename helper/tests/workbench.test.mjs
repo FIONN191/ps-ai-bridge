@@ -53,4 +53,23 @@ test('neutral sRGB samples fall at vectorscope centre; original-size import is l
  const {normalizeImage}=await import('../lib/image.mjs');const imported=await normalizeImage(jobs.useUpload(id),0);
  assert.equal(imported.width,5000);assert.equal(imported.height,8);assert.equal(imported.mime,'image/png');
 });
+test('per-region pending item settings are independent and locked while running',async()=>{
+ const b=await post('batches',{inputs:[{uploadId:uploaded(),name:'left'},{uploadId:uploaded(),name:'right'}],options:{provider:'fake',prompt:'base',aspect:'auto'}});
+ const changed=await post(`batches/${b.id}/item`,{itemId:b.items[0].id,options:{provider:'fake',model:'chosen-model',prompt:'selected preset',aspect:'1:1',resolution:'2K'}});
+ assert.equal(changed.items[0].aspect,'1:1');assert.equal(changed.items[0].options.prompt,'selected preset');assert.equal(changed.items[1].aspect,'3:4');assert.equal(changed.items[1].options,null);
+ await assert.rejects(()=>post(`batches/${b.id}/item`,{itemId:b.items[0].id,options:{provider:'fake',prompt:'x',aspect:'auto'}}),/明确比例/);
+ await post(`batches/${b.id}/start`);await assert.rejects(()=>post(`batches/${b.id}/item`,{itemId:b.items[0].id,prompt:'too late'}),/暂停/);await post(`batches/${b.id}/cancel`);
+});
+test('project edits preserve document bindings and reminders from organizer',async()=>{
+ const p=await post('projects',{title:'shared project'}),file=path.join(dir,'workbench','projects',p.id+'.json');
+ fs.writeFileSync(file,JSON.stringify({...p,documents:[{docId:7,session:'bound'}],reminder:{enabled:true}}));
+ const saved=await post('projects',{id:p.id,title:'renamed',state:'working'});assert.equal(saved.documents[0].docId,7);assert.equal(saved.reminder.enabled,true);
+});
+test('batch retry cannot resubmit uncertain upstream work and adopts recovered completion',async()=>{
+ const b=await post('batches',{inputs:[{uploadId:uploaded()}],options:{provider:'fake',prompt:'edit',aspect:'1:1'}});
+ const created=await jobs.createLocalResult({sourcePath:jobs.useUpload(uploaded()),buffer,title:'test recovered result'}),j=jobs.getJob(created.id);j.upstream={kind:'comfyui',state:'submitting',taskId:'existing-task'};j.status='error';jobs.persist(j);
+ const f=path.join(dir,'workbench','batches',b.id+'.json');b.items[0].status='error';b.items[0].jobId=j.id;fs.writeFileSync(f,JSON.stringify(b));
+ await assert.rejects(()=>post(`batches/${b.id}/retry`),/已有上游任务/);assert.equal(JSON.parse(fs.readFileSync(f)).items[0].attempt,1);
+ j.status='done';jobs.persist(j);const restored=await post(`batches/${b.id}/retry`);assert.equal(restored.items[0].jobId,j.id);assert.equal(restored.items[0].status,'done');assert.equal(restored.items[0].attempt,1);
+});
 test.after(()=>{wb.close();fs.rmSync(dir,{recursive:true,force:true});});
