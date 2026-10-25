@@ -104,6 +104,8 @@ input[type=text] { width: 100%; }
 .hint { min-height: 14px; margin-top: 4px; }
 .hint.err { color: #e5675f; }
 .top-hint { margin: 0 0 4px 0; min-height: 0; }
+/* 插件有新版本时的提示条 */
+.update-note { display: none; margin: 0 0 6px 0; padding: 5px 7px; border-radius: 4px; background-color: rgba(230, 160, 40, 0.18); color: var(--uxp-host-text-color); }
 
 /* 生成组 */
 .jobs-head { display: flex; flex-direction: row; justify-content: space-between; align-items: center; margin-top: 12px; border-top: 1px solid var(--uxp-host-border-color); padding-top: 6px; }

@@ -22,7 +22,11 @@ import { geminiApi, openaiApi } from './providers/api.mjs';
 import { flow, FLOW_MODELS, FLOW_ASPECTS } from './providers/flow.mjs';
 import { chatgpt, CHATGPT_ASPECTS } from './providers/chatgpt.mjs';
 
-const VERSION = '0.5.2';
+const VERSION = '0.5.3';
+// 和 helper 一起分发的插件版本（桌面端里在 resources/plugin，源码版是仓库里的 plugin/）。PS 面板拿它和自己的版本比，旧了就提示更新
+const BUNDLED_PLUGIN = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(ROOT, '..', 'plugin', 'manifest.json'), 'utf8')).version; } catch { return null; }
+})();
 const shortcuts = createShortcuts();
 process.on('exit', () => shortcuts.stop());
 // 桌面端托管时带 IPC 通道：桌面端退出（包括崩溃、被强退）就跟着退出
@@ -118,7 +122,7 @@ const server = http.createServer(async (req, res) => {
         list[key] = { label: p.label, ...(await p.status().catch((e) => ({ available: false, note: e.message }))), ...capabilities[key] };
       }
       const chrome = { path: config.chrome.app, found: fs.existsSync(config.chrome.app) };
-      return send(res, 200, { ok: true, version: VERSION, outputDir: config.outputDir, dataDir: DATA_DIR, chrome, providers: list });
+      return send(res, 200, { ok: true, version: VERSION, plugin: { latest: BUNDLED_PLUGIN }, outputDir: config.outputDir, dataDir: DATA_DIR, chrome, providers: list });
     }
 
     // ---- 运行中可改的设置（出图后是否关掉标签页等） ----

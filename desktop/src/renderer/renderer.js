@@ -95,7 +95,51 @@ async function refresh() {
   renderHealth(state.helper.health);
   // 工作台（workspace.js）跟着更新平台列表、端口
   document.dispatchEvent(new CustomEvent('app-state', { detail: state }));
+  maybePromptPluginUpdate();
 }
+
+// App 更新后自带的插件变新了，但装在 Photoshop 里的还是旧的：打开时提示一次（使用说明、桌面端更新弹窗先走完）
+let pluginPrompted = false;
+function maybePromptPluginUpdate() {
+  if (pluginPrompted || busy || !$('guide').hidden || !$('updateModal').hidden) return;
+  const v = state.plugin.version;
+  const old = targetsOf(state.plugin).filter((ps) => ps.installed && cmp(ps.installed, v) < 0);
+  if (!old.length) return;
+  pluginPrompted = true;
+  $('pmText').textContent = `${old.map((ps) => `${ps.name} 里装的是 v${ps.installed}`).join('、')}，新版是 v${v}。更新后重启 Photoshop 才生效${state.plugin.psRunning ? '（Photoshop 正在运行，先保存好文件）' : ''}。`;
+  $('pluginModal').hidden = false;
+}
+$('pmLater').addEventListener('click', () => { $('pluginModal').hidden = true; });
+$('pmUpdate').addEventListener('click', () => {
+  $('pluginModal').hidden = true;
+  showTab('settings');
+  $('install').click();
+});
+
+$('checkPluginUpdate').addEventListener('click', () => action(async () => {
+  $('checkPluginUpdate').disabled = true;
+  try {
+    await refresh(); // 先重新看一遍 Photoshop 里装的是哪个版本
+    const r = await window.bridge.checkPluginUpdate();
+    const targets = targetsOf(state.plugin);
+    if (!targets.length) return toast('没找到可以装插件的 Photoshop', true);
+    const outdated = targets.filter((ps) => !ps.installed || cmp(ps.installed, r.bundled) < 0);
+    if (outdated.length) {
+      lastResult = { kind: 'ok', html: `<p>插件有新版本 v${esc(r.bundled)}（${outdated.map((ps) => `${esc(ps.name)} ${ps.installed ? `装的是 v${esc(ps.installed)}` : '还没装'}`).join('、')}）。点上面的「更新插件」，然后重启 Photoshop。</p>` };
+      renderPlugin(state.plugin);
+      return;
+    }
+    if (r.latestPlugin && cmp(r.latestPlugin, r.bundled) > 0) {
+      toast(`插件 v${r.latestPlugin} 跟着桌面端 v${r.desktop.latest} 发布，先更新桌面端`);
+      await window.bridge.checkUpdate(); // 弹出「发现新版本」
+      return;
+    }
+    if (r.desktop.status === 'error') toast(`Photoshop 里的插件和 App 自带的一样（v${r.bundled}），但没连上 GitHub 查更新的版本`, true);
+    else toast(`插件已经是最新版本（v${r.bundled}）`);
+  } finally {
+    $('checkPluginUpdate').disabled = false;
+  }
+}));
 
 async function action(fn) {
   try { await fn(); } catch (e) { toast(reason(e), true); }

@@ -163,6 +163,31 @@ function refreshOptions() {
   if (caps.thinking) fillSelect($('thinking'), caps.thinking.map((t) => [t, THINKING_LABELS[t] || t]), $('thinking').value || prefs.thinking || 'High');
 }
 
+// 版本号比较：a 比 b 新返回正数
+function cmpVersion(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+// helper 带的插件比现在这个新（桌面端更新过了、插件还没更新）：面板顶上提示去更新
+function showPluginUpdate(h) {
+  let mine = '';
+  try { mine = uxp.versions.plugin || ''; } catch {}
+  const latest = h && h.plugin && h.plugin.latest;
+  const el = $('pluginUpdate');
+  if (latest && mine && cmpVersion(latest, mine) > 0) {
+    el.textContent = `插件有新版本 v${latest}（现在是 v${mine}）：在 PS AI Bridge 桌面端的设置页点「更新插件」，然后重启 Photoshop`;
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 async function checkHelper() {
   try {
     const r = await fetch(`${HELPER}/health`);
@@ -171,6 +196,7 @@ async function checkHelper() {
     health = h;
     $('helperDot').className = 'dot ok';
     $('helperText').textContent = `helper 已连接 · v${h.version}`;
+    showPluginUpdate(h);
     if (first) {
       const prefs = loadPrefs();
       const items = Object.entries(h.providers).map(([k, p]) => [k, p.available ? p.label : `${p.label}（${p.note || '不可用'}）`, !p.available]);

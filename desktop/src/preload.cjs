@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('bridge', {
   installPlugin: (dirs) => ipcRenderer.invoke('plugin:install', dirs),
   uninstallPlugin: (dirs) => ipcRenderer.invoke('plugin:uninstall', dirs),
   installViaCC: () => ipcRenderer.invoke('plugin:installViaCC'),
+  checkPluginUpdate: () => ipcRenderer.invoke('plugin:checkUpdate'),
   addPhotoshop: () => ipcRenderer.invoke('plugin:addPhotoshop'),
   removePhotoshop: (root) => ipcRenderer.invoke('plugin:removePhotoshop', root),
   setOpenAtLogin: (on) => ipcRenderer.invoke('settings:openAtLogin', on),

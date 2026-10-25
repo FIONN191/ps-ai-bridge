@@ -41,7 +41,9 @@ for (const [platform, name] of Object.entries(FILES)) {
   if (!fs.existsSync(file)) throw new Error(`没找到 ${path.relative(REPO_ROOT, file)}，先 npm run dist`);
   files[platform] = { url: `https://github.com/${repo}/releases/download/${tag}/${name}`, sha256: sha256(file), size: fs.statSync(file).size };
 }
-const manifest = { version, date: new Date().toISOString().slice(0, 10), notes, files };
+// plugin：这一版带的 PS 插件版本，桌面端「检查插件更新」用它判断要不要先更新桌面端
+const plugin = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'plugin', 'manifest.json'), 'utf8')).version;
+const manifest = { version, plugin, date: new Date().toISOString().slice(0, 10), notes, files };
 const manifestFile = path.join(OUT, 'update.json');
 fs.writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`update.json：v${version}，${Object.keys(files).length} 个平台`);

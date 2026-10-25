@@ -2,7 +2,7 @@
 // 没有 Apple 开发者证书，用不了系统那套自动更新（Squirrel 要求正式签名），这里自己下载安装包：
 //  · macOS：下载 dmg，等旧版退出后用脚本把新 App 换进原来的位置再打开；位置不可写（比如没拖进「应用程序」直接从 dmg 里开）就打开 dmg 让用户手动拖
 //  · Windows：下载安装程序直接运行，一键安装会覆盖旧版并自动打开
-// update.json 由 scripts/release.mjs 生成：{ version, date, notes, files: { 'darwin-arm64': { url, sha256, size }, ... } }
+// update.json 由 scripts/release.mjs 生成：{ version, plugin, date, notes, files: { 'darwin-arm64': { url, sha256, size }, ... } }
 import { app, net, shell } from 'electron';
 import { EventEmitter, once } from 'node:events';
 import { spawn } from 'node:child_process';
@@ -58,7 +58,8 @@ export class Updater extends EventEmitter {
     this.manifest = null;
     // status：idle / disabled / checking / latest / available / downloading / installing / manual / error
     // prompt：要不要弹「发现新版本」（跳过的版本、点过「以后再说」的不弹）
-    this.state = { status: 'idle', current: app.getVersion(), latest: null, notes: '', size: 0, percent: 0, error: '', prompt: false };
+    // latestPlugin：最新一版桌面端带的 PS 插件版本
+    this.state = { status: 'idle', current: app.getVersion(), latest: null, latestPlugin: null, notes: '', size: 0, percent: 0, error: '', prompt: false };
   }
 
   set(patch) {
@@ -77,6 +78,7 @@ export class Updater extends EventEmitter {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const m = await r.json();
       const file = m.files?.[PLATFORM];
+      this.set({ latestPlugin: m.plugin || null });
       if (!isNewer(m.version, this.state.current) || !file) return this.set({ status: 'latest', latest: m.version });
       this.manifest = m;
       const skipped = !manual && this.readSettings().skipVersion === m.version;

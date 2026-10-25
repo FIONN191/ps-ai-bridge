@@ -252,6 +252,11 @@ function registerIpc() {
   ipcMain.handle('update:skip', () => updater.skip());
   ipcMain.handle('update:dismiss', () => updater.dismiss());
   ipcMain.handle('update:quit', () => app.quit());
+  // 检查插件更新：App 自带的插件版本 + 网上最新一版桌面端带的插件版本（比自带的新，就得先更新桌面端）
+  ipcMain.handle('plugin:checkUpdate', async () => {
+    await updater.check();
+    return { bundled: installer.bundled.version, latestPlugin: updater.state.latestPlugin, desktop: updater.state };
+  });
   ipcMain.handle('settings:openAtLogin', (_e, on) => {
     app.setLoginItemSettings({ openAtLogin: !!on, args: ['--hidden'] });
     return app.getLoginItemSettings().openAtLogin;
