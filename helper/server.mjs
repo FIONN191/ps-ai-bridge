@@ -11,18 +11,24 @@ import { normalizeImage } from './lib/image.mjs';
 import * as bridge from './lib/bridge.mjs';
 import { accountStatus, openLogin } from './lib/accounts.mjs';
 import { getPrefs, updatePrefs } from './lib/prefs.mjs';
-import { createJob, getJob, listJobs, cancelJob, publicJob, saveUpload, loadHistory, variantPath, ensureThumb } from './lib/jobs.mjs';
-import { CATEGORIES, listPresets, getPreset, savePreset, setStar, deletePreset, importFolder } from './lib/presets.mjs';
+import { createJob, getJob, listJobs, cancelJob, publicJob, saveUpload, loadHistory, variantPath, ensureThumb, appliedVariant, recordPlacement, useUpload } from './lib/jobs.mjs';
+import { CATEGORIES, listPresets, getPreset, savePreset, setStar, deletePreset, importFolder, listTrash, restorePreset, listRevisions, restoreRevision, exportPresets, importPack } from './lib/presets.mjs';
 import { CC_MODES } from './lib/post.mjs';
 import { assist } from './lib/assist.mjs';
+import { registerChannels, channelRoutes, channelAssist } from './providers/channels.mjs';
+import { engineRoutes } from './lib/engines.mjs';
+import { createWorkbench } from './lib/workbench.mjs';
+import { createRuns } from './lib/runs.mjs';
 import { showChrome } from './lib/chrome.mjs';
 import { aistudio, AISTUDIO_MODELS, AISTUDIO_ASPECTS } from './providers/aistudio.mjs';
 import { codex, agy } from './providers/cli.mjs';
 import { geminiApi, openaiApi } from './providers/api.mjs';
 import { flow, FLOW_MODELS, FLOW_ASPECTS } from './providers/flow.mjs';
+import { runninghub, runninghubRoutes } from './providers/runninghub.mjs';
+import { comfyui, comfyRoutes } from './providers/comfyui.mjs';
 import { chatgpt, CHATGPT_ASPECTS } from './providers/chatgpt.mjs';
 
-const VERSION = '0.5.4';
+const VERSION = '0.6.3';
 // 和 helper 一起分发的插件版本（桌面端里在 resources/plugin，源码版是仓库里的 plugin/）。PS 面板拿它和自己的版本比，旧了就提示更新
 const BUNDLED_PLUGIN = (() => {
   try { return JSON.parse(fs.readFileSync(path.join(ROOT, '..', 'plugin', 'manifest.json'), 'utf8')).version; } catch { return null; }
@@ -32,11 +38,13 @@ process.on('exit', () => shortcuts.stop());
 // 桌面端托管时带 IPC 通道：桌面端退出（包括崩溃、被强退）就跟着退出
 if (process.send) process.on('disconnect', () => process.exit(0));
 
-const providers = { aistudio, codex, agy, 'gemini-api': geminiApi, 'openai-api': openaiApi, chatgpt, flow };
+const providers = { aistudio, codex, agy, 'gemini-api': geminiApi, 'openai-api': openaiApi, chatgpt, flow, comfyui, runninghub };
 
 // 给插件的平台能力表：比例「自动」时插件按这里的列表挑最接近选区的比例
 const GPT_ASPECTS = ['1:1', '2:3', '3:2', '3:4', '4:3', '9:16', '16:9'];
 const capabilities = {
+  runninghub: { aspects: ['1:1', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9'], resolutions: ['1K', '2K', '4K'] },
+  comfyui: { aspects: ['1:1', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9'], resolutions: ['1K', '2K', '4K'] },
   aistudio: { models: Object.keys(AISTUDIO_MODELS), aspects: AISTUDIO_ASPECTS, resolutions: ['1K', '2K', '4K'], thinking: ['Minimal', 'Medium', 'High'] },
   codex: { aspects: GPT_ASPECTS },
   agy: { aspects: ['1:1', '9:16', '16:9', '3:4', '4:3', '3:2', '2:3', '5:4', '4:5', '21:9'] },
@@ -45,6 +53,8 @@ const capabilities = {
   chatgpt: { aspects: CHATGPT_ASPECTS },
   flow: { models: Object.keys(FLOW_MODELS), aspects: FLOW_ASPECTS, resolutions: ['1K', '2K'] },
 };
+
+registerChannels(providers, capabilities);
 
 function pruneCheckpoints(root) {
   const max = (Number(config.checkpointMaxGB) || 20) * 1024 ** 3;
@@ -94,6 +104,17 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const parts = url.pathname.split('/').filter(Boolean);
 
+    if (parts[0] === 'runs') return send(res, 200, await runs.route(req.method, parts, req.method === 'GET' ? {} : JSON.parse((await readBody(req)).toString() || '{}')));
+
+    if (parts[0] === 'api-channels') return send(res, 200, await channelRoutes(req.method, parts, req.method === 'GET' ? {} : JSON.parse((await readBody(req, 1024 * 1024)).toString() || '{}')));
+    if (parts[0] === 'engine') return send(res, 200, await engineRoutes(req.method, parts, req.method === 'GET' ? {} : JSON.parse((await readBody(req, 16384)).toString() || '{}')));
+    if (parts[0] === 'runninghub') return send(res, 200, await runninghubRoutes(req.method, parts, req.method === 'GET' ? {} : JSON.parse((await readBody(req, 1024 * 1024)).toString() || '{}')));
+    if (parts[0] === 'comfyui') return send(res, 200, await comfyRoutes(req.method, parts, req.method === 'GET' ? {} : JSON.parse((await readBody(req)).toString() || '{}')));
+    if (['batches', 'projects', 'tools'].includes(parts[0])) {
+      const result = await workbench.route(req.method, parts, req.method === 'GET' ? {} : JSON.parse((await readBody(req)).toString() || '{}'));
+      if (result !== undefined) return send(res, 200, result);
+    }
+
     if (url.pathname === '/shortcuts' && req.method === 'GET') return send(res, 200, shortcuts.status());
     if (url.pathname === '/shortcuts' && req.method === 'POST') return send(res, 200, shortcuts.update(JSON.parse((await readBody(req, 2048)).toString())));
     if (url.pathname === '/shortcuts/poll' && req.method === 'POST') {
@@ -121,6 +142,7 @@ const server = http.createServer(async (req, res) => {
       for (const [key, p] of Object.entries(providers)) {
         list[key] = { label: p.label, ...(await p.status().catch((e) => ({ available: false, note: e.message }))), ...capabilities[key] };
       }
+      for (const key of Object.keys(list)) if (list[key].hidden) delete list[key];
       const chrome = { path: config.chrome.app, found: fs.existsSync(config.chrome.app) };
       return send(res, 200, { ok: true, version: VERSION, plugin: { latest: BUNDLED_PLUGIN }, outputDir: config.outputDir, dataDir: DATA_DIR, chrome, providers: list });
     }
@@ -145,6 +167,24 @@ const server = http.createServer(async (req, res) => {
     // ---- 预设库 ----
     if (parts[0] === 'presets') {
       if (req.method === 'GET' && parts.length === 1) return send(res, 200, { categories: CATEGORIES, presets: listPresets() });
+      if (req.method === 'POST' && parts[1] === 'reference-data') {
+        const { uploadIds } = JSON.parse((await readBody(req, 4096)).toString());
+        if (!Array.isArray(uploadIds) || uploadIds.length > 4) throw new Error('最多 4 张参考图');
+        return send(res, 200, { refImages: uploadIds.map(id => { const src = useUpload(id); if (!src) throw new Error('参考图已失效'); return fs.readFileSync(src).toString('base64'); }) });
+      }
+      if (req.method === 'GET' && parts[1] === 'trash') return send(res, 200, { presets: listTrash() });
+      if (req.method === 'POST' && parts[1] === 'restore') {
+        const body = JSON.parse((await readBody(req)).toString());
+        return send(res, 200, restorePreset(body.trashId));
+      }
+      if (req.method === 'POST' && parts[1] === 'export') {
+        const body = JSON.parse((await readBody(req)).toString());
+        return send(res, 200, exportPresets(body.ids));
+      }
+      if (req.method === 'POST' && parts[1] === 'import-pack') {
+        const body = JSON.parse((await readBody(req)).toString());
+        return send(res, 200, importPack(body.pack, body.preview === true));
+      }
       if (req.method === 'POST' && parts[1] === 'import') {
         const { dir } = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8') || '{}');
         return send(res, 200, importFolder(String(dir || '').replace(/^~/, os.homedir())));
@@ -157,6 +197,11 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'GET' && parts.length === 2) {
         const p = getPreset(id);
         return p ? send(res, 200, p) : send(res, 404, { error: '没有这个预设' });
+      }
+      if (req.method === 'GET' && parts[2] === 'revisions') return send(res, 200, { revisions: listRevisions(id) });
+      if (req.method === 'POST' && parts[2] === 'restore-revision') {
+        const body = JSON.parse((await readBody(req)).toString());
+        return send(res, 200, restoreRevision(id, body.revision));
       }
       if (req.method === 'POST' && parts[2] === 'refs') {
         // 预设自带的参考图（V6 存成 base64 PNG）转成 uploadId 给插件用
@@ -210,7 +255,7 @@ const server = http.createServer(async (req, res) => {
       if (!text || !String(text).trim()) return send(res, 400, { error: '先写一句想怎么改' });
       const dir = path.join(config.outputDir, '_uploads');
       const imagePath = uploadId ? ['jpg', 'png'].map((e) => path.join(dir, `${String(uploadId).replace(/[^a-f0-9]/g, '')}.${e}`)).find((p) => fs.existsSync(p)) : null;
-      return send(res, 200, { prompt: await assist({ text: String(text), imagePath }) });
+      return send(res, 200, { prompt: (await channelAssist({ text: String(text), imagePath })) ?? await assist({ text: String(text), imagePath }) });
     }
 
     // ---- 截图当参考图：系统自带的框选截图，拖一个框，Esc 取消 ----
@@ -233,9 +278,9 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/uploads/from-file') {
       const { path: file, jobId, maxSide } = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8') || '{}');
       const job = jobId ? getJob(jobId) : null;
-      const src = job ? (job.result?.base && fs.existsSync(job.result.base) ? job.result.base : job.result?.path) : file;
+      const src = job ? await variantPath(job, appliedVariant(job)) : file;
       if (!src || !fs.existsSync(src)) return send(res, 404, { error: '找不到这张图' });
-      const img = await normalizeImage(src, Math.min(Number(maxSide) || 2048, 4096)).catch(() => { throw new Error('这个格式读不了，先转成 JPG 或 PNG'); });
+      const img = await normalizeImage(src, maxSide === 'original' ? 0 : Math.min(Number(maxSide) || 2048, 4096));
       return send(res, 200, { uploadId: saveUpload(img.buffer, img.mime), width: img.width, height: img.height, name: path.basename(src) });
     }
 
@@ -255,12 +300,14 @@ const server = http.createServer(async (req, res) => {
       const job = getJob(parts[1]);
       if (!job) return send(res, 404, { error: '没有这个任务' });
       if (req.method === 'GET' && parts.length === 2) return send(res, 200, publicJob(job));
+      if (req.method === 'POST' && parts[2] === 'placement') return send(res, 200, await recordPlacement(job, JSON.parse((await readBody(req, 16384)).toString())));
       if (req.method === 'GET' && parts[2] === 'result') {
         if (job.status !== 'done') return send(res, 409, { error: '还没生成完' });
-        const cc = url.searchParams.get('cc') || job.post?.cc || 'none';
+        const selected = appliedVariant(job);
+        const cc = url.searchParams.get('cc') || selected.cc;
         if (!CC_MODES.includes(cc)) return send(res, 400, { error: `没有这种校色：${cc}` });
-        const tex = url.searchParams.get('tex') === '1';
-        const t = url.searchParams.has('t') ? Number(url.searchParams.get('t')) : 1;
+        const tex = url.searchParams.has('tex') ? url.searchParams.get('tex') === '1' : selected.tex;
+        const t = url.searchParams.has('t') ? Number(url.searchParams.get('t')) : selected.t;
         // raw=1：网页上生成的原图（没对齐、没校色），用来和贴回 PS 的版本对比
         const file = url.searchParams.get('raw') === '1' ? job.result.path : await variantPath(job, { cc, tex, t: Number.isFinite(t) ? t : 1 });
         const ext = path.extname(file).slice(1).toLowerCase();
@@ -294,6 +341,8 @@ server.on('error', (e) => {
 });
 
 const restored = loadHistory();
+const workbench = createWorkbench({ providers, capabilities });
+const runs = createRuns({ providers, capabilities });
 
 server.listen(config.port, '127.0.0.1', () => {
   if (restored) console.log(`已读回 ${restored} 个历史任务（检查点）`);

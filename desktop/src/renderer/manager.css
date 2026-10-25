@@ -1,0 +1,61 @@
+.manager { padding: 24px; overflow: auto; height: calc(100vh - 72px); }
+.manager-toolbar, .manager .row, .manager-dialog .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.manager-toolbar h2 { margin: 0; }
+.manager-body { display: grid; grid-template-columns: minmax(240px, 32%) 1fr; gap: 24px; }
+.manager-list { border-right: 1px solid #383838; padding-right: 18px; }
+.manager-list > input, .manager-list > select { width: 100%; margin-bottom: 10px; }
+.manager-list-item { display: flex; gap: 10px; align-items: center; padding: 10px; border-bottom: 1px solid #333; }
+.manager-list-item.selected { background: #37304d; border-radius: 6px; }
+.manager-list-item button { text-align: left; flex: 1; border: 0; background: transparent; padding: 3px; }
+.manager-list-item small { display: block; color: #aaa; margin-top: 5px; }
+.manager-editor input, .manager-editor select, .manager-editor textarea { width: 100%; }
+.manager-editor .field { display: block; margin-bottom: 16px; }
+.manager-editor textarea { font: 14px/1.6 system-ui; resize: vertical; }
+.manager-dialog { max-width: 780px; max-height: 85vh; overflow: auto; }
+.manager-dialog article, #pmRevisions > div { border-bottom: 1px solid #444; padding: 12px 0; }
+.manager-dialog pre { white-space: pre-wrap; }
+@media (max-width: 900px) { .manager-body { grid-template-columns: 260px 1fr; } }
+.studio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; align-items: start; }
+.studio-card { background: #20201f; border: 1px solid #363636; border-radius: 12px; padding: 22px; }
+.studio-card > input, .studio-card > select, .studio-card .field input, .studio-card .field select, .studio-card textarea { width: 100%; margin: 6px 0 12px; }
+.studio-card .field { display: block; }
+.studio-card h3 { margin-top: 0; }
+.studio-card article { border-top: 1px solid #444; padding: 14px 0; }
+.mini-gallery { display: flex; flex-wrap: wrap; max-height: 160px; overflow: auto; gap: 6px; margin-bottom: 12px; }
+.mini-gallery img { width: 64px; height: 64px; object-fit: cover; border-radius: 5px; }
+.tool-preview { max-height: 320px; width: 100%; object-fit: contain; background: #111; }
+.tool-range { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
+.tool-range input { flex: 1; }
+.tool-range output { width: 40px; }
+.studio-card canvas { width: 100%; background: #101010; margin-top: 10px; }
+.workflow-map { display: grid; grid-template-columns: 1fr 170px; gap: 8px; align-items: center; padding: 5px 0; }
+#comfyMapping { max-height: 280px; overflow: auto; margin: 12px 0; }
+.manager input:not([type=checkbox]):not([type=range]), .manager select, .manager textarea { color: var(--fg); background: #292929; border: 1px solid #444; border-radius: 7px; padding: 9px 11px; font: inherit; }
+.manager input:focus, .manager textarea:focus, .manager select:focus { outline: 2px solid #9276ff; outline-offset: 1px; }
+.manager-list { max-height: calc(100vh - 210px); overflow-y: auto; }
+.manager-list-item button.link { flex: 0 0 auto; }
+.manager-editor { align-self: start; }
+.studio-card pre { font-size: 12px; white-space: pre-wrap; max-height: 240px; overflow: auto; }
+.rh-map { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px; align-items: center; margin: 8px 0; }
+.rh-map input { min-width: 0; width: 100%; }
+#toolVectorscope { width: 256px; max-width: 100%; }
+#runSteps textarea, #runSteps input { width: 100%; }
+
+.api-editor .field { display: flex; flex-direction: column; margin: 10px 0; }
+.api-editor input[type="text"], .api-editor input[type="password"], .api-editor input:not([type]), .api-editor select { width: 100%; min-height: 32px; }
+.api-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
+.api-status { padding: 10px; background: #292536; color: #dad0ff; white-space: pre-wrap; }
+.api-editor .check { display: flex; align-items: center; margin: 10px 0; }
+
+/* API settings share the dark controls of the workbench. */
+.api-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 18px; }
+.api-editor > p, .api-editor > .api-actions { grid-column: 1 / -1; }
+.api-editor .field { gap: 7px; min-width: 0; }
+.api-editor input:not([type="checkbox"]), .api-editor select {
+  box-sizing: border-box; color: var(--text, #e7e7e7); background: #292929;
+  border: 1px solid #494949; border-radius: 7px; padding: 9px 10px; font: inherit;
+}
+.api-editor input:disabled { opacity: .65; }
+.api-editor input:focus, .api-editor select:focus { outline: 1px solid #9175ff; }
+.api-editor option { background: #292929; color: #eee; }
+@media (max-width: 720px) { .api-editor { grid-template-columns: 1fr; } }

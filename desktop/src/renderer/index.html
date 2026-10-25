@@ -6,12 +6,16 @@
 <title>AI 生图贴回</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="workspace.css">
+<link rel="stylesheet" href="manager.css">
 </head>
 <body>
 <nav class="topbar">
   <img class="logo-sm" src="../../assets/icon.png" alt="">
   <div class="tabs" role="tablist">
     <button class="tab-btn active" data-tab="work" role="tab">工作台</button>
+    <button class="tab-btn" data-tab="studio" role="tab">工具与项目</button>
+    <button class="tab-btn" data-tab="runs" role="tab">流程与分块</button>
+    <button class="tab-btn" data-tab="presets" role="tab">预设管理</button>
     <button class="tab-btn" data-tab="settings" role="tab">设置</button>
   </div>
   <span class="spacer"></span>
@@ -87,7 +91,7 @@
       <input type="search" id="jobSearch" placeholder="搜索提示词">
       <select id="jobFilter">
         <option value="">全部来源</option>
-        <option value="desktop">桌面端</option>
+        <option value="desktop">桌面端</option><option value="batch">照片批处理</option><option value="tools">本地图像工具</option><option value="workflow">流程与分块</option>
         <option value="ps">Photoshop 面板</option>
       </select>
     </div>
@@ -153,12 +157,13 @@
     <div class="notice warn"><strong>使用须知</strong>：使用无需 API 的生图服务（AI Studio、Google Flow、ChatGPT 网页）需要自备魔法，专用 Chrome 要能正常打开 Google 和 ChatGPT。出图后标签页默认留在专用 Chrome 里，可以直接在网页上看生成的样子；网页上的原图也存在任务文件夹里，在工作台看大图时可以切到「网页原图」。</div>
   </section>
 
+  <section class="card"><h2>API 设置</h2><div id="apiSettings"></div></section>
   <section class="card">
     <div class="card-head">
       <h2>生图平台</h2>
     </div>
     <ul class="providers" id="providers"><li class="mute">本机服务就绪后显示</li></ul>
-    <p class="mute">官方 API 通道要在配置文件里填 Key，改完点「重启服务」。</p>
+    <p class="mute">墨墨、GRS 和兼容渠道在上方配置；原有官方 API 配置继续保留。</p>
   </section>
 
   <section class="card">
@@ -286,10 +291,101 @@
   </div>
 </div>
 
+<section class="tab manager" id="tab-studio" hidden>
+  <header class="manager-toolbar"><h2>工具与项目</h2><span class="spacer"></span><button id="studioRefresh">刷新</button></header>
+  <div class="studio-grid">
+    <article class="studio-card"><h3>RunningHub 工作流</h3><p class="mute">使用自己的账号与额度。保存节点映射后，可从工作台或批处理队列运行。画幅只有映射宽高节点后才会传入工作流。</p>
+      <label class="field">服务地址<select id="rhUrl"><option>https://www.runninghub.ai</option><option>https://www.runninghub.cn</option></select></label>
+      <label class="field">API 密钥（留空保留）<input type="password" id="rhKey" autocomplete="off"></label><label class="check"><input type="checkbox" id="rhEnabled">启用连接</label>
+      <div class="row"><button id="rhConnect">保存连接</button><button id="rhTest">检测账号与余额</button></div><p id="rhStatus" class="mute"></p>
+      <select id="rhWorkflows"><option value="">新工作流</option></select><label class="field">名称<input id="rhTitle"></label><label class="field">工作流 ID<input id="rhWorkflowId"></label><label class="field">输出节点 ID（可选，需单图输出）<input id="rhOutput"></label>
+      <p class="mute">填写工作流中对应节点的 ID 和字段名。留空的节点不会被修改。</p><div id="rhMapping"></div><button class="primary" id="rhSave">保存工作流</button>
+    </article>
+    <article class="studio-card"><h3>本机抠像引擎</h3><p class="mute">照片在本机处理。首次安装需要联网下载独立环境，模型按需下载。输出透明 PNG，并保留灰度蒙版。</p>
+      <div class="row"><button id="engineInstall">安装 / 修复引擎</button><button id="engineRefresh">刷新状态</button></div><p id="engineState" class="mute"></p>
+      <select id="engineModel"></select><button id="engineDownload">下载所选模型</button>
+      <div class="row"><button id="enginePick">选择照片</button><button id="engineFromWork">工作台原图</button><span id="engineInputLabel" class="mute">未选择</span></div>
+      <label class="field">收缩 / 扩张边缘（像素，负值为扩张）<input type="number" min="-15" max="15" value="0" id="engineErode"></label>
+      <label class="field">边缘羽化（像素）<input type="number" min="0" max="30" step="0.5" value="0" id="engineFeather"></label>
+      <button class="primary" id="engineRun">开始本机抠像</button><div id="engineRuns"></div><details><summary>安装日志</summary><pre id="engineLog"></pre></details>
+    </article>
+    <article class="studio-card"><h3>ComfyUI 工作流</h3><p class="mute">连接自己的 ComfyUI，导入 API 格式工作流后，可在工作台的平台列表选择。</p>
+      <label class="field">服务地址<input id="comfyUrl" placeholder="http://127.0.0.1:8188"></label><label class="field">认证密钥（可选，留空保留）<input id="comfyKey" type="password" autocomplete="off"></label>
+      <label class="check"><input type="checkbox" id="comfyEnabled">启用此连接</label>
+      <div class="row"><button id="comfyConnect">保存连接</button><button id="comfyTest">检测服务</button></div><p id="comfyStatus" class="mute"></p>
+      <select id="comfyWorkflows"><option value="">新工作流</option></select><div class="row"><button id="comfyImport">导入 API 工作流</button><button id="comfyInspect">检查缺失节点和模型</button></div>
+      <label class="field">工作流名称<input id="comfyTitle"></label><label class="field">图像输出节点<select id="comfyOutput"></select></label><div id="comfyMapping"></div><button class="primary" id="comfySave">保存工作流</button>
+    </article>
+    <article class="studio-card"><h3>照片批处理</h3><p class="mute">使用工作台当前平台、模型、提示词和参考图。每张照片生成一张结果。</p>
+      <input id="batchTitle" placeholder="队列名称"><div class="row"><button id="batchPick">添加照片</button><button id="batchClear">清空</button><span id="batchCount">0 张</span></div>
+      <div id="batchInputs" class="mini-gallery"></div><button class="primary" id="batchCreate">创建队列</button><div id="batchList"></div>
+    </article>
+    <article class="studio-card"><h3>项目</h3><select id="projectSelect"><option value="">新建项目</option></select>
+      <label class="field">名称<input id="projectTitle"></label><label class="field">状态<select id="projectState"><option value="todo">待处理</option><option value="working">处理中</option><option value="done">完成</option><option value="rework">返工</option><option value="archived">归档</option></select></label>
+      <label class="field">计划日期<input type="date" id="projectDue"></label><label class="field">备注<textarea id="projectNotes" rows="4"></textarea></label>
+      <div class="row"><button class="primary" id="projectSave">保存项目</button><button id="projectAttach">加入当前查看的结果</button></div><div id="projectJobs"></div>
+    </article>
+    <article class="studio-card"><h3>本地调色与辉光</h3><p class="mute">选择工作台原图或已有结果，预览满意后保存为独立结果，可继续改或贴回 PS。</p>
+      <div class="row"><button id="toolPick">选择图片</button><button id="toolUseInput">工作台原图</button><button id="toolUseResult">最近查看的结果</button></div>
+      <img id="toolInput" class="tool-preview" alt="原图" hidden>
+      <label class="tool-range">亮度增益（档）<input id="toolExposure" type="range" min="-4" max="4" step="0.1" value="0"><output>0</output></label>
+      <label class="tool-range">饱和度 <input id="toolSaturation" type="range" min="0" max="3" step="0.05" value="1"><output>1</output></label>
+      <label class="tool-range">锐化 <input id="toolSharpen" type="range" min="0" max="5" step="0.1" value="0"><output>0</output></label>
+      <label class="tool-range">辉光 <input id="toolGlow" type="range" min="0" max="1" step="0.05" value="0"><output>0</output></label>
+      <div class="row"><button id="toolPreview">预览</button><button class="primary" id="toolSave" disabled>保存此预览</button><button id="toolScopes">图像示波器</button></div>
+      <img id="toolOutput" class="tool-preview" alt="调整预览" hidden><p id="toolMessage" class="mute"></p>
+      <canvas id="toolHistogram" width="512" height="180" hidden></canvas><canvas id="toolWaveform" width="512" height="180" hidden></canvas>
+      <canvas id="toolParade" width="768" height="180" hidden></canvas><canvas id="toolVectorscope" width="256" height="256" hidden></canvas>
+    </article>
+  </div>
+</section>
+<section class="tab manager" id="tab-runs" hidden>
+  <header class="manager-toolbar"><h2>流程与分块</h2><span class="spacer"></span><button id="runsRefresh">刷新</button></header>
+  <div class="studio-grid">
+    <article class="studio-card"><h3>创建流程</h3>
+      <label class="field">名称<input id="runTitle" placeholder="例如：清背景 → 修衣服 → 统一光线"></label>
+      <div class="row"><button id="runPick">选择原尺寸图片</button><button id="runFromWork">工作台原图</button><span id="runSourceLabel" class="mute">未选择</span></div>
+      <img id="runSourcePreview" class="tool-preview" alt="流程原图" hidden>
+      <label class="field">处理方式<select id="runMode"><option value="chain">连续步骤</option><option value="tiles">分块生成并合成</option></select></label>
+      <p class="mute">连续步骤以上一步完成时的结果继续生成。分块会为每块分别提交任务，完成后按原坐标融合；这是所选模型的逐块生成，不是专用超分模型。</p>
+      <div id="runChainFields"><button id="runAddStep">添加工作台当前设置为一步</button><div id="runSteps"></div></div>
+      <div id="runTileFields" hidden><label class="field">块尺寸（像素）<input type="number" id="runTileSize" value="1024" min="128" max="4096" step="64"></label><label class="field">重叠（像素）<input type="number" id="runTileOverlap" value="128" min="0" max="2047" step="16"></label><p class="mute">使用创建时工作台的平台、模型、提示词和参考图。最多 100 块、4000 万像素；合成保持导入原图尺寸。</p></div>
+      <label class="check"><input type="checkbox" id="runReview" checked>每一步完成后暂停查看</label>
+      <button class="primary" id="runCreate">创建待执行流程</button><p id="runMessage" class="mute"></p>
+    </article>
+    <article class="studio-card"><h3>已保存流程</h3><p class="mute">创建后先核对步骤和任务数量，再点击开始。重启后暂停；重试只处理失败步骤。</p><div id="runsList"></div></article>
+  </div>
+</section>
+<section class="tab manager" id="tab-presets" hidden>
+  <header class="manager-toolbar"><h2>预设管理</h2><span class="spacer"></span>
+    <button id="pmNew">新建预设</button><button id="pmImport">导入 JSON 包</button><button id="pmExport">导出已选</button><button id="pmTrash">回收站</button>
+  </header>
+  <div class="manager-body">
+    <aside class="manager-list"><input id="pmSearch" type="search" placeholder="名称或拼音搜索"><select id="pmCategory"></select><div id="pmList"></div></aside>
+    <article class="manager-editor">
+      <p class="mute" id="pmHint">选择预设后可编辑；出厂预设修改后会保存为个人副本。</p>
+      <label class="field">名称<input id="pmName" maxlength="200"></label>
+      <label class="field">分类<select id="pmEditCategory"></select></label>
+      <label class="field">提示词<textarea id="pmContent" rows="16" spellcheck="false"></textarea></label>
+      <div class="row"><button id="pmUseCurrent">使用工作台当前提示词</button><button id="pmRefs">使用工作台参考图</button><span class="mute" id="pmRefCount">0 张参考图</span></div>
+      <div class="row"><button class="primary" id="pmSavePreset">保存</button><button id="pmDuplicate">保存副本</button><button id="pmUse">用于生成</button><button id="pmDelete">移入回收站</button></div>
+      <details><summary>历史版本</summary><div id="pmRevisions"></div></details>
+    </article>
+  </div>
+</section>
+<div class="modal" id="pmDialog" hidden><div class="modal-box manager-dialog"><h2 id="pmDialogTitle"></h2><div id="pmDialogBody"></div><div class="row"><button id="pmDialogClose">关闭</button><button class="primary" id="pmDialogApply" hidden>导入可用项</button></div></div></div>
 <div class="toast" id="toast" hidden></div>
 <script src="common.js"></script>
 <script src="renderer.js"></script>
 <script src="workspace.js"></script>
+<script src="preset-manager.js"></script>
+<script src="studio.js"></script>
+<script src="comfyui.js"></script>
+<script src="engines.js"></script>
+<script src="runninghub.js"></script>
+<script src="runs.js"></script>
+<script src="api-settings.js"></script>
+<script src="channels.js"></script>
 <script src="accounts.js"></script>
 <script src="updates.js"></script>
 </body>

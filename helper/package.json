@@ -1,6 +1,6 @@
 {
   "name": "ps-ai-bridge-helper",
-  "version": "0.5.4",
+  "version": "0.6.3",
   "private": true,
   "type": "module",
   "description": "本机服务：接收 Photoshop 插件发来的图和参数，驱动 AI Studio / Codex / agy / 官方 API 生图，再把结果交回插件",

@@ -13,6 +13,17 @@ const GROUPS_KEY = 'ps-ai-bridge-groups';
 
 const MODEL_LABELS = { 'nano-banana-2.1': 'Nano Banana 2.1', 'nano-banana-2': 'Nano Banana 2', 'nano-banana-pro': 'Nano Banana Pro', 'nano-banana-2-lite': 'Nano Banana 2 Lite' };
 const THINKING_LABELS = { Minimal: '最快', Medium: '中等', High: '最高' };
+// 只调整展示顺序，自动换平台仍使用 helper 原有的优先级。
+const PROVIDER_DISPLAY_ORDER = ['aistudio', 'agy', 'gemini-api', 'flow', 'codex', 'openai-api', 'chatgpt'];
+function displayProviders(providers) {
+  const rank = (key) => {
+    if (providers[key]?.family === 'banana') return 3.5;
+    if (providers[key]?.family === 'gpt') return 6.5;
+    const i = PROVIDER_DISPLAY_ORDER.indexOf(key);
+    return i < 0 ? PROVIDER_DISPLAY_ORDER.length : i;
+  };
+  return Object.entries(providers || {}).sort(([a], [b]) => rank(a) - rank(b));
+}
 const CC_LABELS = { none: '不校色', global: '全局校色', precise: '精准校色', mixed: '混合校色' };
 const KEEP_COMPOSITION = '\n\n要求：输出图片的构图、取景、比例和透视与图1完全一致，不要裁切、缩放或平移画面；提示里没提到的人物、服装、五官和光线都保持原样。';
 
@@ -155,7 +166,7 @@ function refreshOptions() {
   const prefs = loadPrefs();
   const caps = providerCaps();
   $('modelField').style.display = caps.models ? 'block' : 'none';
-  if (caps.models) fillSelect($('model'), caps.models.map((m) => [m, MODEL_LABELS[m] || m]), $('model').value || prefs.model);
+  if (caps.models) fillSelect($('model'), caps.models.map((m) => [m, caps.modelLabels?.[m] || MODEL_LABELS[m] || m]), $('model').value || prefs.model);
   fillSelect($('aspect'), [['auto', '自动（贴合选区）'], ...(caps.aspects || ['1:1']).map((a) => [a, a])], $('aspect').value || prefs.aspect || 'auto');
   $('resolutionField').style.display = caps.resolutions ? 'block' : 'none';
   if (caps.resolutions) fillSelect($('resolution'), caps.resolutions.map((r) => [r, r]), $('resolution').value || prefs.resolution || '2K');
@@ -193,13 +204,14 @@ async function checkHelper() {
     const r = await fetch(`${HELPER}/health`);
     const h = await r.json();
     const first = !health;
+    const changed = health && JSON.stringify(health.providers) !== JSON.stringify(h.providers);
     health = h;
     $('helperDot').className = 'dot ok';
     $('helperText').textContent = `helper 已连接 · v${h.version}`;
     showPluginUpdate(h);
-    if (first) {
+    if (first || changed) {
       const prefs = loadPrefs();
-      const items = Object.entries(h.providers).map(([k, p]) => [k, p.available ? p.label : `${p.label}（${p.note || '不可用'}）`, !p.available]);
+      const items = displayProviders(h.providers).map(([k, p]) => [k, p.available ? p.label : `${p.label}（${p.note || '不可用'}）`, !p.available]);
       fillSelect($('provider'), items, $('provider').value || prefs.provider || 'aistudio');
       refreshOptions();
       await loadPresets();
@@ -276,7 +288,7 @@ async function restorePreset(id) {
   currentPreset = await r.json();
   const text = $('prompt').value;
   for (const pa of currentPreset.params) {
-    const m = text.match(new RegExp(`"@param:${reEsc(pa.name)}"\\s*:\\s*(-?[\\d.]+)`));
+    const m = text.match(new RegExp(`"?@param:${reEsc(pa.name)}"\\s*:\\s*(-?[\\d.]+)`));
     if (m) pa.value = Number(m[1]);
   }
   for (const f of currentPreset.fills) {
@@ -298,7 +310,7 @@ function renderPresetDetail() {
     <div class="param">
       <div class="slider-row">
         <span class="small slider-label" title="${esc(pa.desc)}">${esc(pa.name)}</span>
-        <sp-slider min="0" max="1" step="0.05" value="${pa.value}" data-param="${i}"></sp-slider>
+        <sp-slider min="${pa.min ?? 0}" max="${pa.max ?? 1}" step="${pa.step ?? 0.05}" value="${pa.value}" data-param="${i}"></sp-slider>
         <span class="small slider-val" id="pv${i}">${pa.value}</span>
       </div>
       ${pa.desc ? `<div class="param-desc">${esc(pa.desc)}</div>` : ''}
@@ -317,9 +329,9 @@ const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // 滑杆和填空直接改提示词框里的文字，用户看到的就是要发出去的
 function setParam(i, value) {
   const pa = currentPreset.params[i];
-  pa.value = Math.round(Number(value) * 100) / 100;
+  pa.value = Number(Math.min(pa.max ?? 1, Math.max(pa.min ?? 0, Number(value))).toFixed(6));
   $(`pv${i}`).textContent = String(pa.value);
-  const re = new RegExp(`("@param:${reEsc(pa.name)}"\\s*:\\s*)(-?[\\d.]+)`, 'g');
+  const re = new RegExp(`("?@param:${reEsc(pa.name)}"\\s*:\\s*)(-?[\\d.]+)`, 'g');
   $('prompt').value = $('prompt').value.replace(re, `$1${pa.value}`);
 }
 function setFill(i, value) {
@@ -694,6 +706,11 @@ async function placeFileInGroup(g, doc, file, name, below) {
   return layer;
 }
 
+async function syncPlacement(g, job, v) {
+  const r = await post(`/jobs/${job.id}/placement`, { variant: { cc: v.cc, tex: Boolean(v.tex), t: (v.strength ?? 100) / 100 }, docId: g.docId, docName: g.docName, layerId: job.layerId, groupId: g.id });
+  if (!r.ok) throw new Error('图已贴回，但共享版本记录未保存；请保留面板并重试应用');
+}
+
 async function placeJob(g, job) {
   const v = appliedOf(g);
   const file = await writeResult(job, v);
@@ -716,6 +733,7 @@ async function placeJob(g, job) {
   }, { commandName: 'AI 生图贴回' });
   try { await file.delete(); } catch {}
   job.placed = true;
+  await syncPlacement(g, job, v);
   job.appliedKey = variantKey(v);
 }
 
@@ -728,7 +746,7 @@ async function applyVariant(g, job, v = appliedOf(g)) {
   await core.executeAsModal(async (ctl) => {
     const doc = app.documents.find((d) => d.id === g.docId);
     const old = doc && findLayer(doc, job.layerId);
-    if (!old) return;
+    if (!old) throw new Error('原图层或文档已关闭，请从历史重新贴回');
     if (app.activeDocument.id !== doc.id) app.activeDocument = doc;
     const hid = await ctl.hostControl.suspendHistory({ documentID: doc.id, name: 'AI 生图：调整结果' });
     try {
@@ -748,6 +766,7 @@ async function applyVariant(g, job, v = appliedOf(g)) {
     }
   }, { commandName: 'AI 生图：调整结果' });
   try { await file.delete(); } catch {}
+  await syncPlacement(g, job, v);
   job.appliedKey = key;
   const parts = [CC_LABELS[v.cc], v.tex ? '替换纹理' : '', `强度 ${v.strength == null ? 100 : v.strength}%`].filter(Boolean);
   hint(`已应用：${parts.join(' · ')}`);
@@ -955,11 +974,16 @@ async function pasteHistory(jobId) {
     const sel = await selectionBounds(doc.id);
     const ratio = s.result.width / s.result.height;
     const base = sel || (s.meta && s.meta.rect && s.meta.docName === doc.title ? s.meta.rect : { left: 0, top: 0, right: doc.width, bottom: doc.height });
-    return { docId: doc.id, docName: doc.title, layerId: doc.activeLayers[0] ? doc.activeLayers[0].id : null, rect: sel ? fitRect(base, ratio, doc.width, doc.height) : base };
+    let chanName = null;
+    if (sel && $('maskWithSelection').checked) {
+      chanName = `AI选区 ${Date.now().toString(36)}（贴回后自动删除）`;
+      await bp({ _obj: 'duplicate', _target: [{ _ref: 'channel', _property: 'selection' }], name: chanName });
+    }
+    return { docId: doc.id, docName: doc.title, layerId: doc.activeLayers[0] ? doc.activeLayers[0].id : null, rect: sel ? fitRect(base, ratio, doc.width, doc.height) : base, chanName, selShort: sel ? Math.min(sel.right-sel.left, sel.bottom-sel.top) : 0 };
   }, { commandName: 'AI 生图：读取位置' });
   const g = {
     id: `h${Date.now()}`, ...ctx, title: s.prompt.slice(0, 40), providerLabel: (health && health.providers[s.provider] || {}).label || s.provider, aspect: s.aspect, resolution: s.resolution,
-    jobs: [{ id: s.id, status: 'done', providerLabel: (health && health.providers[s.provider] || {}).label || s.provider }], cc: s.post ? s.post.cc : 'none', tex: false, strength: 100, autoReturn: true, raster: $('returnAs').value === 'raster', color: $('groupColor').value, shrink: 0, blur: 0, selShort: 0, chanName: null,
+    jobs: [{ id: s.id, status: 'done', providerLabel: (health && health.providers[s.provider] || {}).label || s.provider }], cc: s.applied?.variant?.cc || s.post?.cc || 'none', tex: Boolean(s.applied?.variant?.tex), strength: (s.applied?.variant?.t ?? 1) * 100, applied: { cc: s.applied?.variant?.cc || s.post?.cc || 'none', tex: Boolean(s.applied?.variant?.tex), strength: (s.applied?.variant?.t ?? 1) * 100 }, autoReturn: true, raster: $('returnAs').value === 'raster', color: $('groupColor').value, shrink: Number($('shrink').value) || 0, blur: Number($('blur').value) || 0,
   };
   groups.unshift(g);
   renderGroups();
@@ -1106,7 +1130,7 @@ function nextProvider() {
 async function onAssist() {
   const text = $('prompt').value.trim();
   if (!text) return hint('先在提示词框里用一句话说想改什么，再点 AI 帮写', true);
-  hint('AI 正在写提示词（用本机 Codex，约半分钟）…');
+  hint('AI 正在写提示词（按 API 设置或本机 Codex）…');
   $('assist').textContent = 'AI 帮写中…';
   try {
     let uploadId;
@@ -1250,6 +1274,8 @@ uxp.entrypoints.setup({
 
 document.addEventListener('DOMContentLoaded', () => {
   bindUI();
+  const apiSettings = mountApiSettings({ root: $('apiSettings'), plugin: true, select: fillSelect, request: async (method, route, body) => { const r = method === 'GET' ? await fetch(HELPER + route) : await post(route, body); const d = await r.json(); if (!r.ok) throw new Error(d.error || '设置请求失败'); return d; }, openLink: url => uxp.shell.openExternal(url) });
+  $('apiSettingsToggle').addEventListener('click', () => apiSettings.refresh());
   initShortcuts();
   checkHelper();
   setInterval(checkHelper, 5000);

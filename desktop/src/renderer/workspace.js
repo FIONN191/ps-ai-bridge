@@ -43,8 +43,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ---------- 顶栏标签 ----------
 function showTab(name) {
   for (const b of document.querySelectorAll('.tab-btn')) b.classList.toggle('active', b.dataset.tab === name);
-  $('tab-work').hidden = name !== 'work';
-  $('tab-settings').hidden = name !== 'settings';
+  for (const pane of document.querySelectorAll('.tab[id^="tab-"]')) pane.hidden = pane.id !== `tab-${name}`;
+  document.dispatchEvent(new CustomEvent('workspace-tab', { detail: name }));
   try { localStorage.setItem(TAB_KEY, name); } catch {}
   if (name === 'work') refreshJobs();
 }
@@ -59,7 +59,7 @@ function fillSelect(sel, items, value) {
 
 function fillProviders() {
   const prefs = readPrefs();
-  const items = Object.entries(work.health.providers).map(([k, p]) => [k, p.available ? p.label : `${p.label}（${p.note || '不可用'}）`, !p.available]);
+  const items = displayProviders(work.health.providers).map(([k, p]) => [k, p.available ? p.label : `${p.label}（${p.note || '不可用'}）`, !p.available]);
   fillSelect($('provider'), items, $('provider').value || prefs.provider || 'aistudio');
   refreshOptions();
 }
@@ -68,7 +68,7 @@ function refreshOptions() {
   const prefs = readPrefs();
   const caps = (work.health && work.health.providers[$('provider').value]) || {};
   $('modelField').hidden = !caps.models;
-  if (caps.models) fillSelect($('model'), caps.models.map((m) => [m, MODEL_LABELS[m] || m]), $('model').value || prefs.model);
+  if (caps.models) fillSelect($('model'), caps.models.map((m) => [m, caps.modelLabels?.[m] || MODEL_LABELS[m] || m]), $('model').value || prefs.model);
   fillSelect($('aspect'), [['auto', '自动（按原图）'], ...(caps.aspects || ['1:1']).map((a) => [a, a])], $('aspect').value || prefs.aspect || 'auto');
   $('resolutionField').hidden = !caps.resolutions;
   if (caps.resolutions) fillSelect($('resolution'), caps.resolutions.map((r) => [r, r]), $('resolution').value || prefs.resolution || '2K');
@@ -81,7 +81,7 @@ document.addEventListener('app-state', (e) => {
   work.base = `http://127.0.0.1:${s.helper.port}`;
   const h = s.helper.health;
   const first = h && !work.health;
-  const changed = h && work.health && JSON.stringify(Object.values(h.providers).map((p) => p.available)) !== JSON.stringify(Object.values(work.health.providers).map((p) => p.available));
+  const changed = h && work.health && JSON.stringify(h.providers) !== JSON.stringify(work.health.providers);
   work.health = h || work.health;
   if (first || changed) fillProviders();
   if (first) loadPresets();
@@ -223,7 +223,7 @@ function renderPresetDetail() {
   $('presetTitle').textContent = p.title;
   $('paramList').innerHTML = p.params.map((pa, i) => `
     <div class="param">
-      <div class="param-row"><span title="${esc(pa.desc)}">${esc(pa.name)}</span><input type="range" min="0" max="1" step="0.05" value="${pa.value}" data-param="${i}"><span id="wpv${i}">${pa.value}</span></div>
+      <div class="param-row"><span title="${esc(pa.desc)}">${esc(pa.name)}</span><input type="range" min="${pa.min ?? 0}" max="${pa.max ?? 1}" step="${pa.step ?? 0.05}" value="${pa.value}" data-param="${i}"><span id="wpv${i}">${pa.value}</span></div>
       ${pa.desc ? `<div class="param-desc">${esc(pa.desc)}</div>` : ''}
     </div>`).join('');
   $('fillList').innerHTML = p.fills.map((f, i) => `<div class="fill"><label>${esc(f.name)}</label><input type="text" data-fill="${i}" value="${esc(f.value)}"></div>`).join('');
@@ -232,9 +232,9 @@ function renderPresetDetail() {
 // 滑杆和填空直接改提示词框里的文字，看到的就是要发出去的
 function setParam(i, value) {
   const pa = work.preset.params[i];
-  pa.value = Math.round(Number(value) * 100) / 100;
+  pa.value = Number(Math.min(pa.max ?? 1, Math.max(pa.min ?? 0, Number(value))).toFixed(6));
   $(`wpv${i}`).textContent = String(pa.value);
-  const re = new RegExp(`("@param:${reEsc(pa.name)}"\\s*:\\s*)(-?[\\d.]+)`, 'g');
+  const re = new RegExp(`("?@param:${reEsc(pa.name)}"\\s*:\\s*)(-?[\\d.]+)`, 'g');
   $('genPrompt').value = $('genPrompt').value.replace(re, `$1${pa.value}`);
 }
 function setFill(i, value) {
@@ -353,8 +353,8 @@ $('provider').addEventListener('change', () => { refreshOptions(); savePrefs(); 
 for (const id of ['model', 'aspect', 'resolution', 'thinking', 'count', 'keepComposition', 'fallback']) $(id).addEventListener('change', savePrefs);
 
 // ---------- 生成记录 ----------
-const providerLabel = (k) => work.health?.providers[k]?.label || k;
-const originOf = (j) => (j.meta?.origin === 'desktop' ? 'desktop' : 'ps');
+const providerLabel = (k) => k === 'local-tool' ? '本地图像工具' : work.health?.providers[k]?.label || k;
+const originOf = (j) => j.meta?.origin || 'ps';
 const fmtTime = (t) => new Date(t).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 // 结构化提示词里第一个「做什么」：task / action 之类的字段，深度优先
@@ -407,13 +407,16 @@ function visibleGroups() {
 
 function sourceText(j) {
   const m = j.meta || {};
+  if (m.origin === 'batch') return '照片批处理';
+  if (m.origin === 'tools') return '本地图像工具';
+  if (m.origin === 'workflow') return '流程与分块';
   if (originOf(j) === 'desktop') return m.docName ? `桌面端 · PS「${m.docName}」` : `桌面端${m.fileName ? ` · ${m.fileName}` : ''}`;
   return `PS 面板${m.docName ? ` · ${m.docName}` : ''}`;
 }
 
 function renderGroups() {
   const groups = visibleGroups();
-  const key = JSON.stringify([$('jobSearch').value, $('jobFilter').value, groups.map((g) => [g.id, g.jobs.map((j) => [j.id, j.status, j.stage])])]);
+  const key = JSON.stringify([$('jobSearch').value, $('jobFilter').value, groups.map((g) => [g.id, g.jobs.map((j) => [j.id, j.status, j.stage, j.applied?.id])])]);
   if (key === work.renderedKey) return;
   work.renderedKey = key;
   if (!groups.length) {
@@ -434,7 +437,7 @@ function renderGroups() {
       <div class="g-thumbs">${thumbs}</div>
       <div class="g-actions">
         ${busy ? `<button data-cancel="${esc(g.id)}">取消</button>` : ''}
-        <button data-rerun="${esc(g.id)}">重新生成</button>
+        ${j0.provider !== 'local-tool' ? `<button data-rerun="${esc(g.id)}">重新生成</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -495,13 +498,13 @@ function viewerJobs() {
 
 // 哪些版本有：没原图就没有「送去的原图」；没对齐也没校色时贴回版本就是网页原图
 function modesOf(j) {
-  const changed = Boolean(j.result?.align?.applied) || (j.post?.cc && j.post.cc !== 'none');
+  const changed = Boolean(j.applied) || Boolean(j.result?.align?.applied) || (j.post?.cc && j.post.cc !== 'none');
   return { final: true, raw: changed, input: Boolean(j.inputPath) };
 }
 function srcOf(j, mode) {
   if (mode === 'raw') return `/jobs/${j.id}/result?raw=1`;
   if (mode === 'input') return `/jobs/${j.id}/input`;
-  return `/jobs/${j.id}/result?cc=${encodeURIComponent(j.post?.cc || 'none')}`;
+  return `/jobs/${j.id}/result?applied=${j.applied?.id || 'initial'}`;
 }
 
 function openViewer(groupId, jobId) {
@@ -539,6 +542,7 @@ function renderViewer(reset) {
   if (reset) Object.assign(v, { s: 1, x: 0, y: 0 });
   const r = j.result || {};
   $('vTitle').textContent = titleOf(j);
+  $('vRerun').hidden = j.provider === 'local-tool';
   $('vMeta').textContent = [providerLabel(j.provider), r.width && `${r.width}×${r.height}`, fmtTime(j.createdAt), sourceText(j), r.source].filter(Boolean).join(' · ');
   for (const b of $('vModes').querySelectorAll('button')) {
     b.disabled = !modes[b.dataset.mode];

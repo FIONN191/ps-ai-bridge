@@ -2,6 +2,8 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('bridge', {
+  openPack: () => ipcRenderer.invoke('pack:open'),
+  savePack: (name, data) => ipcRenderer.invoke('pack:save', name, data),
   state: () => ipcRenderer.invoke('state'),
   logs: () => ipcRenderer.invoke('logs'),
   restartHelper: () => ipcRenderer.invoke('helper:restart'),

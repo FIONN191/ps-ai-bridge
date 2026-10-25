@@ -135,3 +135,9 @@ input[type=text] { width: 100%; }
 .tex-label { margin-left: 4px; }
 .thumb.unplaced img { opacity: 0.55; }
 .apply-btn { margin-right: 10px; }
+
+.api-editor .field { display: flex; flex-direction: column; margin: 10px 0; }
+.api-editor input[type="text"], .api-editor input[type="password"], .api-editor input:not([type]), .api-editor select { width: 100%; min-height: 32px; }
+.api-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
+.api-status { padding: 10px; background: #292536; color: #dad0ff; white-space: pre-wrap; }
+.api-editor .check { display: flex; align-items: center; margin: 10px 0; }

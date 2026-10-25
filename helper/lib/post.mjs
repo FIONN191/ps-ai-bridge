@@ -420,6 +420,12 @@ export async function makeVariant({ inputPath, basePath, cc, tex, t, outPath }) 
   else if (cc === 'precise' || cc === 'mixed') O = await localColor(I, O, W, H, cc);
   if (tex) O = await restoreTexture(I, O, W, H);
   if (t < 1) O = t <= 0 ? I : await interpolate(I, O, W, H, t);
+  // Colour/texture adjustments must not discard the cutout's transparency.
+  if (meta.hasAlpha) {
+    const alpha = await sharp(basePath).ensureAlpha().extractChannel('alpha').raw().toBuffer();
+    await sharp(O, rawOpts(W, H)).joinChannel(alpha, { raw: { width: W, height: H, channels: 1 } }).png().toFile(outPath);
+    return outPath;
+  }
   return savePNG(O, W, H, outPath);
 }
 

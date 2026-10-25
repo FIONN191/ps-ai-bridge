@@ -178,6 +178,18 @@ const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'tif', 'tiff', 'gif', 'avif', 
 
 function registerIpc() {
   ipcMain.handle('state', () => collectState());
+  ipcMain.handle('pack:open', async () => {
+    const r = await dialog.showOpenDialog(win, { title: '选择 JSON 文件', filters: [{ name: 'JSON', extensions: ['json'] }], properties: ['openFile'] });
+    if (r.canceled) return null;
+    if (fs.statSync(r.filePaths[0]).size > 64 * 1024 * 1024) throw new Error('文件超过 64 MB');
+    return { name: path.basename(r.filePaths[0]), data: JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8')) };
+  });
+  ipcMain.handle('pack:save', async (_e, name, data) => {
+    const r = await dialog.showSaveDialog(win, { title: '导出数据包', defaultPath: String(name || 'presets.json').replace(/[/\\]/g, '_'), filters: [{ name: 'JSON', extensions: ['json'] }] });
+    if (r.canceled) return null;
+    fs.writeFileSync(r.filePath, JSON.stringify(data, null, 2));
+    return r.filePath;
+  });
   ipcMain.handle('api', (_e, method, p, body) => helperApi(method, p, body));
   // 本地图片 → helper 统一转成上传图（摆正、转 sRGB、限制长边）
   ipcMain.handle('upload:files', async (_e, files, maxSide) => {

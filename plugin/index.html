@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <link rel="stylesheet" href="style.css">
+  <script src="api-settings.js"></script>
   <script src="index.js"></script>
 </head>
 <body>
@@ -13,6 +14,9 @@
   </div>
   <div id="pluginUpdate" class="small update-note"></div>
   <div id="topHint" class="small hint top-hint"></div>
+
+  <div class="section-head" id="apiSettingsToggle" data-toggle="apiSettingsBody"><span>API 设置 · 墨墨 / GRS / 自定义</span></div>
+  <div id="apiSettingsBody" style="display:none"><div id="apiSettings"></div></div>
 
   <!-- 预设：剪影选部位 → 列表 → 参数滑杆 -->
   <div class="section-head" data-toggle="presetBody"><span>预设</span><span id="presetCount" class="small"></span></div>

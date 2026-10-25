@@ -5,6 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { config } from './config.mjs';
+import { atomicJson } from './store.mjs';
 import { alignOutput, makeVariant, thumbnail, CC_MODES, CC_VERSION, TEX_VERSION } from './post.mjs';
 
 const jobs = new Map();
@@ -30,8 +31,9 @@ export function saveUpload(buffer, mime) {
   return id;
 }
 // 同一张原图会被同一组的几个任务共用，所以这里复制而不是挪走；_uploads 里的旧文件启动时清理
-function useUpload(id) {
-  const file = uploads.get(id);
+export function useUpload(id) {
+  if (typeof id !== 'string' || !/^[a-f0-9]{16}$/.test(id)) return null;
+  const file = uploads.get(id) || ['png', 'jpg'].map(ext => path.join(config.outputDir, '_uploads', `${id}.${ext}`)).find(fs.existsSync);
   return file && fs.existsSync(file) ? file : null;
 }
 
@@ -48,8 +50,8 @@ export function getJob(id) {
   return jobs.get(id);
 }
 
-function persist(job) {
-  try { fs.writeFileSync(path.join(job.dir, 'job.json'), JSON.stringify(publicJob(job), null, 2)); } catch {}
+export function persist(job) {
+  atomicJson(path.join(job.dir, 'job.json'), publicJob(job));
 }
 
 export function cancelJob(id) {
@@ -165,6 +167,7 @@ export function createJob(params, providers, capabilities) {
     error: null,
     abort: new AbortController(),
   };
+  providers[params.provider].prepare?.(job);
   jobs.set(id, job);
   persist(job);
   enqueue(job, providers, capabilities);
@@ -211,7 +214,7 @@ async function run(job, providers, capabilities) {
   } catch (e) {
     const msg = e?.message || String(e);
     // 失败自动换平台：只换到支持同一比例的平台，否则贴回位置会对不上
-    const next = !job.abort.signal.aborted && job.fallbacks.find((p) => (capabilities[p]?.aspects || []).includes(job.aspect));
+    const next = !job.abort.signal.aborted && !job.upstream && job.fallbacks.find((p) => (capabilities[p]?.aspects || []).includes(job.aspect));
     if (next) {
       log(`${job.provider} 失败（${msg.split('\n')[0]}），换到 ${next}`);
       job.fallbacks = job.fallbacks.filter((p) => p !== next);
@@ -287,4 +290,46 @@ export async function variantPath(job, { cc = 'none', tex = false, t = 1 }) {
   r.variants[key] = out;
   persist(job);
   return out;
+}
+
+// One shared record for the image actually placed by Photoshop. Preview requests never change it.
+export function appliedVariant(job) {
+  return job.applied?.variant || { cc: job.post?.cc || 'none', tex: false, t: 1 };
+}
+
+export function normalizeVariant(value = {}) {
+  const cc = value.cc ?? 'none';
+  if (!CC_MODES.includes(cc)) throw new Error('校色参数无效');
+  const t = Number(value.t ?? 1);
+  if (!Number.isFinite(t) || t < 0 || t > 1) throw new Error('强度必须在 0 到 1 之间');
+  return { cc, tex: value.tex === true, t: Math.round(t * 20) / 20 };
+}
+
+export async function recordPlacement(job, body) {
+  if (job.status !== 'done') throw new Error('任务还没有完成');
+  const variant = normalizeVariant(body.variant);
+  const file = await variantPath(job, variant);
+  const placement = { id: crypto.randomUUID(), variant, path: file, at: Date.now(),
+    document: { id: Number(body.docId) || null, name: String(body.docName || '').slice(0, 250) },
+    layerId: Number(body.layerId) || null, groupId: String(body.groupId || '').slice(0, 100) };
+  job.placements = [...(job.placements || []), placement].slice(-100);
+  job.applied = placement;
+  persist(job);
+  return placement;
+}
+
+export async function createLocalResult({ sourcePath, buffer, title, parameters }) {
+  const id = `${stamp()}-${crypto.randomBytes(4).toString('hex')}`;
+  const dir = path.join(config.outputDir, id.slice(0, 8), id);
+  fs.mkdirSync(dir, { recursive: true });
+  const output = path.join(dir, 'output.png'), input = path.join(dir, `input${path.extname(sourcePath)}`);
+  fs.copyFileSync(sourcePath, input); fs.writeFileSync(output, buffer);
+  const { imageSize } = await import('./image.mjs');
+  const size = await imageSize(output);
+  const j = { id, groupId: id, schemaVersion: 1, dir, provider: 'local-tool', prompt: title, model: parameters?.model || 'sharp',
+    inputPath: input, refPaths: [], status: 'done', createdAt: Date.now(), finishedAt: Date.now(),
+    post: { align: false, cc: 'none' }, meta: { origin: 'tools', title, parameters }, log: [],
+    result: { path: output, base: output, bytes: buffer.length, ...size, source: parameters?.model ? `本地模型 · ${parameters.model}` : '本地调整', variants: {} }, abort: new AbortController() };
+  jobs.set(id, j); persist(j); await ensureThumb(j);
+  return publicJob(j);
 }

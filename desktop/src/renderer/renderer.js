@@ -77,8 +77,8 @@ function renderHealth(health) {
   $('chromeText').textContent = c.found
     ? `网页平台（AI Studio、Flow、ChatGPT）不需要 API Key，用你自己的账号，在一个单独的 ${name} 窗口里生图，和你平时用的浏览器互不影响。登录一次即可，之后出图时它在后台运行。`
     : '没找到 Google Chrome（Windows 上也没找到 Edge）。网页平台需要它，请先安装 Google Chrome。';
-  $('providers').innerHTML = Object.values(health.providers || {})
-    .map((p) => `<li class="${p.available ? 'yes' : 'no'}">${esc(p.label)}${p.available ? '' : `（${esc(p.note || '不可用')}）`}</li>`).join('');
+  $('providers').innerHTML = displayProviders(health.providers)
+    .map(([, p]) => `<li class="${p.available ? 'yes' : 'no'}">${esc(p.label)}${p.available ? '' : `（${esc(p.note || '不可用')}）`}</li>`).join('');
 }
 
 async function refresh() {
