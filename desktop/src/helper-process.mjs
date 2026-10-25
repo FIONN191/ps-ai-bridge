@@ -49,7 +49,7 @@ export class HelperProcess extends EventEmitter {
     const stamped = `${new Date().toTimeString().slice(0, 8)} ${line}`;
     this.logs.push(stamped);
     if (this.logs.length > MAX_LOG_LINES) this.logs.splice(0, this.logs.length - MAX_LOG_LINES);
-    this.logStream.write(`${new Date().toISOString().slice(0, 10)} ${stamped}\n`);
+    this.logStream.write(`${new Date().toLocaleDateString('sv-SE')} ${stamped}\n`); // sv-SE 是本地日期的 YYYY-MM-DD 写法
     this.emit('log', stamped);
   }
 
