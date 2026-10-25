@@ -1,6 +1,6 @@
 # macOS 快捷键组件
 
-源码 hotkey.swift 使用系统 Carbon RegisterEventHotKey，不录制或监听普通输入，不使用事件 tap。仅前台 bundle ID 为 com.adobe.Photoshop 且插件心跳不超过 2 秒时注册；离开 PS 或心跳失效时释放。
+源码 hotkey.swift 使用系统 Carbon RegisterEventHotKey，不录制或监听普通输入，不使用事件 tap。热键事件要靠 NSApplication 的事件循环分发（不显示 Dock 图标），只跑 RunLoop 会注册成功却收不到按键（0.5.4 之前就是这样）。仅前台 bundle ID 为 com.adobe.Photoshop 且插件心跳不超过 2 秒时注册；离开 PS 或心跳失效时释放。
 
 通过 stdin 接收 JSON 行 {code, mods, enabled}；stdout 返回 ready / error:OSStatus / fire。按下到松开之间只发送一次 fire。stdin 关闭时退出。
 

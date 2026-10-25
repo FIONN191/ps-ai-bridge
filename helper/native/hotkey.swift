@@ -1,6 +1,12 @@
 import AppKit
 import Carbon
 
+// Carbon 的全局快捷键事件要靠应用的事件循环分发：必须启动 NSApplication（.accessory 不显示 Dock 图标），
+// 只跑 RunLoop 的话注册会成功，但按键永远收不到。
+let app = NSApplication.shared
+app.setActivationPolicy(.accessory)
+// 只在这个程序在前台时生效；PS_AI_BRIDGE_HOTKEY_APP 是测试用的，平时就是 Photoshop（正式版和 Beta 的 bundle ID 一样）
+let targetApp = ProcessInfo.processInfo.environment["PS_AI_BRIDGE_HOTKEY_APP"] ?? "com.adobe.Photoshop"
 var hotkey: EventHotKeyRef?
 var code: UInt32 = 5
 var mods: UInt32 = UInt32(cmdKey)
@@ -11,7 +17,7 @@ var lastStatus = ""
 func emit(_ value: String) { print(value); fflush(stdout) }
 func refresh() {
     let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
-    let active = enabled && Date().timeIntervalSince(lastHeartbeat) < 2 && front == "com.adobe.Photoshop"
+    let active = enabled && Date().timeIntervalSince(lastHeartbeat) < 2 && front == targetApp
     if !active {
         if let h = hotkey { UnregisterEventHotKey(h); hotkey = nil }
         held = false
@@ -46,4 +52,4 @@ DispatchQueue.global().async {
     DispatchQueue.main.async { exit(0) }
 }
 let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in refresh() }
-RunLoop.main.run()
+app.run()
