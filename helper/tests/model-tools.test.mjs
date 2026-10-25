@@ -160,8 +160,13 @@ test('Forge / model workflows / engine management',async t=>{
   await ep('probe',{model:'u2netp'});await assert.rejects(()=>ep('uninstall',{target:'environment'}),/正在运行/);
   // Readiness is written only AFTER installing SIGTERM handling, avoiding a startup race.
   const readyFile=path.join(dir,'probe-started'),deadline=Date.now()+10000;
-  while(!fs.existsSync(readyFile)&&Date.now()<deadline)await new Promise(r=>setTimeout(r,20));
-  assert.ok(fs.existsSync(readyFile),'mock worker did not become ready');const workerPid=Number(fs.readFileSync(readyFile,'utf8'));
+  let workerPid=0;
+  while(Date.now()<deadline){
+   const marker=fs.existsSync(readyFile)?fs.readFileSync(readyFile,'utf8').trim():'';
+   if(/^[1-9][0-9]*$/.test(marker)){workerPid=Number(marker);break;}
+   await new Promise(r=>setTimeout(r,20));
+  }
+  assert.ok(workerPid>0,'mock worker did not publish a complete PID marker');
   assert.equal(workers.length,1,'probe must launch exactly one worker');
   assert.equal(workers[0].child.pid,workerPid,'stop must track the actual worker PID');
   const stopped=await ep('stop');

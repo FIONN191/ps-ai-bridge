@@ -5,6 +5,7 @@ import { spawn, execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {setTimeout as delay} from 'node:timers/promises';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const MAX_LOG_LINES = 2000;
@@ -162,5 +163,18 @@ export class HelperProcess extends EventEmitter {
     await this.stop();
     this.crashes = [];
     await this.start();
+  }
+}
+
+// Queue the first request while the managed service is starting. This never retries
+// a submitted request, so paid generation and other mutations cannot be duplicated.
+export async function waitForHelperReady(helper,{signal,timeoutMs=30000}={}) {
+  const deadline=Date.now()+timeoutMs;
+  for(;;){
+    signal?.throwIfAborted();
+    if(!helper || helper.stopping || helper.state.status==='error')throw new Error(helper?.state.error||'本机服务没有运行');
+    if(['running','external'].includes(helper.state.status))return;
+    if(Date.now()>=deadline)throw new Error('本机服务启动超时，请在设置中查看日志');
+    await delay(Math.min(100,Math.max(1,deadline-Date.now())),undefined,{signal});
   }
 }

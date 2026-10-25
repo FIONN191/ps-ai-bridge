@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { HelperProcess, loginShellPath } from './helper-process.mjs';
+import { HelperProcess, loginShellPath, waitForHelperReady } from './helper-process.mjs';
 import { createInstaller, isPhotoshopRunning } from './plugin-installer.mjs';
 import { Updater } from './updater.mjs';
 import { createOrganizerDesktop } from './organizer-desktop.mjs';
@@ -166,6 +166,7 @@ const helperUrl = (p) => {
   return `http://127.0.0.1:${PORT}${p}`;
 };
 async function helperApi(method, p, body, { signal } = {}) {
+  await waitForHelperReady(helper,{signal});
   const post = method !== 'GET';
   const r = await fetch(helperUrl(p), {
     method, signal,
