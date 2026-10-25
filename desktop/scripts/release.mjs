@@ -55,7 +55,10 @@ const gh = (args) => execFileSync('gh', args, { stdio: 'inherit', cwd: REPO_ROOT
 const revision=execFileSync('git',['rev-parse','HEAD'],{cwd:REPO_ROOT,encoding:'utf8'}).trim();
 gh(['release', 'create', tag, '--repo', repo, '--title', tag, '--notes-file', notesFile, '--draft', '--target', revision,
   ...Object.values(FILES).map((n) => path.join(OUT, n)), manifestFile]);
-const uploaded=JSON.parse(execFileSync('gh',['api',`repos/${repo}/releases/tags/${tag}`],{cwd:REPO_ROOT,encoding:'utf8'}));
+// A draft has no published Git tag yet; resolve its release ID from the authenticated list.
+const releases=JSON.parse(execFileSync('gh',['api',`repos/${repo}/releases?per_page=100`],{cwd:REPO_ROOT,encoding:'utf8'}));
+const uploaded=releases.find(release=>release.tag_name===tag && release.draft);
+if(!uploaded) throw new Error(`未找到待验证的发布草稿：${tag}`);
 for(const local of [...Object.values(FILES).map(n=>path.join(OUT,n)),manifestFile]){
   const asset=uploaded.assets.find(a=>a.name===path.basename(local));
   if(!asset||asset.state!=='uploaded'||asset.size!==fs.statSync(local).size||asset.digest!==`sha256:${sha256(local)}`)
