@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self' data: http://127.0.0.1:*; script-src 'self'">
+<title>AI 生图贴回</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="workspace.css">
+</head>
+<body>
+<nav class="topbar">
+  <img class="logo-sm" src="../../assets/icon.png" alt="">
+  <div class="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="work" role="tab">工作台</button>
+    <button class="tab-btn" data-tab="settings" role="tab">设置</button>
+  </div>
+  <span class="spacer"></span>
+  <button class="link" id="openGuide">使用说明</button>
+  <span class="status" id="psStatus"><i class="dot"></i><span>Photoshop 未连接</span></span>
+  <span class="status" id="topStatus"><i class="dot"></i><span>本机服务…</span></span>
+</nav>
+
+<div class="tab work" id="tab-work">
+  <aside class="gen" id="genPanel">
+    <div class="field">
+      <div class="lbl">原图</div>
+      <div class="seg" id="sourceSeg">
+        <button data-source="ps">PS 选区</button>
+        <button data-source="file">本地图片</button>
+        <button data-source="none">不用原图</button>
+      </div>
+      <p class="mute small-note" id="psNote"></p>
+      <div class="drop" id="inputDrop" hidden>
+        <div class="drop-empty" id="inputEmpty">把图片拖到这里，或 <button class="link inline" id="pickInput">选择图片</button> · <button class="link inline" id="pasteInput">粘贴</button></div>
+        <div class="drop-preview" id="inputPreview" hidden>
+          <img id="inputImg" alt="">
+          <div class="drop-meta"><span id="inputMeta"></span><button class="link inline" id="clearInput">移除</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="lbl">参考图 <span class="mute">最多 4 张</span></div>
+      <div class="refs" id="refs"></div>
+    </div>
+
+    <div class="field">
+      <div class="lbl">预设 <span class="mute" id="presetCount"></span></div>
+      <div class="preset-bar">
+        <input type="search" id="presetSearch" placeholder="搜名字或拼音首字母，如 tf">
+        <select id="presetCat"></select>
+      </div>
+      <div class="preset-list" id="presetList"></div>
+      <div class="preset-detail" id="presetDetail" hidden>
+        <div class="preset-title"><strong id="presetTitle"></strong><button class="link inline" id="presetClear">不用预设</button></div>
+        <div id="paramList"></div>
+        <div id="fillList"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="lbl">提示词</div>
+      <textarea id="genPrompt" rows="6" placeholder="写要怎么改，或者先选一个预设"></textarea>
+      <label class="check"><input type="checkbox" id="keepComposition" checked> 要求模型保持构图（有原图时）</label>
+    </div>
+
+    <div class="grid2">
+      <label class="field"><span class="lbl">平台</span><select id="provider"></select></label>
+      <label class="field" id="modelField"><span class="lbl">模型</span><select id="model"></select></label>
+      <label class="field"><span class="lbl">比例</span><select id="aspect"></select></label>
+      <label class="field" id="resolutionField"><span class="lbl">分辨率</span><select id="resolution"></select></label>
+      <label class="field" id="thinkingField"><span class="lbl">思考强度</span><select id="thinking"></select></label>
+      <label class="field"><span class="lbl">张数</span><select id="count"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+    </div>
+    <label class="check"><input type="checkbox" id="fallback" checked> 失败自动换平台</label>
+    <p class="small-note acc-warn" id="providerNote" hidden></p>
+
+    <div class="gen-actions">
+      <button class="primary big" id="generate">生成</button>
+      <p class="mute small-note" id="genHint"></p>
+    </div>
+  </aside>
+
+  <section class="results">
+    <div class="results-head">
+      <h2>生成记录</h2>
+      <input type="search" id="jobSearch" placeholder="搜索提示词">
+      <select id="jobFilter">
+        <option value="">全部来源</option>
+        <option value="desktop">桌面端</option>
+        <option value="ps">Photoshop 面板</option>
+      </select>
+    </div>
+    <div class="groups" id="groups"><p class="mute empty">本机服务就绪后显示</p></div>
+  </section>
+</div>
+
+<div class="tab settings" id="tab-settings" hidden>
+<main>
+  <section class="card" id="pluginCard">
+    <div class="card-head">
+      <h2>Photoshop 插件</h2>
+      <span class="mute" id="bundled"></span>
+    </div>
+    <ul class="ps-list" id="psList"><li class="mute">正在查找 Photoshop…</li></ul>
+    <div class="actions">
+      <button class="primary" id="install" disabled>一键安装插件</button>
+      <button id="uninstall" hidden>卸载</button>
+      <button class="link" id="addPs">手动添加 Photoshop…</button>
+    </div>
+    <p class="mute alt">装好并重启后 Photoshop 里还是没有面板？<button class="link inline" id="viaCC">改用 Creative Cloud 安装</button></p>
+    <div class="notice" id="pluginNotice" hidden></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>本机服务</h2>
+      <span class="status" id="helperStatus"><i class="dot"></i><span>检查中…</span></span>
+    </div>
+    <p class="mute" id="helperDetail">Photoshop 面板通过它调用各个生图平台，关掉窗口后会在后台继续运行。</p>
+    <div class="actions">
+      <button id="openConsole">打开控制台</button>
+      <button id="restartHelper">重启服务</button>
+      <button class="link" id="toggleLogs">查看日志</button>
+    </div>
+    <div class="logs" id="logsBox" hidden>
+      <pre id="logs"></pre>
+      <button class="link" id="openLogFile">在文件夹里显示日志文件</button>
+    </div>
+  </section>
+
+  <section class="card" id="accountsCard">
+    <div class="card-head">
+      <h2>账号登录</h2>
+    </div>
+    <p id="chromeText" class="mute">网页平台（AI Studio、Flow、ChatGPT）不需要 API Key，用你自己的账号，在一个单独的 Chrome 窗口里生图，和你平时用的浏览器互不影响。登录一次即可，之后出图时它在后台运行。</p>
+    <ul class="accounts">
+      <li>
+        <div><div class="acc-name">Google 账号</div><div class="mute">AI Studio、Google Flow（Nano Banana）</div></div>
+        <span class="acc-state" data-acc="google"></span>
+        <button data-login="google">用 Google 账号登录</button>
+      </li>
+      <li>
+        <div><div class="acc-name">ChatGPT 账号</div><div class="mute">ChatGPT 网页（GPT Image）</div></div>
+        <span class="acc-state" data-acc="chatgpt"></span>
+        <button data-login="chatgpt">用 ChatGPT 账号登录</button>
+      </li>
+    </ul>
+    <label class="check"><input type="checkbox" id="closeTabs"> 出图后自动关闭专用 Chrome 里的标签页</label>
+    <p class="mute buy">还没有账号？<a href="https://aiprobe.yumeapi.cn/home" target="_blank">购买账号</a> · <a href="https://aiprobe.yumeapi.cn/search?q=gemini" target="_blank">购买 Gemini Pro 账号</a></p>
+    <div class="notice warn"><strong>使用须知</strong>：使用无需 API 的生图服务（AI Studio、Google Flow、ChatGPT 网页）需要自备魔法，专用 Chrome 要能正常打开 Google 和 ChatGPT。出图后标签页默认留在专用 Chrome 里，可以直接在网页上看生成的样子；网页上的原图也存在任务文件夹里，在工作台看大图时可以切到「网页原图」。</div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>生图平台</h2>
+    </div>
+    <ul class="providers" id="providers"><li class="mute">本机服务就绪后显示</li></ul>
+    <p class="mute">官方 API 通道要在配置文件里填 Key，改完点「重启服务」。</p>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>设置</h2>
+      <span class="mute" id="appMeta">桌面端</span>
+    </div>
+    <div class="version-row">
+      <span id="updateText" class="mute">自动检查更新</span>
+      <button id="checkUpdate">检查更新</button>
+    </div>
+    <label class="check"><input type="checkbox" id="openAtLogin"> 开机时自动启动（只在后台运行）</label>
+    <div class="actions">
+      <button id="openOutput">结果文件夹</button>
+      <button id="openConfig">配置文件（API Key）</button>
+      <button id="openData">数据文件夹</button>
+    </div>
+  </section>
+
+  <footer class="mute">
+    本程序以 GNU GPL v3 发布。出厂预设、预设格式与剪影分区来自夏三七「修图轮椅 V6」（GPLv3）。
+  </footer>
+</main>
+</div>
+
+<div class="viewer" id="viewer" hidden>
+  <div class="viewer-top">
+    <div class="viewer-title">
+      <strong id="vTitle"></strong>
+      <span class="mute" id="vMeta"></span>
+    </div>
+    <div class="seg" id="vModes">
+      <button data-mode="final" title="对齐、校色后贴回 PS 的版本">贴回版本</button>
+      <button data-mode="raw" title="网页上生成的原图，没对齐、没校色">网页原图</button>
+      <button data-mode="input" title="送去生图的原图（PS 选区导出的那块）">送去的原图</button>
+    </div>
+    <div class="seg" id="vCompare">
+      <button data-compare="">不对比</button>
+      <button data-compare="input:final">原图 ↔ 贴回版本</button>
+      <button data-compare="raw:final">网页原图 ↔ 贴回版本</button>
+    </div>
+    <button class="icon-btn" id="vClose" title="关闭（Esc）">✕</button>
+  </div>
+  <div class="stage" id="stage">
+    <div class="layer" id="layerBottom"><img id="imgBottom" alt="" draggable="false"></div>
+    <div class="layer top" id="layerTop" hidden><img id="imgTop" alt="" draggable="false"></div>
+    <div class="handle" id="handle" hidden><span id="handleLeft"></span><span id="handleRight"></span></div>
+    <button class="nav prev" id="vPrev" title="上一张（←）">‹</button>
+    <button class="nav next" id="vNext" title="下一张（→）">›</button>
+    <div class="stage-msg" id="stageMsg" hidden></div>
+    <div class="zoom-tag" id="zoomTag" hidden></div>
+  </div>
+  <div class="viewer-bottom">
+    <div class="viewer-actions">
+      <button class="primary" id="vPaste">贴到 PS 当前选区</button>
+      <button id="vReuse">用这张继续改</button>
+      <button id="vRerun">重新生成</button>
+      <button id="vCopy">复制图片</button>
+      <button id="vReveal">在文件夹中显示</button>
+      <button id="vCopyPrompt">复制提示词</button>
+      <span class="spacer"></span>
+      <span class="mute" id="vIndex"></span>
+    </div>
+    <details class="viewer-prompt"><summary>提示词与日志</summary><pre id="vPrompt"></pre></details>
+  </div>
+</div>
+
+<div class="modal" id="guide" hidden>
+  <div class="modal-box">
+    <h2>欢迎使用 AI 生图贴回</h2>
+    <p class="mute">在 Photoshop 里框选一块画面，AI 生成后自动贴回原位置。三步就能用：</p>
+    <ol class="steps">
+      <li>
+        <div class="step-head"><strong>安装 Photoshop 插件</strong><span class="step-state" id="gPlugin"></span></div>
+        <p class="mute">把插件装进 Photoshop 2024（25.0）以上版本。装完重启 Photoshop，在菜单「增效工具 → AI 生图贴回」打开面板。</p>
+        <button id="gInstall">一键安装插件</button>
+      </li>
+      <li>
+        <div class="step-head"><strong>登录生图账号</strong></div>
+        <p class="mute">网页平台不需要 API Key，用你自己的 Google / ChatGPT 账号，在专用 Chrome 里登录一次即可。</p>
+        <div class="g-accounts">
+          <div><button data-login="google">用 Google 账号登录</button><span class="acc-state" data-acc="google"></span></div>
+          <div><button data-login="chatgpt">用 ChatGPT 账号登录</button><span class="acc-state" data-acc="chatgpt"></span></div>
+        </div>
+        <p class="mute">还没有账号？<a href="https://aiprobe.yumeapi.cn/home" target="_blank">购买账号</a> · <a href="https://aiprobe.yumeapi.cn/search?q=gemini" target="_blank">购买 Gemini Pro 账号</a></p>
+      </li>
+      <li>
+        <div class="step-head"><strong>开始生图</strong></div>
+        <p class="mute">在 Photoshop 面板里框选 → 选预设或写提示词 → 生成并贴回。也可以在桌面端「工作台」里生图、看大图、对比网页原图和贴回的版本。</p>
+      </li>
+    </ol>
+    <div class="notice warn"><strong>使用须知</strong>：使用无需 API 的生图服务（AI Studio、Google Flow、ChatGPT 网页）需要自备魔法，专用 Chrome 要能正常打开 Google 和 ChatGPT。</div>
+    <div class="modal-actions">
+      <span class="mute">之后可以点顶栏的「使用说明」再打开</span>
+      <button class="primary" id="guideDone">知道了，开始使用</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="updateModal" hidden>
+  <div class="modal-box update-box">
+    <h2 id="upTitle">发现新版本</h2>
+    <p class="mute" id="upMeta"></p>
+    <pre class="up-notes" id="upNotes"></pre>
+    <div class="up-progress" id="upProgress" hidden><div class="up-bar"><i id="upBar"></i></div><span id="upPct"></span></div>
+    <p class="up-msg" id="upMsg" hidden></p>
+    <div class="modal-actions">
+      <button class="link" id="upSkip">跳过这个版本</button>
+      <span class="spacer"></span>
+      <button id="upLater">以后再说</button>
+      <button class="primary" id="upInstall">立即更新</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<script src="common.js"></script>
+<script src="renderer.js"></script>
+<script src="workspace.js"></script>
+<script src="accounts.js"></script>
+<script src="updates.js"></script>
+</body>
+</html>

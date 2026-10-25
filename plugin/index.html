@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+  <script src="index.js"></script>
+</head>
+<body>
+  <div class="status-row">
+    <span id="helperDot" class="dot"></span>
+    <span id="helperText" class="small grow">正在连接 helper…</span>
+    <a id="toggleHistory" class="small link">历史</a>
+  </div>
+  <div id="topHint" class="small hint top-hint"></div>
+
+  <!-- 预设：剪影选部位 → 列表 → 参数滑杆 -->
+  <div class="section-head" data-toggle="presetBody"><span>预设</span><span id="presetCount" class="small"></span></div>
+  <div id="presetBody">
+    <div class="preset-top">
+      <div id="silhouette" class="silhouette">
+        <img src="icons/body/body.png" class="silhouette-img">
+        <div id="silhouetteLabels"></div>
+      </div>
+      <div class="preset-side">
+        <input id="presetSearch" type="text" placeholder="搜名字或拼音首字母，如 tf">
+        <div class="chip-row">
+          <span class="chip" data-cat="">全部</span>
+          <span class="chip" data-cat="*">★ 收藏</span>
+        </div>
+        <div id="catNow" class="small"></div>
+        <div id="presetList" class="preset-list"></div>
+      </div>
+    </div>
+    <div id="presetDetail" class="preset-detail hidden">
+      <div class="detail-head">
+        <span id="presetTitle" class="grow"></span>
+        <a id="presetStar" class="small link">☆ 收藏</a>
+        <a id="presetDelete" class="small link">删除</a>
+      </div>
+      <div id="paramList"></div>
+      <div id="fillList"></div>
+    </div>
+  </div>
+
+  <label class="lbl" for="prompt">提示词</label>
+  <textarea id="prompt" placeholder="选一个预设，或者直接写：例如 去掉背景里的路人和灯架，地面补成干净的展馆地毯"></textarea>
+  <div class="row-inline">
+    <a id="clearPrompt" class="small link">清空</a>
+    <a id="openSave" class="small link">存为预设</a>
+    <a id="assist" class="small link">AI 帮写提示词</a>
+  </div>
+  <div id="saveRow" class="save-row hidden">
+    <input id="saveName" type="text" placeholder="预设名字">
+    <div class="dd" id="saveCat"></div>
+    <button id="saveBtn">保存</button>
+  </div>
+  <div class="check-row">
+    <input type="checkbox" id="keepComposition" checked>
+    <label for="keepComposition" class="small">要求模型保持构图（贴回更容易对齐）</label>
+  </div>
+
+  <!-- 参考图 -->
+  <div class="section-head"><span>参考图</span><span id="refCount" class="small">0/4</span></div>
+  <div id="refList" class="ref-list"></div>
+  <div class="row-inline">
+    <a id="refSelection" class="small link">PS 选区加参考</a>
+    <a id="refScreenshot" class="small link">截图加参考</a>
+    <a id="refClear" class="small link">清空</a>
+  </div>
+
+  <!-- 生成 -->
+  <div class="section-head"><span>生成</span></div>
+  <div class="row">
+    <div class="field grow2">
+      <label class="lbl" for="provider">平台</label>
+      <div class="dd" id="provider"></div>
+    </div>
+    <div class="field small-field">
+      <label class="lbl" for="count">张数</label>
+      <div class="dd" id="count">
+        <div data-v="1">1</div>
+        <div data-v="2">2</div>
+        <div data-v="3">3</div>
+        <div data-v="4">4</div>
+      </div>
+    </div>
+  </div>
+  <div class="field" id="modelField">
+    <label class="lbl" for="model">模型</label>
+    <div class="dd" id="model"></div>
+  </div>
+  <div class="row">
+    <div class="field half">
+      <label class="lbl" for="aspect">比例</label>
+      <div class="dd" id="aspect"></div>
+    </div>
+    <div class="field half" id="resolutionField">
+      <label class="lbl" for="resolution">分辨率</label>
+      <div class="dd" id="resolution"></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="field half" id="thinkingField">
+      <label class="lbl" for="thinking">思考强度</label>
+      <div class="dd" id="thinking"></div>
+    </div>
+    <div class="field half">
+      <label class="lbl" for="padding">选区外扩</label>
+      <div class="dd" id="padding">
+        <div data-v="0">0%</div>
+        <div data-v="10">10%</div>
+        <div data-v="25">25%</div>
+        <div data-v="50">50%</div>
+      </div>
+    </div>
+  </div>
+  <div class="field">
+    <label class="lbl" for="source">发送的画面</label>
+    <div class="dd" id="source">
+      <div data-v="auto">自动（有选区发合并可见，没有发当前图层）</div>
+      <div data-v="visible">合并可见图层</div>
+      <div data-v="layer">只发当前图层</div>
+      <div data-v="none">不发图（纯文字生图）</div>
+    </div>
+  </div>
+  <div class="check-row">
+    <input type="checkbox" id="fallback" checked>
+    <label for="fallback" class="small">失败自动换平台（只换到支持同一比例的）</label>
+  </div>
+
+  <!-- 贴回 -->
+  <div class="section-head" data-toggle="returnBody"><span>贴回</span></div>
+  <div id="returnBody">
+    <div class="check-row">
+      <input type="checkbox" id="maskWithSelection" checked>
+      <label for="maskWithSelection" class="small">用原选区做蒙版</label>
+    </div>
+    <div class="slider-row">
+      <span class="small slider-label">蒙版收缩</span>
+      <sp-slider id="shrink" min="0" max="20" step="1" value="2"></sp-slider>
+      <span id="shrinkVal" class="small slider-val">2%</span>
+    </div>
+    <div class="slider-row">
+      <span class="small slider-label">边缘羽化</span>
+      <sp-slider id="blur" min="0" max="20" step="1" value="5"></sp-slider>
+      <span id="blurVal" class="small slider-val">5%</span>
+    </div>
+    <div class="row">
+      <div class="field half">
+        <label class="lbl" for="returnAs">传回为</label>
+        <div class="dd" id="returnAs">
+          <div data-v="smart" data-sel>智能对象</div>
+          <div data-v="raster">普通图层</div>
+        </div>
+      </div>
+      <div class="field half">
+        <label class="lbl" for="groupColor">生成组颜色</label>
+        <div class="dd" id="groupColor">
+          <div data-v="none">无</div>
+          <div data-v="red">红</div>
+          <div data-v="orange">橙</div>
+          <div data-v="yellowColor">黄</div>
+          <div data-v="grain">绿</div>
+          <div data-v="blue">蓝</div>
+          <div data-v="violet" data-sel>紫</div>
+          <div data-v="gray">灰</div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field half">
+        <label class="lbl" for="cc">校色</label>
+        <div class="dd" id="cc">
+          <div data-v="none">不校色</div>
+          <div data-v="global">全局校色</div>
+          <div data-v="precise">精准校色</div>
+          <div data-v="mixed">混合校色</div>
+        </div>
+      </div>
+      <div class="field half checks">
+        <div class="check-row">
+          <input type="checkbox" id="align" checked>
+          <label for="align" class="small">快速对齐</label>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="sound" checked>
+          <label for="sound" class="small">完成提示音</label>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="tex">
+          <label for="tex" class="small">替换纹理</label>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="autoReturn" checked>
+          <label for="autoReturn" class="small">自动传回</label>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label class="lbl" for="checkpointMin">检查点（生成时存整张画布的无损 PNG，PS 崩了能找回）</label>
+      <div class="dd" id="checkpointMin">
+        <div data-v="0" data-sel>关闭</div>
+        <div data-v="5">每 5 分钟最多一张</div>
+        <div data-v="10">每 10 分钟最多一张</div>
+        <div data-v="30">每 30 分钟最多一张</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label class="lbl" for="shortcutValue">生成并贴回快捷键</label>
+    <input id="shortcutValue" type="text" value="Cmd+G" placeholder="如 Cmd+Shift+G">
+    <div class="check-row"><input id="shortcutEnabled" type="checkbox" checked><label for="shortcutEnabled" class="small">启用</label><button id="shortcutSave">保存快捷键</button></div>
+    <div id="shortcutStatus" class="small">连接 helper 后生效；支持 Cmd / Ctrl / Alt / Shift。</div>
+  </div>
+  <button id="generate" uxp-variant="cta">生成并贴回</button>
+  <div id="hint" class="small hint"></div>
+
+  <div class="jobs-head">
+    <span class="lbl">生成组</span>
+    <span class="links">
+      <a id="openChrome" class="small link">打开专用 Chrome</a>
+      <a id="openConsole" class="small link">控制台</a>
+    </span>
+  </div>
+  <div id="groups"></div>
+  <div id="history" class="hidden"></div>
+</body>
+</html>

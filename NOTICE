@@ -1,0 +1,11 @@
+PS AI Bridge（AI 生图贴回）
+
+本项目以 GNU General Public License v3（或更高版本）发布，见 LICENSE。
+
+包含或参考了以下 GPLv3 项目的内容：
+  夏三七的修图轮椅 V6（xiasanqi Wheelchair）
+  Copyright (C) 2026 xiasanqi（夏三七）
+  - helper/presets/factory/ 下的出厂预设（原样复制）
+  - 预设格式、"@param" 参数滑杆、【填空】字段与 MODULE 块清理规则（plugin/index.js 的 sanitizePrompt）
+  - 人体剪影分区与 plugin/icons/body/body.png
+  - 贴回时按选区短边百分比收缩 + 模糊蒙版的羽化做法

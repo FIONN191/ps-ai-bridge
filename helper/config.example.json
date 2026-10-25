@@ -1,0 +1,15 @@
+{
+  "port": 47811,
+  "outputDir": "~/Pictures/AI生图/ps-ai-bridge",
+  "chrome": {
+    "app": "",
+    "profileDir": "",
+    "debugPort": 47812
+  },
+  "imagenSkillDir": "~/.claude/skills/agent-imagen-skill",
+  "geminiApiKey": "",
+  "geminiModel": "gemini-3-pro-image-preview",
+  "openaiApiKey": "",
+  "openaiModel": "gpt-image-1",
+  "checkpointMaxGB": 20
+}

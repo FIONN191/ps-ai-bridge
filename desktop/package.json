@@ -1,0 +1,27 @@
+{
+  "name": "ps-ai-bridge-desktop",
+  "productName": "PS AI Bridge",
+  "version": "0.5.0",
+  "description": "AI 生图贴回桌面端：托管本机 helper，一键把插件装进 Photoshop",
+  "author": "fionn",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "main": "src/main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "icons": "node scripts/make-icons.mjs",
+    "dist:mac": "node scripts/build.mjs mac",
+    "dist:win": "node scripts/build.mjs win",
+    "dist": "node scripts/build.mjs mac win",
+    "release": "node scripts/release.mjs"
+  },
+  "devDependencies": {
+    "electron": "44.9.3",
+    "electron-builder": "26.17.0",
+    "sharp": "0.34.5"
+  },
+  "psAiBridge": {
+    "repo": "FIONN191/ps-ai-bridge"
+  }
+}

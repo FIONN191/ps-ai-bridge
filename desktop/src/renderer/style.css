@@ -1,0 +1,87 @@
+:root {
+  --bg: #f6f6f4; --card: #fff; --fg: #1d1d1b; --mute: #6b6b66; --line: #e3e2dd;
+  --ok: #1f7a4a; --err: #b3261e; --run: #8a5a00; --accent: #5b3fd6; --accent-fg: #fff;
+  --notice: #f1edff; --warn-bg: #fff4e0;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161615; --card: #1f1f1d; --fg: #ecebe6; --mute: #9b9a93; --line: #33332f;
+    --ok: #5cc28b; --err: #ff8a80; --run: #f0b44c; --accent: #8f78ff; --accent-fg: #fff;
+    --notice: #26213d; --warn-bg: #3a2e14;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  -webkit-user-select: none; user-select: none;
+}
+header { display: flex; align-items: center; gap: 12px; padding: 20px 20px 4px; }
+.logo { width: 44px; height: 44px; }
+h1 { font-size: 18px; margin: 0; }
+h2 { font-size: 14px; margin: 0; }
+.mute { color: var(--mute); font-size: 12px; }
+p { margin: 6px 0 0; }
+main { padding: 12px 20px 24px; display: grid; gap: 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+
+button {
+  font: inherit; font-size: 13px; color: var(--fg); background: transparent;
+  border: 1px solid var(--line); border-radius: 7px; padding: 6px 12px; cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--mute); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; padding: 7px 16px; }
+button.primary:hover:not(:disabled) { filter: brightness(1.08); border-color: var(--accent); }
+button.link { border: 0; padding: 6px 4px; color: var(--accent); }
+button.link.inline { padding: 0; font-size: 12px; }
+.alt { margin-top: 10px; }
+
+.ps-list, .providers { list-style: none; margin: 10px 0 0; padding: 0; }
+.ps-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.ps-list li:first-child { border-top: 0; }
+.ps-name { font-weight: 500; }
+.ps-ver { color: var(--mute); font-size: 12px; margin-left: 6px; }
+.ps-path { color: var(--mute); font-size: 11px; word-break: break-all; }
+.ps-state { white-space: nowrap; font-size: 12px; }
+.ps-state.ok { color: var(--ok); }
+.ps-state.old { color: var(--run); }
+.ps-state.bad { color: var(--err); }
+.ps-remove { font-size: 11px; padding: 0 0 0 6px; }
+
+.notice { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--notice); font-size: 13px; }
+.notice.warn { background: var(--warn-bg); }
+.notice.err { color: var(--err); }
+.notice p:first-child { margin-top: 0; }
+
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mute); display: inline-block; }
+.dot.ok { background: var(--ok); }
+.dot.run { background: var(--run); }
+.dot.bad { background: var(--err); }
+
+.logs { margin-top: 10px; }
+.logs pre {
+  margin: 0; max-height: 220px; overflow: auto; padding: 8px 10px; border-radius: 6px; background: var(--bg);
+  border: 1px solid var(--line); font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-all;
+  -webkit-user-select: text; user-select: text;
+}
+
+.providers { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+.providers li { font-size: 12px; }
+.providers .yes::before { content: "●"; color: var(--ok); margin-right: 6px; }
+.providers .no { color: var(--mute); }
+.providers .no::before { content: "○"; margin-right: 6px; }
+
+.check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; }
+footer { padding: 4px 2px; line-height: 1.6; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: calc(100% - 40px);
+  background: var(--fg); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.2);
+}
+.toast.err { background: var(--err); color: #fff; }
+
+@media (max-width: 520px) { .providers { grid-template-columns: 1fr; } }

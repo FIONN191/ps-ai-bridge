@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PS AI Bridge</title>
+<style>
+  :root { --bg: #f6f6f4; --card: #fff; --fg: #1d1d1b; --mute: #6b6b66; --line: #e3e2dd; --ok: #1f7a4a; --err: #b3261e; --run: #8a5a00; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161615; --card: #1f1f1d; --fg: #ecebe6; --mute: #9b9a93; --line: #33332f; --ok: #5cc28b; --err: #ff8a80; --run: #f0b44c; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 -apple-system, "PingFang SC", sans-serif; }
+  header { padding: 20px 16px 8px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .mute { color: var(--mute); font-size: 12px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 8px 16px 40px; display: grid; gap: 12px; }
+  .job { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; }
+  .imgs { display: flex; gap: 8px; grid-column: 1 / -1; flex-wrap: wrap; }
+  .imgs figure { margin: 0; }
+  .imgs img { height: 180px; max-width: 100%; border-radius: 6px; border: 1px solid var(--line); background: repeating-conic-gradient(#ccc 0 25%, #fff 0 50%) 0 0 / 16px 16px; }
+  figcaption { font-size: 11px; color: var(--mute); }
+  .st-done { color: var(--ok); } .st-error { color: var(--err); } .st-running, .st-queued { color: var(--run); }
+  .prompt { white-space: pre-wrap; word-break: break-word; }
+  details { grid-column: 1 / -1; font-size: 12px; color: var(--mute); }
+  pre { margin: 6px 0 0; white-space: pre-wrap; }
+  .empty { color: var(--mute); padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PS AI Bridge</h1>
+  <div class="mute" id="meta">连接中…</div>
+</header>
+<main id="list"><div class="empty">还没有任务。在 Photoshop 的「AI 生图贴回」面板里点生成，这里会显示进度。</div></main>
+<script>
+const list = document.getElementById('list');
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const STATUS = { queued: '排队中', running: '生成中', done: '完成', error: '失败' };
+let lastKey = '';
+async function refresh() {
+  try {
+    const [h, j] = await Promise.all([fetch('/health').then((r) => r.json()), fetch('/jobs').then((r) => r.json())]);
+    document.getElementById('meta').textContent = `v${h.version} · 结果目录：${h.outputDir}`;
+    const key = JSON.stringify(j.jobs.map((x) => [x.id, x.status, x.stage]));
+    if (key === lastKey) return;
+    lastKey = key;
+    if (!j.jobs.length) return;
+    list.innerHTML = j.jobs.map((x) => `
+      <div class="job">
+        <div><div class="prompt">${esc(x.prompt)}</div>
+          <div class="mute">${esc(x.provider)}${x.model ? ' · ' + esc(x.model) : ''} · ${esc(x.aspect)} · ${esc(x.resolution)} · ${new Date(x.createdAt).toLocaleString('zh-CN')}</div></div>
+        <div class="st-${x.status}">${STATUS[x.status] || x.status}${x.status === 'running' ? '：' + esc(x.stage) : ''}${x.error ? '：' + esc(x.error) : ''}</div>
+        <div class="imgs">
+          ${x.inputPath ? `<figure><img src="/jobs/${x.id}/input" loading="lazy" alt="原图"><figcaption>发送的原图</figcaption></figure>` : ''}
+          ${x.status === 'done' ? `<figure><img src="/jobs/${x.id}/result" loading="lazy" alt="结果"><figcaption>${x.result.width}×${x.result.height} · ${esc(x.result.path)}</figcaption></figure>` : ''}
+        </div>
+        <details><summary>日志</summary><pre>${esc(x.log.join('\n'))}</pre></details>
+      </div>`).join('');
+  } catch {
+    document.getElementById('meta').textContent = 'helper 没有在运行';
+  }
+}
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

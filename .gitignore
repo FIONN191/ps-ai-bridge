@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+# 本地产物和个人文件
+/dist/
+/backups/
+desktop/dist/
+desktop/dist-next/
+desktop/.stage/
+helper/config.json

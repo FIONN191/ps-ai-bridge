@@ -1,0 +1,34 @@
+// 给页面用的接口：只开放这几个调用，页面本身拿不到 Node
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
+
+contextBridge.exposeInMainWorld('bridge', {
+  state: () => ipcRenderer.invoke('state'),
+  logs: () => ipcRenderer.invoke('logs'),
+  restartHelper: () => ipcRenderer.invoke('helper:restart'),
+  open: (what) => ipcRenderer.invoke('open', what),
+  installPlugin: (dirs) => ipcRenderer.invoke('plugin:install', dirs),
+  uninstallPlugin: (dirs) => ipcRenderer.invoke('plugin:uninstall', dirs),
+  installViaCC: () => ipcRenderer.invoke('plugin:installViaCC'),
+  addPhotoshop: () => ipcRenderer.invoke('plugin:addPhotoshop'),
+  removePhotoshop: (root) => ipcRenderer.invoke('plugin:removePhotoshop', root),
+  setOpenAtLogin: (on) => ipcRenderer.invoke('settings:openAtLogin', on),
+  setOnboarded: () => ipcRenderer.invoke('settings:onboarded'),
+  updateState: () => ipcRenderer.invoke('update:state'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  skipUpdate: () => ipcRenderer.invoke('update:skip'),
+  dismissUpdate: () => ipcRenderer.invoke('update:dismiss'),
+  quitForUpdate: () => ipcRenderer.invoke('update:quit'),
+  onUpdate: (fn) => ipcRenderer.on('update', (_e, s) => fn(s)),
+  // 工作台
+  api: (method, path, body) => ipcRenderer.invoke('api', method, path, body),
+  uploadFiles: (files, maxSide) => ipcRenderer.invoke('upload:files', files, maxSide),
+  pickImages: (maxSide, multiple) => ipcRenderer.invoke('upload:pick', maxSide, multiple),
+  uploadClipboard: () => ipcRenderer.invoke('upload:clipboard'),
+  revealJob: (jobId) => ipcRenderer.invoke('job:reveal', jobId),
+  copyImage: (path) => ipcRenderer.invoke('job:copyImage', path),
+  copyText: (text) => ipcRenderer.invoke('clipboard:text', text),
+  pathForFile: (file) => webUtils.getPathForFile(file),
+  onHelper: (fn) => ipcRenderer.on('helper', (_e, s) => fn(s)),
+  onLog: (fn) => ipcRenderer.on('log', (_e, line) => fn(line)),
+});
