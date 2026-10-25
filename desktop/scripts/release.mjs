@@ -64,5 +64,5 @@ for(const local of [...Object.values(FILES).map(n=>path.join(OUT,n)),manifestFil
   if(!asset||asset.state!=='uploaded'||asset.size!==fs.statSync(local).size||asset.digest!==`sha256:${sha256(local)}`)
     throw new Error(`上传校验失败，保留草稿且不会更新 Latest：${path.basename(local)}`);
 }
-gh(['release','edit',tag,'--repo',repo,'--draft=false','--latest']);
+gh(['api','--method','PATCH',`repos/${repo}/releases/${uploaded.id}`,'-F','draft=false','-f','make_latest=true','--jq','.html_url']);
 console.log(`已发布并验证：https://github.com/${repo}/releases/tag/${tag}`);
