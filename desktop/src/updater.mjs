@@ -30,7 +30,7 @@ PID="$1"; DMG="$2"; APP="$3"
 for i in $(seq 1 100); do kill -0 "$PID" 2>/dev/null || break; sleep 0.2; done
 MNT="$(mktemp -d /tmp/ps-ai-bridge-update.XXXXXX)"
 fail() {
-  hdiutil detach "$MNT" -quiet 2>/dev/null
+  hdiutil detach "$MNT" -quiet 2>/dev/null; rmdir "$MNT" 2>/dev/null
   if [ -d "$APP.old" ] && [ ! -d "$APP" ]; then mv "$APP.old" "$APP"; fi
   rm -rf "$APP.new"
   open "$DMG"
@@ -44,7 +44,7 @@ ditto "$SRC" "$APP.new" || fail
 mv "$APP" "$APP.old" || fail
 mv "$APP.new" "$APP" || fail
 rm -rf "$APP.old"
-hdiutil detach "$MNT" -quiet
+hdiutil detach "$MNT" -quiet; rmdir "$MNT" 2>/dev/null
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null
 open "$APP"
 `;
