@@ -103,11 +103,25 @@ const server = http.createServer(async (req, res) => {
       if (req.method !== 'POST' || !/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: { message: '请用 POST + application/json' } });
       const abort = new AbortController();
       res.on('close', () => { if (!res.writableFinished) abort.abort(); });
+      // 网页出图可能排队好几分钟；调用方（Node fetch）等响应头超过 5 分钟会自己断开。
+      // 3 分钟还没出结果就先回 200 头，之后每 20 秒发一个空格保活（JSON 前面的空白不影响解析）。
+      let keepAlive = null;
+      const holdOpen = setTimeout(() => {
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+        keepAlive = setInterval(() => res.write(' '), 20000);
+      }, 180000);
+      const finish = (code, payload) => {
+        clearTimeout(holdOpen); clearInterval(keepAlive);
+        if (!res.headersSent) return send(res, code, payload);
+        // 头已经发出去了，失败只能放进正文：V7 会显示「API 仅返回文本：…」
+        if (payload.error) payload = { candidates: [{ content: { role: 'model', parts: [{ text: `免 API 出图失败：${payload.error.message}` }] } }] };
+        res.end(JSON.stringify(payload));
+      };
       try {
         const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
-        return send(res, 200, await compatGenerate(m[1], body, { providers, capabilities, signal: abort.signal }));
+        return finish(200, await compatGenerate(m[1], body, { providers, capabilities, signal: abort.signal }));
       } catch (e) {
-        return send(res, e.status || 500, { error: { code: e.status || 500, message: e.message || String(e) } });
+        return finish(e.status || 500, { error: { code: e.status || 500, message: e.message || String(e) } });
       }
     }
     if (req.method !== 'GET' && req.headers['x-ps-ai-bridge'] !== '1') return send(res, 403, { error: 'missing x-ps-ai-bridge header' });

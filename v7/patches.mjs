@@ -92,4 +92,10 @@ export const PATCHES = [
     find: "        +(配了?modelQuotaHtml():'<span class=\"model-quota\" data-state=\"empty\"",
     replace: "        +(免API?'':配了?modelQuotaHtml():'<span class=\"model-quota\" data-state=\"empty\"",
   },
+  {
+    file: 'ui/ui-main.js',
+    why: '免 API 模式：生成卡的算力来源写清楚走本机账号（原来显示「自有 API · 免 API 模式」，容易和平台算力混淆）',
+    find: "[['own','自有 API · '+(V7ProviderConnections.TITLES?.[settingsRuntime.provider]||settingsRuntime.provider||'其他'),ownReady]",
+    replace: "[['own',settingsRuntime.provider==='other'?'免 API 模式 · 本机账号出图':'自有 API · '+(V7ProviderConnections.TITLES?.[settingsRuntime.provider]||settingsRuntime.provider||'其他'),ownReady]",
+  },
 ];

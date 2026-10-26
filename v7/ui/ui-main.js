@@ -11614,7 +11614,7 @@ function syncGenerationCompute(){
   const ownReady=workflow?!!settingsRuntime.runninghubKey:aiProviderReady();   // ⚠ GRS 托管没有 key 也算配好（见 aiProviderReady）
   // ⭐ 2026-10-16 千问模式：这一格就是设置里的「千问模式在哪算」（云端 / 本机 ComfyUI），跟 Banana 的连接无关
   const choices=qwen?[['platform','云端开源模型',!!account.signedIn],['local','本机 ComfyUI',!!settingsRuntime.comfyUrl]]
-    :workflow?[['local','本地 ComfyUI',!!settingsRuntime.comfyUrl],['own',window.V7_RUNNINGHUB_OFF?'自有工作流（RunningHub）':'自有工作流',window.V7_RUNNINGHUB_OFF?false:ownReady],['platform','平台工作流',!!account.signedIn]]:[['own','自有 API · '+(V7ProviderConnections.TITLES?.[settingsRuntime.provider]||settingsRuntime.provider||'其他'),ownReady],['platform','平台算力',!!account.signedIn]];
+    :workflow?[['local','本地 ComfyUI',!!settingsRuntime.comfyUrl],['own',window.V7_RUNNINGHUB_OFF?'自有工作流（RunningHub）':'自有工作流',window.V7_RUNNINGHUB_OFF?false:ownReady],['platform','平台工作流',!!account.signedIn]]:[['own',settingsRuntime.provider==='other'?'免 API 模式 · 本机账号出图':'自有 API · '+(V7ProviderConnections.TITLES?.[settingsRuntime.provider]||settingsRuntime.provider||'其他'),ownReady],['platform','平台算力',!!account.signedIn]];
   const html=choices.map(([value,label,ready])=>'<option value="'+value+'"'+(value===selected?' selected':'')+(!ready&&(value!==selected||(workflow&&value==='own'&&window.V7_RUNNINGHUB_OFF))?' disabled':'')+'>'+escapeHtml(label+(!ready?(value==='platform'?' · 需登录':(workflow&&value==='own'&&window.V7_RUNNINGHUB_OFF)?' · 暂未接通':' · 需配置'):''))+'</option>').join('');
   if(source.innerHTML!==html)source.innerHTML=html;
   if(source.value!==selected)source.value=selected;

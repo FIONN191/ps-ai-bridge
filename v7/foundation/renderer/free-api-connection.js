@@ -43,9 +43,15 @@
       settingsRuntime.otherKey = 'local';
       if (typeof settingsVault !== 'undefined' && settingsVault) settingsVault.markEdited('otherKey');
     }
+    // 出图要走「自有连接」才会到本机；选着「平台算力」的话请求发去夏三七的云端，免 API 根本收不到
+    const routedKey = `${SEEDED}.route:${scope}`;
+    if (settingsRuntime.provider === 'other' && settingsRuntime.imageComputeSource === 'platform' && !localStorage.getItem(routedKey)) {
+      settingsRuntime.imageComputeSource = 'own';
+      try { localStorage.setItem(routedKey, '1'); } catch (_) {}
+    }
     if (firstTime) {
       const hasPaidKey = ['aji', 'momo', 'grs'].some((slot) => String(settingsRuntime[`${slot}Key`] || '').trim());
-      if (!hasPaidKey) Object.assign(settingsRuntime, { provider: 'other', otherConnection: 'custom' });
+      if (!hasPaidKey) Object.assign(settingsRuntime, { provider: 'other', otherConnection: 'custom', imageComputeSource: 'own' });
       const order = window.V7ComputeSlots ? V7ComputeSlots.order(settingsRuntime.computeSlotOrder) : ['aji', 'momo', 'grs'];
       settingsRuntime.computeSlotOrder = ['other', ...order.filter((slot) => slot !== 'other')];
     }
@@ -121,6 +127,19 @@
     model.value = first;
     model.dispatchEvent(new Event('change', { bubbles: true }));
   }, true);
+
+  // 在设置里把服务商换成「免 API 模式」时，算力来源一起换到本机（不然还会发去平台算力）
+  let lastProvider = null;
+  window.addEventListener('wheelchair:settings-changed', () => {
+    try {
+      const provider = settingsRuntime.provider;
+      if (lastProvider !== null && provider === 'other' && lastProvider !== 'other' && settingsRuntime.imageComputeSource === 'platform') {
+        settingsRuntime.imageComputeSource = 'own';
+        settingsSave();
+      }
+      lastProvider = provider;
+    } catch (_) {}
+  });
 
   const run = () => { running = (running || Promise.resolve()).then(seed).catch((e) => console.warn('[免 API]', e && e.message || e)); };
   // V7 换账号时先读新设置、再读密钥；等一会儿再填，免得被它读回来的值盖掉
