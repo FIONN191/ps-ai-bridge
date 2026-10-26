@@ -19233,7 +19233,7 @@ V7MainCardShortcuts.configure({
     return {
       signedIn:!!account.signedIn,email:account.account?.email||'',
       points:balances?{common:Number(balances.common||0),banana:Number(balances.banana||0)}:null,
-      providerLabel:(window.V7ComputeSlots&&V7ComputeSlots.customName(settingsRuntime.computeSlotNames,settingsRuntime.provider==='other'&&settingsRuntime.otherConnection==='grs'?'grs':settingsRuntime.provider))||({aji:'AJI',momo:'MOMO',other:'Others'})[settingsRuntime.provider]||String(settingsRuntime.provider||'未选'),
+      providerLabel:(window.V7ComputeSlots&&V7ComputeSlots.customName(settingsRuntime.computeSlotNames,settingsRuntime.provider==='other'&&settingsRuntime.otherConnection==='grs'?'grs':settingsRuntime.provider))||({aji:'AJI',momo:'MOMO',other:'免 API 模式'})[settingsRuntime.provider]||String(settingsRuntime.provider||'未选'),
       providerReady:aiProviderReady(),
       imageSource:settingsRuntime.imageComputeSource,flowSource:settingsRuntime.workflowSource,
       backendUrl:settingsRuntime.backendUrl,

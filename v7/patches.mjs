@@ -98,4 +98,10 @@ export const PATCHES = [
     find: "[['own','自有 API · '+(V7ProviderConnections.TITLES?.[settingsRuntime.provider]||settingsRuntime.provider||'其他'),ownReady]",
     replace: "[['own',settingsRuntime.provider==='other'?'免 API 模式 · 本机账号出图':'自有 API · '+(V7ProviderConnections.TITLES?.[settingsRuntime.provider]||settingsRuntime.provider||'其他'),ownReady]",
   },
+  {
+    file: 'ui/ui-main.js',
+    why: '免 API 模式：设置卡摘要里的服务商名（原来显示 Others）',
+    find: "({aji:'AJI',momo:'MOMO',other:'Others'})[settingsRuntime.provider]",
+    replace: "({aji:'AJI',momo:'MOMO',other:'免 API 模式'})[settingsRuntime.provider]",
+  },
 ];
