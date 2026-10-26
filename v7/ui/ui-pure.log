@@ -1,0 +1,29 @@
+
+[Shortcut] 注册 CommandOrControl+Enter: 成功
+[link] 37889 启动失败: listen EADDRINUSE: address already in use 127.0.0.1:37889
+[渲染层错误] Scripts "build/three.js" and "build/three.min.js" are deprecated with r150+, and will be removed with r160. Please use ES Modules or alternatives: https://threejs.org/docs/index.html#manual/en/introduction/Installation  (three.min.js:1)
+[渲染层] [拼音] 保底 357 字 + 自动扩展可用(自检 11/14)  (pinyin-initials.js:144)
+[link] 轮询间隔改为 180ms
+[Shortcut] 注册 CommandOrControl+Enter: 成功
+[渲染层] [报错] 错误码表 275 条 / 自检全过  (ui.html:15346)
+[渲染层] [图标] 图形库 73 个 / 静态 8 个 / 大图标 0 个已登记 / 自检全过  (ui.html:15371)
+[渲染层错误] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.  (sandbox_bundle:2)
+[link] 轮询间隔改为 180ms
+Error occurred in handler for 'http:fetch': Error: 网络错误: Failed to parse URL from 
+    at D:\WheelchairV7-Dev\ui-pure\main.js:1255:11
+    at async WebContents.<anonymous> (node:electron/js2c/browser_init:2:87023)
+[渲染层] [校色] 未检测到加速引擎，用本机算法(档1：网格对齐 + 校色，已内置) · Failed to fetch  (ui.html:15290)
+[渲染层] [预设] 就绪：37 个素材 / 328 条预设  (preset-ui.js:3277)
+[渲染层] [预设] 37 个素材 / 328 条预设 / 已迁移过 / 画布比例 0.667 / 素材自检全过  (ui.html:14935)
+[渲染层] [预设] 素材位置: head 43.1,11.1 13.9×8.7/alpha | hair 24.3,7.1 38.9×21.5/alpha | neck 41.3,19.2 17.5×4.1/alpha | torso 40.2,23.5 19.7×14.9/alpha | arms 26.2,23.5 47.9×23.3/alpha | hands 18.3,48.1 59.8×8.2/alpha | legs 32.5,64.5 35.1×24/alpha | feet 27.7,88.5 44.8×8.3/alpha | clothing 28.5,38.3 43.1×27.4/alpha | accessory 23.3,45.8 53.4×3.5/alpha | fullbody 0.3,1.1 15.9×13.7/alpha | lighting 83,0.9 16.5×12.8/alpha | background 0,27.4 100×59.1/alpha | weapon 70.9,49.4 24.7×34.5/alpha | cleanup 0.5,80.3 66.4×19.5/alpha | effects 86.6,88.8 12.6×10.9/alpha | other 0.9,49.1 14.2×5/alpha | __tool__ 72,2 16×12/alpha | __tool_partition__ 4,6 14×9.4/alpha | __tool_tiles__ 82,6 14×9.4/alpha | __tool_stitch__ 4,21 14×9.4/alpha | __tool_dlss__ 82,21 14×9.4/alpha | __tool_scene__ 4,36 14×9.4/alpha | __tool_hemisynth__ 4,51 14×9.4/alpha | __tool_kao__ 82,51 14×9.4/alpha | __tool_color-match__ 4,66 14×9.4/alpha | __tool_color-grade__ 82,66 14×9.4/alpha | __tool_image-scopes__ 4,81 14×9.4/alpha | __tool_batch-queue__ 82,81 14×9.4/alpha | __tool_seam-review__ 4,88 14×9.4/alpha | __tool_matting__ 82,88 14×9.4/alpha | __tool_segment__ 4,88 14×9.4/alpha | __tool_sam2__ 82,88 14×9.4/alpha | __tool_glow__ 4,88 14×9.4/alpha | __tool_camera__ 82,88 14×9.4/alpha | __tool_light__ 4,88 14×9.4/alpha | __tool_hub__ 2.5,24 18×12/alpha  (ui.html:14936)
+[渲染层] [预设] 列表 328 条 · 当前隐藏，量不了高度  (preset-ui.js:634)
+Error occurred in handler for 'http:fetch': Error: 网络错误: Failed to parse URL from 
+    at D:\WheelchairV7-Dev\ui-pure\main.js:1255:11
+    at async WebContents.<anonymous> (node:electron/js2c/browser_init:2:87023)

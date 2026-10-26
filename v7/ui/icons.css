@@ -1,0 +1,46 @@
+/* ═══════════════════════════════════════════════════════════════
+   icons.css —— 图标显示规则
+   2026-09-14 建立。配合 icons.js / motion.js。
+
+   ⚠⚠ 这个文件【只管图标自己】，绝不用通配选择器去碰别人的样式。
+     2026-09-14 血的教训：第一版在这里写了三条"通用规则"，
+     结果把项目里【本来就有的】动画全杀了 ——
+       · `.zone` 那条覆盖了二级卡的入场过渡（.34s 变 .16s，淡入丢失）
+       · `transform:none !important` 把折叠按钮/胶囊按钮的悬停放大按下回弹全禁了
+       · `@media (prefers-reduced-motion)` 那条把【整个界面】的动画关光了
+         （用户 Windows 里关了"显示动画"→ Chromium 判定 reduce → 全局命中）
+     规矩：**这个文件里的选择器必须以 .ico / .ico-btn 开头，或明确指名到图标容器。**
+     想给某类元素加反馈，去那类元素自己的样式段里加，不要在这儿一网打尽。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 图标本体 ───────────────────────────────────────────────── */
+.ico{
+  display:inline-block; vertical-align:middle;
+  color:inherit;               /* 跟随文字色，语义色由父容器给 */
+  flex-shrink:0;
+}
+
+/* 描边宽度按尺寸分档：小图标要粗线否则糊，大图标要细线否则笨重。
+   ⚠ 档位表见 docs/43，改之前先看那份。 */
+.ico[width="12"], .ico[width="13"], .ico[width="14"]{ stroke-width:2; }
+.ico[width="15"], .ico[width="16"], .ico[width="17"]{ stroke-width:2.0; }
+.ico[width="18"], .ico[width="20"]{ stroke-width:2; }
+.ico[width="24"]{ stroke-width:2; }
+.ico[width="30"], .ico[width="38"]{ stroke-width:2; }
+
+/* 部件的变换原点 = 它自己的中心。
+   ⚠ 不写 transform-box:fill-box 的话，origin 是相对整个 SVG 视口算的，
+     多部件图标做局部动画（齿轮只转齿）会整个飞出去。 */
+.ico > g{ transform-box:fill-box; transform-origin:50% 50%; }
+
+/* ── 小图标按钮：简单的悬停 + 按下反馈 ────────────────────────
+   基准是剪影卡右下角那个齿轮（用户点名的参照物）：
+   背景提亮 + 轻微形变，.15s，克制。
+   ⚠ 只作用于显式加了 .ico-btn 的元素，不波及别人。 */
+.ico-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  cursor:pointer; color:var(--tx);
+  transition:background var(--m-fast), transform var(--m-fast) var(--ease-out);
+}
+.ico-btn:hover{ background:hsl(var(--accent-hsl, 211 100% 68%) / .16); }
+.ico-btn:active{ transform:scale(.92); }

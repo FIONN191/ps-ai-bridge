@@ -1,0 +1,460 @@
+/* ⭐ 2026-10-21（开发便利，不改样子）：这个文件里的规则原来都写成 :is(#settingsZone,#generationZone,#feedbackZone,#communityZone) …
+   —— 一共 127 处，加一张「单张大二级」卡就得每处都补（漏了 = 那张卡的二级只有 200 宽）。
+   现在改成认标签：ui.html 里大二级的外框带 class="… v7-big-zone" 就套上这些样式。加卡 = 给外框加这个 class，样式一处都不用动。
+   ⚠ 写法 :is(.v7-big-zone,#v7-big-zone-specificity)：后面那个 id 页面上没有、永远匹配不到，只是为了让优先级保持「id 级」，
+     跟原来的 #settingsZone 写法一样大 —— 不然优先级降成 class 级，有些规则会被别处压过去、样子就变了。别删它。
+   验过：改前改后 8 个画面、约两万个元素的全部计算样式逐项一致（tmp/ab/snapshot.cjs + compare.cjs）。 */
+/* 设置卡 · 大二级（540×400：左 416 内容 + 右 108 点阵导航）
+ *
+ * 2026-10-01 实装。骨架逐条照抄 records-card.css 的实装（用户要求"按实装代码做"）：
+ *   · 整块 540×400，左边内容 416、右边导航 108
+ *   · 导航是【内嵌的一格】，不是另一张卡 → 只圆右边、无外阴影、透明底、只留左缘一条线
+ *   · 内嵌区底色比大卡【浅一档】（提亮不是压暗），且跟着 --ui-bg-opacity 走
+ *   · 节点三层底：默认【透明】、悬停/选中【都是 hsl(var(--accent-hsl, 211 100% 68%) / .04)】
+ *     （用户原话："节点滚条不按照设置逻辑内的统一深色底按钮走，我需要变成标准状态
+ *       透明跟随设置、颜色跟随设置"）
+ *   · 方点描边 = --glow-detail（检查点专用紫，全项目就它一个用，刻意的设计意图）
+ *
+ * ⚠ 全部规则收在 :is(.v7-big-zone,#v7-big-zone-specificity) 里 —— 不这么收会漏到别的卡上去。
+ *   ⭐ 2026-10-15：生成卡也改成单张大二级，【用同一个组件】（V7SettingsCard），
+ *     所以样式也同一份：选择器从 #settingsZone 扩成 :is(.v7-big-zone,#v7-big-zone-specificity)。
+ *     两张卡长得一样是故意的（用户要"和别的卡片一样的二级大卡片"）。
+ * ⚠ 颜色一律用 tokens.css 的代币，不写死色值（主题一换就花）。
+ * ⚠ 滚轮【不在这里挂】—— 二级滚轮归 ui.html 统一管（records-card.js 的规矩）。
+ */
+
+/* ═══ 二级主体 ═══ */
+:is(.v7-big-zone,#v7-big-zone-specificity){
+  width:540px;height:400px;
+  border:0; box-shadow:var(--shadow-mid), inset 0 0 0 1px var(--line);
+}
+/* 二级整体底：透明跟随设置、颜色跟随设置（同 #recordsZone::before 那套三件套） */
+:is(.v7-big-zone,#v7-big-zone-specificity)::before{
+  content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; z-index:0;
+  background-color:var(--bg-solid);
+  /* 2026-10-22（docs/263 第 20 条）：平铺同一深浅（原来上中下三档的中间值），不再竖向渐变 */
+  background-image:linear-gradient(hsl(var(--card-h, 220 28%) 8% / .6), hsl(var(--card-h, 220 28%) 8% / .6)),
+    var(--card-bg-image, none);
+  background-size:cover; background-position:center;
+  opacity:var(--ui-bg-opacity,1);
+}
+
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-main{position:absolute;left:0;top:0;width:416px;height:400px;overflow:hidden}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-pages{position:absolute;inset:0}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-page{position:absolute;inset:0;display:flex;flex-direction:column;
+  transition:transform var(--m-base) var(--ease-out),opacity var(--m-fast) var(--ease-soft);will-change:transform}
+/* ⭐⭐ 2026-10-15 修（设置二级"左边整片空白、只剩右边导航"的第二道保险）：
+   .sc-main 只负责【裁】，从来不该【滚】—— 真正滚的是里面的 .sc-body。
+   但 overflow:hidden 的框照样能被"焦点自动滚动 / scrollIntoView"推着走（实测被推到 scrollTop 2869）。
+   ⇒ 改成 overflow:clip：一样裁切，但【浏览器和脚本都滚不动它】。前一行 hidden 留给不认 clip 的老内核兜底。
+   ⚠ 第一道（根因）在 ui.html 的 .tgl{position:relative}；这一道是防以后别的控件再犯同样的错。 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-main{overflow:hidden;overflow:clip}
+
+/* 内容区：可上下滚（设置项比记录条目高）。滚动条隐藏 + 上下留一点呼吸 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;
+  padding:12px 16px 14px;overscroll-behavior:contain}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-body::-webkit-scrollbar{display:none}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-head{flex:none;padding:12px 16px 9px;border-bottom:1px solid var(--line-faint)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-title{font-size:15px;font-weight:600}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-sub{margin-top:2px;font-size:10px;color:var(--tx2)}
+
+/* ═══ 右边那条导航栏（内嵌格）═══ */
+/* ⚠⚠ 2026-10-05：overflow 从 hidden 改成 visible。
+ *   细分列现在是【朝左滑出到内容区上方】的一层浮层（.rail-sub），
+ *   留着 hidden 会把它整块裁掉 —— 和本项目踩过的
+ *   "轨道 overflow:hidden 把圆点探出去的那半截裁掉"（docs/139 §1.4）是同一类坑。
+ *   原来要靠它裁的东西（.z-glow / .z-bright / ::before 底色）都是 absolute inset:0，
+ *   本来就贴着 rail 自己的框，不需要 overflow 兜。 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-rail{
+  position:absolute;left:432px;top:0;width:108px;height:400px;
+  border-radius:0 20px 20px 0;          /* 只圆右边 —— 它是大卡里的内嵌格 */
+  box-shadow:none;                      /* 内嵌区不该有外投影 */
+  background-color:transparent;background-image:none;
+  overflow:visible;
+  border:0; border-left:1px solid var(--line-faint);   /* 只留左缘一条分隔线 */
+}
+/* 内嵌区的底：比大卡底色略浅一档，做出"这一块是嵌进去的"分区感。
+ * ⚠ 用提亮而不是压暗：这张卡本来就压着深色渐变，再压暗会跟左边内容糊成一片。
+ * ⚠ 跟着 --ui-bg-opacity 走，不写死。 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-rail::before{
+  content:''; position:absolute; inset:0; pointer-events:none; z-index:0;
+  background:rgba(255,255,255,calc(.05 * var(--ui-bg-opacity,1)));
+}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-rail .z-glow{position:absolute;left:0;top:0;bottom:0;width:0;pointer-events:none;z-index:1;opacity:0;
+  background:linear-gradient(90deg,hsl(var(--glow-zone)/1) 0%,hsl(var(--glow-zone)/.6) 55%,hsl(var(--glow-zone)/0) 100%)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-rail .z-bright{position:absolute;left:0;top:0;bottom:0;width:3px;pointer-events:none;z-index:1;opacity:0;
+  background:linear-gradient(180deg,transparent,hsl(var(--glow-zone)/1),transparent)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-rail .z-glow.glow{animation:scZoneGlowSweep .6s var(--ease-out) forwards}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-rail .z-bright.glow{animation:scZoneBrightSweep .6s var(--ease-out) forwards}
+@keyframes scZoneGlowSweep{0%{opacity:0;width:0}16%{opacity:1;width:29px}40%{opacity:1;width:29px}55%{opacity:0.5;width:12px}100%{opacity:0;width:0}}
+@keyframes scZoneBrightSweep{0%{opacity:0}16%{opacity:0.95}40%{opacity:0.95}55%{opacity:0.3}100%{opacity:0}}
+
+/* ⚠⚠ 2026-10-06 审查修：左右内边距 8px → 5px。
+ *   实测（1022×768）：整个 rail 108px，扣掉 rail-in 左右各 8 + 节点左右内边距 9/6 +
+ *   圆点 10 + 箭头 3.5 + 两个 8px 间距 ⇒ 留给文字的只剩 **47px**，
+ *   而六个页签名（连接与账号 / 积分与账单 / 外观与交互 / 对齐与校色 / 工具与隐私 / 客服与公告）
+ *   每个都要 55px ⇒ **六个全被截成"连接与账…"**（test-card-architecture-layout 报的就是它）。
+ *   ⇒ 三处一起收：本行左右 8→5、节点左右 9/6→8/4、节点 gap 8→6，共让出 13px（47 → 60.5）。
+ *   ⚠ 竖线的对齐【没变】：线在 rail-nodes 里的 left:13px，
+ *     圆点中心 = rail-in 5 + 节点左内边距 8 + 圆点半径 5 = 18 = 5 + 13 ✅ 正好重合
+ *     （改之前是 8+9+5=22 对 8+13=21，本来就差 1px）。 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-in{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;padding:10px 5px 8px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 4px 6px;font-size:11px;font-weight:600;border-bottom:1px solid var(--line-faint)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-head small{font-size:10px;color:var(--tx2);font-weight:400;font-variant-numeric:tabular-nums}
+/* ⚠ 列表要 display:flex+column，配合 .rail-nodes 的 margin:auto 做【上下居中】 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-list{position:relative;flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;
+  padding:6px 0;overscroll-behavior:contain;display:flex;flex-direction:column}
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-list::-webkit-scrollbar{display:none}
+/* 节点列：左边一条贯通竖线
+ * ⭐ 整列【上下居中】（用户 2026-10-01 定：居中更符合直觉）
+ * ⚠ 绝不能用 justify-content:center —— 内容超出会被裁掉【顶部】而且滚不回去。
+ *   用 margin:auto 才两全：装得下时居中、装不下时正常滚。 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-nodes{position:relative;display:flex;flex-direction:column;gap:3px;margin:auto 0;width:100%}
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-nodes::before{content:"";position:absolute;left:13px;top:10px;bottom:10px;width:2px;border-radius:0px;background:hsl(var(--glow-detail)/.26)}
+/* 一个 Tab = 一个节点 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .scn{position:relative;height:24px;border-radius:8px;display:flex;align-items:center;gap:6px;padding:0 4px 0 8px;cursor:pointer;
+  color:var(--tx2);font-size:11px;font-variant-numeric:tabular-nums;transition:background var(--m-fast),color var(--m-fast)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scn i{flex:none;width:10px;height:10px;border-radius:4px;background:var(--bg-solid);
+  border:2px solid hsl(var(--glow-detail)/calc(.75 * var(--ui-bg-opacity,1)));
+  transition:transform var(--m-fast) var(--ease-out),background var(--m-fast),box-shadow var(--m-fast),border-color var(--m-fast)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scn .tt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ⚠ 悬停和选中的底色【一样】都是 .04（实装就是这么写的，跟预设列表行同一档亮度） */
+:is(.v7-big-zone,#v7-big-zone-specificity) .scn:hover{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)));color:var(--tx)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scn:hover i{transform:scale(1.2);background:hsl(var(--glow-detail)/calc(.6 * var(--ui-bg-opacity,1)))}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scn.sel{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)));color:var(--tx)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scn.sel i{background:hsl(var(--glow-detail));box-shadow:0 0 8px 2px hsl(var(--glow-detail)/calc(.7 * var(--ui-bg-opacity,1)))}
+/* ⚠⚠ 这里【不要】给选中节点加弹跳/缩放/抖动。
+   复核实装 records-card.css：13 个 keyframe 里没有一个给"选中态"做弹跳。
+   这个项目的动效语言只有四种：淡入上滑 / 左缘光扫 / 呼吸圈 / 整体顶一下。 */
+
+/* ═══ 右栏【第二级】= 小节列（2026-10-05 整轮重做）═══
+ * 用户 10-04 定："右侧做了菜单分割，就不要再在左侧去再做分割"⇒ 细分全挪到右栏。
+ * 用户 10-05 报："这个拆分不是很稳定，也没有一个比较 OK 的动画""展开之后东西会被弹走"
+ *   "鼠标悬浮在哪之后就朝左滑""还是以滚轮为操作驱动""主菜单它的位置是不变的"
+ *
+ * ⭐⭐ 形态定案：细分是【朝左滑出、浮在内容区上方】的一层，不进主菜单的文档流。
+ *   · 位置：JS 量出所属那一行在 .rail-nodes 里的 offsetTop，钉上去（左右跟着那一行走）
+ *   · 宽度：向右溢出到内容区上面（不是缩在主菜单那一格里 —— 108px 放不下中文小节名）
+ *   · 动画：transform:translateX 从 +10px 滑到 0 + 淡入。
+ *     ⚠ 只用 transition，不用 keyframes —— 给"已存在的元素"加 class 播 animation
+ *       会先画终态再播、闪两次（本项目铁律，30_动画那条）。
+ *   · 展开/切换【绝不动主菜单】—— 这就是"被弹走"的根治：它不再占流里的位置。
+ *
+ * ⚠ 视觉上必须跟一级页签【明确分层】：页签是实心圆点 + 11px，
+ *   小节是小横线 + 10px + 更浅。别做成两个一样的东西。
+ *   依据：orbit 那条规矩 —— 悬停色≠选中色，做一样了用户以为总有一行被选中。 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-sub{
+  position:absolute;                 /* ⚠ 绝对定位 = "不进流"，主菜单不位移的关键 */
+  left:-152px;                       /* 朝左探出到内容区上面：108(导轨宽) + 152 = 260 宽 */
+  width:152px;height:auto;           /* ⚠ 高度按内容自然长，由 JS 只钉 top */
+  z-index:6;                         /* 压在内容区上面；但低于报错卡/浮条（那些是 20+） */
+  display:flex;align-items:flex-start;
+  padding-right:10px;                /* 跟主菜单那一行留一道缝，不然贴着像同一块 */
+  pointer-events:auto;
+  opacity:0;transform:translateX(10px);
+  /* ⚠ top 也补间：从这一行滑到下一行时是"顺过去"，不是硬跳。
+     animate=false 那条路会临时关掉它（换页后重钉不该看到横移）。 */
+  transition:top var(--m-base) var(--ease-out),opacity var(--m-fast) var(--ease-soft),transform var(--m-base) var(--ease-out);
+}
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-sub.no-glide{transition:opacity var(--m-fast) var(--ease-soft),transform var(--m-base) var(--ease-out)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-sub.open{opacity:1;transform:translateX(0)}
+/* 小节列自己的底：一块圆角面板，跟内容区拉开层次（不然文字直接糊在设置项上） */
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-sub .scs-in{
+  position:relative;flex:1;min-width:0;overflow-y:auto;scrollbar-width:none;
+  display:flex;flex-direction:column;gap:1px;
+  padding:5px 7px;border-radius:8px;
+  background-color:var(--bg-solid);
+  background-image:linear-gradient(hsl(var(--card-h, 220 28%) 9% / .92), hsl(var(--card-h, 220 28%) 9% / .92));
+  box-shadow:var(--shadow-mid), inset 0 0 0 1px var(--line);
+}
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-sub .scs-in::-webkit-scrollbar{display:none}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scs{
+  position:relative;display:flex;align-items:center;height:22px;padding:0 6px 0 13px;
+  border-radius:4px;cursor:pointer;color:var(--tx2);font-size:10px;
+  transition:background var(--m-fast) var(--ease-soft),color var(--m-fast);
+}
+/* 小节的记号 = 一条短横线（跟页签的圆点明确区分开） */
+:is(.v7-big-zone,#v7-big-zone-specificity) .scs::before{
+  content:'';position:absolute;left:4px;top:50%;width:5px;height:1px;margin-top:-0.5px;
+  background:currentColor;opacity:0.5;transition:opacity var(--m-fast),width var(--m-fast);
+}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scs .tt{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ⭐ 2026-10-05：悬停到【没选中】的页签时，那一页还没渲染、扫不出小节，
+ *   浮层里就显示"这一栏是干什么的"（TABS 的 sub 文案）。见 settings-card.js 的 fallback。
+ *   ⚠ 它跟 .scs 一样占位、但不可点（不是链接，别做成能点的样子 —— 那会让人以为点了有反应）。
+ *   ⚠ white-space 用 normal：这句是整句中文，nowrap 会被截掉一半。 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .scs-info{
+  display:flex;align-items:center;padding:6px 7px 6px 13px;
+  color:var(--tx2);font-size:10px;line-height:1.55;
+}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scs-info .tt{white-space:pre-line;overflow-wrap:anywhere}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scs:hover{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)));color:var(--tx)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scs.sel{color:var(--tx);font-weight:600}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scs.sel::before{opacity:1;width:9px;background:hsl(var(--glow-detail))}
+/* ⚠ 不给"当前小节"加动画 —— 它跟着滚动一直在变，加动画会一直在闪 */
+/* ⚠ 主菜单那一行右边的小箭头：表示"这一行有细分"。选中态常驻的那一行亮着。 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .scn .ck{flex:none;width:0;height:0;border-left:3.5px solid currentColor;
+  border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
+  opacity:0;transform:translateX(-3px);transition:opacity var(--m-fast),transform var(--m-fast) var(--ease-out)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scn:hover .ck,:is(.v7-big-zone,#v7-big-zone-specificity) .scn.sel .ck{opacity:0.5;transform:translateX(0)}
+
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-foot{padding:6px 4px 0;border-top:1px solid var(--line-faint);display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:10px;color:var(--tx2);font-variant-numeric:tabular-nums}
+
+/* 空状态（将来没有可显示的页时用，现在 5 页都有内容，留着不碍事） */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;color:var(--tx2);font-size:11px}
+
+/* ═══ 设置卡【一级正脸】= 总览（2026-10-01）═══
+ * 上面 5 条状态行 / 中间一排绿灰 tag / 最底下自由摆放开关。
+ * 行和 tag 只看不改，点了跳进二级大卡对应那一页（main-card-shortcuts.js 的 'jump'）。
+ * ⚠ 列表行三层底照项目统一规则：默认透明 / 悬停 .04（跟 .cpn、.pz-row 同一档），
+ *   别写成 --surface（.12）—— 那是小按钮的档位，比列表行亮三倍。
+ * ⚠ 行 / tag 的点击回馈用 element.animate（JS 里），这里不给它们挂 animation。 */
+[data-quick-card="settings"] .sq-rows{display:flex;flex-direction:column;gap:2px;min-width:0}
+[data-quick-card="settings"] .sq-row{position:relative;display:flex;align-items:center;gap:8px;min-width:0;height:34px;padding:0 8px;
+  border:0;border-radius:8px;background:transparent;color:var(--tx);font:inherit;text-align:left;cursor:pointer;
+  transition:background var(--m-fast) var(--ease-soft)}
+[data-quick-card="settings"] .sq-row:hover{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)))}
+[data-quick-card="settings"] .sq-k{flex:none;width:52px;font-size:10px;color:var(--tx2);line-height:14px}
+[data-quick-card="settings"] .sq-v{flex:1;min-width:0;font-size:12px;font-weight:600;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+/* 小圆点：绿 = 正常，灰 = 没登录 / 没配置
+   ⭐ 2026-10-22（docs/263 第 15 条，用户：状态不能只靠颜色、记得对齐）：
+     关 = 空心圈、开 = 实心点 —— 去掉颜色也分得清；8px 整数尺寸 + 行本身 align-items:center，上下居中不偏 */
+[data-quick-card="settings"] .sq-dot{flex:none;box-sizing:border-box;width:8px;height:8px;border-radius:50%;border:2px solid var(--tx2);background:transparent;opacity:0.75}
+[data-quick-card="settings"] .sq-dot.on{border-color:hsl(var(--sem-ok));background:hsl(var(--sem-ok));opacity:1;box-shadow:0 0 7px 1px hsl(var(--sem-ok) / .55)}
+
+[data-quick-card="settings"] .sq-tags{display:flex;flex-wrap:wrap;gap:5px;padding:8px 0 2px;margin-top:4px;border-top:1px solid var(--line-faint)}
+[data-quick-card="settings"] .sq-tag{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:8px;
+  border:1px solid var(--line);background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)));color:var(--tx2);
+  font:inherit;font-size:11px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color var(--m-fast),color var(--m-fast)}
+[data-quick-card="settings"] .sq-tag:hover{border-color:var(--line-strong);color:var(--tx)}
+/* ⭐ 2026-10-22：关 = 空心圈、开 / 提醒 = 实心点（见上面 .sq-dot 那条） */
+[data-quick-card="settings"] .sq-tag i{flex:none;box-sizing:border-box;width:8px;height:8px;border-radius:50%;border:2px solid currentColor;background:transparent;opacity:0.75}
+[data-quick-card="settings"] .sq-tag b{font-weight:600}
+/* 开 = 绿 */
+[data-quick-card="settings"] .sq-tag.on{color:hsl(var(--sem-ok));border-color:hsl(var(--sem-ok) / .38);background:hsl(var(--sem-ok) / .11)}
+[data-quick-card="settings"] .sq-tag.on i,[data-quick-card="settings"] .sq-tag.warn i{background:currentColor;opacity:1}
+/* 要花积分 = 橙（提醒，不是报错） */
+[data-quick-card="settings"] .sq-tag.warn{color:hsl(var(--sem-warn));border-color:hsl(var(--sem-warn) / .34);background:hsl(var(--sem-warn) / .1)}
+/* ⭐ 2026-10-04 用户：「自由摆放需要那么大一个横条吗？我觉得不需要。」
+ *   原样它是一条【带边框 + 底色】的整宽盒子（样式来自 ui.html 的 .gcf-switch），
+ *   跟上面 5 条状态行（透明、悬停才 .04）完全不是一个物种，看着突兀又占地方。
+ *   ⇒ 改成和 .sq-row 同一档：无边框、透明底、悬停 .04、高度对齐 34。
+ *   ⚠ 只改【外观】，不改行为 —— 开关还是 data-setting="freeMode" 那一个，
+ *     点击/键盘/焦点全走原路（用户定：它留在设置卡正脸，只缩成普通开关行）。
+ *   ⚠ 三层底照项目统一规则：默认透明 / 悬停 .04（跟 .sq-row、.cpn、.pz-row 同一档），
+ *     别写成 --surface（.12）—— 那是小按钮的档位，比列表行亮三倍。 */
+/* ⚠⚠ 选择器要把 .bc-fields.quick-card 写全 —— ui.html:651 那条
+ *   `.bc-fields.quick-card .gcf-switch`（带边框+底色+7px 内边距）比
+ *   `[data-quick-card="settings"] .sq-free`（两个类）优先级高，
+ *   不写全的话这几条【静默不生效】——正是本项目最容易踩的那种"改了没反应"。 */
+.bc-fields.quick-card[data-quick-card="settings"] .sq-free{
+  margin-top:4px;
+  min-height:34px; padding:0 8px; gap:8px;
+  border:0; border-radius:8px; background:transparent;
+  transition:background var(--m-fast) var(--ease-soft);
+}
+.bc-fields.quick-card[data-quick-card="settings"] .sq-free:hover{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)))}
+.bc-fields.quick-card[data-quick-card="settings"] .sq-free>span{font-size:12px; font-weight:600; color:var(--tx)}
+/* 开关本体照生成卡那档的样式（32×18 胶囊），别用小圆点 —— 它是个开关，不是状态灯。
+ * ⚠ 也要压过 ui.html 里那条 `.bc-fields.quick-card .gcf-switch input[type=checkbox]`。 */
+.bc-fields.quick-card[data-quick-card="settings"] .sq-free input[type=checkbox]{
+  appearance:none; position:relative; box-sizing:border-box;
+  flex:0 0 32px; width:32px; height:18px; padding:0; margin:0; border:0;
+  border-radius:999px; background:var(--surface-strong); cursor:pointer;
+  transition:background var(--m-fast) var(--ease-soft);
+}
+.bc-fields.quick-card[data-quick-card="settings"] .sq-free input[type=checkbox]::before{
+  content:''; position:absolute; left:2px; top:2px; width:14px; height:14px;
+  border-radius:50%; background:var(--tx); transition:transform var(--m-fast) var(--ease-out);
+}
+.bc-fields.quick-card[data-quick-card="settings"] .sq-free input[type=checkbox]:checked{background:var(--accent)}
+.bc-fields.quick-card[data-quick-card="settings"] .sq-free input[type=checkbox]:checked::before{transform:translateX(14px)}
+
+
+.scn:focus-visible{outline:2px solid currentColor;outline-offset:-3px;}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ⭐⭐⭐ 2026-10-14【一列到底】整轮重排（settings-card.js / card-architecture.js settingsPage）
+
+   用户原话：
+     "不分页，一列到底"、"在右侧的导航栏…切得更细更碎"
+     "排版方面要精炼，不要让一个非常非常空的元素直接把这一整条全部占满"
+     "颜色设置里面那三栏是不是可以直接一横排去搞定？"
+     "一个很长的滑动条…能不能换成左边一个，右边一个，同时放下两个？"
+     "有一个问号单独占一行，这种情况太多了，导致整个设置界面变得极为臃肿"
+
+   ⚠ 这一段【只管两样】：
+     ① 尺寸：导航从 108 加宽到 144（36 行中文小节名，108 放不下"Photoshop 联动"）
+     ② 左侧 .sc-flat 里【我们自己排的那几排】（.settings-grid.cols-N）—— 两个/三个一排
+   ⚠ 嵌进来的模块（账单中心 / 云备份 / 助手面板 / PS 向导 / 布局管理）有自己的排版，
+     这里的规则全部限定在 .cols-N 里面，【不去改它们】，改了会把它们内部挤坏。
+   ═══════════════════════════════════════════════════════════════════════ */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-main{width:396px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-rail{left:396px;width:144px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-body{padding:10px 14px 18px}
+
+/* ── 右边导航：一列到底 ── */
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-in{padding:8px 4px}
+/* ⚠ 长清单不能"上下居中"（margin:auto）—— 装不下时顶部会被裁掉一截。改成从顶上排。 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-nodes{margin:0;gap:1px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-nodes::before{top:4px;bottom:4px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-list{padding:0}
+/* 分组小标题：不可点，只做分段。左边距 24 = 跟下面那几行的文字起点对齐（竖线在 13 的位置，避开它） */
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-group{position:relative;z-index:1;padding:10px 4px 3px 24px;font-size:10px;font-weight:600;
+  color:var(--tx2);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+:is(.v7-big-zone,#v7-big-zone-specificity) .rail-group:first-child{padding-top:2px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .scn{height:22px;font-size:11px}
+
+/* ── 左边：每一节 = 标题 + 一行灰字说明 + 内容。节与节之间只用一条细线分开，不再套卡片框 ── */
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-panel.sc-flat{display:flex;flex-direction:column;gap:0;min-width:0}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat>.settings-section{gap:8px;margin:0;padding:14px 0;border:0;border-top:1px solid var(--line-faint);
+  border-radius:0;background:transparent}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat>.settings-section:first-child{border-top:0;padding-top:2px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat>.settings-section>.settings-section-title{margin:0;min-height:22px;font-size:13px}
+/* 节标题 / 字段标签旁边那颗「?」：点按区域保持 32px（项目无障碍规矩，card-architecture-layout 测试守着），
+ *   但用负外边距让它【不撑高】那一行 —— 看起来跟标题同一行、紧凑，手指照样好点。 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-section-title>.v7-help{margin:-5px 0 -5px auto}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .v7-help{margin:-6px 0}
+/* 常显的那行灰字：这一块是干什么的 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .sec-sub{margin:-4px 0 0;font-size:10px;line-height:1.5;color:var(--tx2)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-status-line{margin:0;font-size:11px;line-height:1.5;color:var(--tx2);overflow-wrap:anywhere}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .slot-idle{margin:0;padding:8px 0;font-size:11px;color:var(--tx2);opacity:0.75}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .module-slot{min-height:36px}
+/* 还没挂上的模块先占一块高度：真挂上时页面跳得少一点 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .module-slot:has(> .slot-idle){min-height:96px}
+
+/* ── 我们自己排的那几排：1 / 2 / 3 个一排 ── */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid.cols-1,
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid.cols-2,
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid.cols-3{display:grid;gap:8px 10px;align-items:end;min-width:0}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid.cols-1{grid-template-columns:minmax(0,1fr)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+/* ⚠ 老标记给开关/滑条都打了 .full（"占满整行"），在这里一律【不占满】—— 用户点名的就是它。
+   只有我们主动标了 .wide 的（地址、Key、长下拉）才占满。 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"]>.full{grid-column:auto}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"]>.wide{grid-column:1/-1}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .settings-row{gap:2px;min-width:0}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .settings-field{gap:3px;min-width:0}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .settings-field>span:first-child{min-height:0;font-size:11px;line-height:1.4}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .settings-field input:not([type=range]):not([type=checkbox]):not([type=color]),
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .settings-field select,
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .settings-field .uisel-trigger{height:32px;min-height:32px;padding:0 9px;font-size:12px}
+/* 下拉/输入框带「?」时：问号跟标签同一行，不另起一行 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .settings-field:has(>.v7-help){grid-template-columns:minmax(0,1fr) auto;column-gap:4px}
+/* 开关：一格高 32，标签在左、开关在右 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .tgl{min-height:32px;padding:5px 8px;gap:6px;font-size:11px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .tgl-label{line-height:1.35}
+/* 滑条：名字 + 数值一行（超长省略，悬停看全），下面一根条 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .nsl-head{min-height:18px;align-items:center}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .nsl-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .nsl-val{font-size:12px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .settings-field .nsl-range{margin:6px 0 5px}
+/* 括号里的小字提示：已经被收进「?」，残留的就压小 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid[class*="cols-"] .sf-hint{font-size:10px}
+/* 颜色三个一排：名字一行，色块 + 「默认」一行 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid.cols-3 .settings-color{flex-wrap:wrap;gap:6px;padding:6px 8px;
+  border:1px solid var(--line-faint);border-radius:var(--radius-control);background:var(--surface-faint)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid.cols-3 .settings-color .sc-name{flex:1 0 100%;font-size:11px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid.cols-3 .settings-color input[type="color"]{flex:1 1 auto;width:auto;min-width:0}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-grid.cols-3 .settings-color>.v7-help{display:none}
+
+/* ── 按钮一排：按内容宽，不再一颗占半行 ── */
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat>.settings-section>.settings-actions,:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .module-slot>.settings-actions{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat>.settings-section>.settings-actions>.settings-btn,:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .module-slot>.settings-actions>.settings-btn{flex:none;width:auto;height:28px;padding:0 12px;font-size:11px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .sc-flat .settings-btn-primary{background:hsl(var(--accent-hsl, 211 100% 68%) / .22);border-color:hsl(var(--accent-hsl, 211 100% 68%) / .55)}
+
+/* ⭐ 2026-10-14：账号那一行右边挂积分（账号 + 积分合成一行）。值短、积分靠右，不抢账号状态的位置。 */
+[data-quick-card="settings"] .sq-x{flex:none;max-width:52%;font-size:11px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+/* 点一下就切换的标签：按下时给个回弹，跟「跳去设置」的那几颗区分手感 */
+[data-quick-card="settings"] .sq-toggle{position:relative}
+[data-quick-card="settings"] .sq-toggle:active{transform:scale(.95)}
+/* 透明的真开关铺满整个标签：点哪都切换；键盘聚焦时给标签描一圈 */
+[data-quick-card="settings"] .sq-toggle-input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+[data-quick-card="settings"] .sq-toggle:has(.sq-toggle-input:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
+
+/* ══ 2026-10-15 设置页整理（用户：按钮不在一行、记住我位置怪、信息太散）══════════════ */
+/* 节标题行右边的小按钮（「积分与充值」的「兑换卡密」）*/
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-section-title>.sec-title-btn{margin-left:auto;min-height:24px;height:24px;padding:0 10px;font-size:11px;font-weight:600}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-section-title>.sec-title-btn[aria-expanded="true"]{background:hsl(var(--accent-hsl, 211 100% 68%) / .22);border-color:hsl(var(--accent-hsl, 211 100% 68%) / .55)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-section-title>.sec-title-btn+.v7-help{margin-left:6px}
+/* 登录：「记住我 …… 忘记密码？」一行 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .account-login-options{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+:is(.v7-big-zone,#v7-big-zone-specificity) .account-login-options>[data-remember-row]{flex:0 1 auto;min-width:0;margin:0}
+:is(.v7-big-zone,#v7-big-zone-specificity) .account-login-options .ai-switch{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx2);cursor:pointer}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-link-btn{flex:none;min-height:0;height:auto;padding:2px 0;border:0;background:none;color:var(--accent);font-size:12px;font-weight:500;cursor:pointer}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-link-btn:hover{text-decoration:underline;background:none}
+:is(.v7-big-zone,#v7-big-zone-specificity) .account-mode{display:flex;flex-direction:column;gap:10px;min-width:0}
+:is(.v7-big-zone,#v7-big-zone-specificity) .account-mode>.settings-actions{display:flex;flex-wrap:nowrap;gap:8px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .account-mode>.settings-actions>.settings-btn{flex:1 1 0;min-width:0}
+:is(.v7-big-zone,#v7-big-zone-specificity) .account-mode>[data-account-remember-status]{font-size:11px;color:var(--tx2)}
+/* 生图服务：检查连接那一块紧跟在 Key 后面 */
+:is(.v7-big-zone,#v7-big-zone-specificity) .provider-check{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:var(--radius-control,10px);
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .05);border:1px solid hsl(var(--accent-hsl, 211 100% 68%) / .18)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .provider-check>.settings-actions{display:flex;gap:8px;flex-wrap:nowrap}
+/* 低频内容的轻折叠（Key 云同步 / 推荐服务商）*/
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-fold-lite>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;min-height:30px;
+  font-size:12px;color:var(--tx2)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-fold-lite>summary::-webkit-details-marker{display:none}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-fold-lite>summary::before{content:'▸';font-size:10px;transition:transform var(--m-fast)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-fold-lite[open]>summary::before{transform:rotate(90deg)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-fold-lite>summary:hover{color:var(--accent)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-fold-lite[open]>*:not(summary){margin-top:8px}
+
+/* ══ 2026-10-15 设置卡正脸：标签分两组（开关 / 去设置），每组上面一行小标题 ══
+ *   ⚠ 第一组的分隔线由小标题承担，组内 .sq-tags 不再各画一条线（否则两道线挤在一起）。 */
+[data-quick-card="settings"] .sq-tags-h{margin-top:8px;padding-top:7px;border-top:1px solid var(--line-faint);
+  font-size:10px;line-height:1.4;color:var(--tx2);opacity:0.75}
+[data-quick-card="settings"] .sq-tags-h+.sq-tags{border-top:0;margin-top:0;padding-top:5px}
+[data-quick-card="settings"] .sq-tag.sq-jump .sq-arrow{margin-left:1px;opacity:0.5;font-size:13px;line-height:1}
+/* 正脸收紧（2026-10-15 量过：内容 377px > 可用 322px，第二组被卡脚盖住 4 个）。
+ *   状态行 34→30、标签 24→22、组间距收小 ⇒ 实测约 300px，全部装得下且不缩字号。 */
+[data-quick-card="settings"] .sq-row{min-height:30px;height:30px}
+[data-quick-card="settings"] .sq-tags-h{margin-top:6px;padding-top:5px;line-height:1.3}
+[data-quick-card="settings"] .sq-tags{gap:4px}
+[data-quick-card="settings"] .sq-tags-h+.sq-tags{padding-top:4px}
+[data-quick-card="settings"] .sq-tag{height:22px;padding:0 8px}
+[data-quick-card="settings"] .sq-row{min-height:28px;height:28px}
+[data-quick-card="settings"] .sq-rows{margin-bottom:0;gap:1px}
+[data-quick-card="settings"] .sq-tags-h{margin-top:4px;padding-top:4px}
+[data-quick-card="settings"] .sq-tag{padding:0 7px}
+
+/* ⭐ 2026-10-16「设置 → 关于软件」：版本号 / 后台 / PS 插件 / 引擎，一行一项（左边名字、右边状态） */
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-about-rows{display:grid;gap:6px;margin:0 0 10px}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-about-row{display:grid;grid-template-columns:72px 1fr;gap:8px;font-size:12px;line-height:1.5}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-about-key{color:var(--tx2)}
+:is(.v7-big-zone,#v7-big-zone-specificity) .settings-about-val{color:var(--tx);overflow-wrap:anywhere}
+
+/* ═══ ⭐ 2026-10-20 设置卡顶上的搜索框（settings-card.js 的 options.search；只有设置卡开）═══
+   用户：「设置内容特别多……顶部需要加一个搜索框……近似搜索……有跳转有分类」
+   · 常驻在内容区最上面（跟剪影卡「打了字才出现」那个不一样 —— 这里是用户要的「顶部加一个搜索框」）
+   · 结果列表盖在正文上（不挤正文），按「分组 · 小节」分类；滚轮落在列表上滚列表（ui.html 设置卡滚轮那段）
+   · 颜色全走主题变量（--accent / --tx / --tx2 / --line-*），不写死 */
+#settingsZone .sc-main.has-search .sc-pages{top:38px}
+#settingsZone .sc-search{position:absolute;left:12px;right:10px;top:8px;height:28px;z-index:5;box-sizing:border-box;
+  display:flex;align-items:center;gap:6px;padding:0 4px 0 9px;
+  border:1px solid var(--line-faint);border-radius:8px;background:rgba(255,255,255,calc(.05 * var(--ui-bg-opacity,1)));color:var(--tx2);
+  transition:border-color var(--m-fast) var(--ease-soft),background-color var(--m-fast) var(--ease-soft)}
+#settingsZone .sc-search:focus-within{border-color:hsl(var(--accent-hsl, 211 100% 68%) / .7);background:rgba(255,255,255,calc(.08 * var(--ui-bg-opacity,1)))}
+#settingsZone .scs-ico{flex:none;display:inline-flex;opacity:.75}
+#settingsZone .scs-input{flex:1;min-width:0;height:100%;padding:0;border:0;outline:0;background:transparent;color:var(--tx);font:inherit;font-size:12px}
+#settingsZone .scs-input::placeholder{color:var(--tx2);opacity:.75}
+#settingsZone .scs-clear{all:unset;cursor:pointer;flex:0 0 20px;width:20px;height:20px;border-radius:50%;text-align:center;line-height:19px;font-size:13px;color:var(--tx2)}
+#settingsZone .scs-clear:hover{color:var(--tx);background:rgba(255,255,255,.1)}
+#settingsZone .scs-clear[hidden]{display:none}
+#settingsZone .scs-results{position:absolute;left:-1px;right:-1px;top:31px;max-height:326px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
+  box-sizing:border-box;padding:4px;border:1px solid var(--line-strong);border-radius:8px;
+  background:hsl(var(--card-h, 220 28%) 9% / .97);box-shadow:var(--shadow-mid)}
+#settingsZone .scs-results::-webkit-scrollbar{display:none}
+#settingsZone .scs-results[hidden]{display:none}
+#settingsZone .scs-row{display:flex;align-items:baseline;gap:6px;min-height:26px;padding:4px 8px;border-radius:8px;cursor:pointer;color:var(--tx);font-size:12px;line-height:1.4}
+#settingsZone .scs-row.cur{background:hsl(var(--accent-hsl, 211 100% 68%) / .16)}
+#settingsZone .scs-sec{margin-top:4px;flex-wrap:wrap}
+#settingsZone .scs-sec:first-child{margin-top:0}
+#settingsZone .scs-sec b{font-weight:600;color:var(--tx)}
+#settingsZone .scs-sec .scs-path{color:var(--tx2);font-size:11px}
+#settingsZone .scs-sec small{flex-basis:100%;color:var(--tx2);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#settingsZone .scs-item{padding-left:20px;color:var(--tx2)}
+#settingsZone .scs-item::before{content:'';flex:none;width:4px;height:4px;border-radius:50%;background:hsl(var(--accent-hsl, 211 100% 68%) / .7);transform:translateY(-2px)}
+#settingsZone .scs-item.cur{color:var(--tx)}
+#settingsZone .scs-empty{padding:12px 10px;color:var(--tx2);font-size:11px;line-height:1.6}

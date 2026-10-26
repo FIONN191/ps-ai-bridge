@@ -1,0 +1,32 @@
+/* L1 keeps the existing 300×400 shell, drag strip, semantic background and footer. */
+.bc-fields.quick-card{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-content:start;overflow:hidden}
+.quick-card .full{grid-column:1/-1}
+.quick-heading{display:flex;align-items:center;justify-content:space-between;min-width:0;height:32px;color:var(--tx2);font-size:11px}
+.quick-card .gcf{font-size:11px;gap:4px}
+.quick-card .gcf>span{display:flex;justify-content:space-between;gap:8px;line-height:16px}
+.quick-card .gcf input:not([type=range]),.quick-card .gcf select,.quick-card textarea{box-sizing:border-box;width:100%;min-width:0;height:32px;padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface);color:var(--tx);font:inherit;font-size:12px;line-height:18px}
+.quick-card textarea{height:78px;resize:none}
+.quick-card input[type=range]{width:100%;height:24px;margin:0;accent-color:var(--accent);cursor:ew-resize}
+.bc-fields.quick-card .gcf-switch{grid-column:auto;min-width:0;min-height:32px;padding:6px 8px;font-size:11px;gap:4px}
+.bc-fields.quick-card .gcf-switch.full{grid-column:1/-1}
+.quick-card .gcf-switch input{flex:none}
+.bc-fields.quick-card .gcf-switch>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.bc-fields.quick-card .gcf-switch input[type=checkbox]{appearance:none;position:relative;box-sizing:border-box;flex:0 0 32px;width:32px;height:18px;padding:0;margin:0;border:0;border-radius:999px;background:var(--surface-strong);cursor:pointer;transition:background var(--m-fast) var(--ease-soft)}
+.bc-fields.quick-card .gcf-switch input[type=checkbox]::before{content:'';position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--tx);transition:transform var(--m-fast) var(--ease-out)}
+.bc-fields.quick-card .gcf-switch input[type=checkbox]:checked{background:var(--accent)}
+.bc-fields.quick-card .gcf-switch input[type=checkbox]:checked::before{transform:translateX(14px)}
+.quick-action{display:flex;align-items:center;justify-content:center;min-width:0;min-height:34px;padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface);color:var(--tx);font:inherit;font-size:12px;font-weight:600;line-height:18px;cursor:pointer;transition:background var(--m-fast) var(--ease-soft),transform var(--m-fast) var(--ease-out),border-color var(--m-fast) var(--ease-soft)}
+.quick-action.primary{border-color:hsl(var(--accent-hsl) / .45);background:hsl(var(--accent-hsl) / .2)}
+.quick-action:hover:not(:disabled){background:var(--surface-strong);border-color:var(--line-strong)}
+.quick-action:active:not(:disabled){transform:scale(.98)}
+.quick-action:disabled{opacity:0.5;cursor:default}
+.quick-card :is(button,input,select,textarea):focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.quick-status{min-width:0;max-height:32px;overflow:hidden;color:var(--tx2);font-size:10px;line-height:16px;overflow-wrap:anywhere}
+.quick-card .gcf input::placeholder,.quick-card textarea::placeholder{color:var(--tx2);opacity:0.75}
+.history-card-context{display:flex;flex-direction:column;justify-content:center;min-width:0;min-height:40px;gap:2px;}
+.history-card-context strong{font-size:15px;line-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.history-card-context span{font-size:11px;color:var(--tx2);line-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.history-card-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;min-height:88px;}
+.history-card-metrics>div{display:flex;align-items:center;justify-content:space-between;min-width:0;gap:4px;padding:7px 8px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface);}
+.history-card-metrics span{font-size:11px;color:var(--tx2);white-space:nowrap;}
+.history-card-metrics strong{font-size:15px;font-weight:650;white-space:nowrap;}

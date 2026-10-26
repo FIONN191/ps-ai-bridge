@@ -1,0 +1,10 @@
+.browser-preferences{display:flex;flex-direction:column;gap:12px;min-width:0;}
+.browser-bookmark-editor{display:flex;flex-direction:column;gap:8px;max-height:48vh;overflow:auto;}
+.browser-bookmark-row{display:grid;grid-template-columns:minmax(110px,.7fr) minmax(180px,1.5fr) auto;gap:8px;align-items:end;padding:8px 0;border-bottom:1px solid var(--line-faint);}
+.browser-bookmark-row label{display:flex;flex-direction:column;gap:4px;color:var(--tx2);font-size:12px;min-width:0;}
+.browser-bookmark-row input{width:100%;min-width:0;box-sizing:border-box;background:var(--surface-faint);border:1px solid var(--line-strong);border-radius:var(--radius-control);color:var(--tx);padding:7px 8px;}
+.browser-preferences-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.browser-task-lock-option{display:flex;gap:8px;align-items:flex-start;color:var(--tx);}
+.v7-workspace-inline .browser-bookmark-editor{max-height:none;overflow:visible}.browser-unsaved-choice{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line-strong);color:var(--tx)}.browser-unsaved-choice p{margin:0;flex-basis:100%;font-weight:600}
+@container v7-workspace (max-width:620px){.browser-bookmark-row{grid-template-columns:minmax(0,1fr);align-items:stretch}.browser-bookmark-row .browser-preferences-actions{justify-content:flex-end}}
+@media(max-width:600px){.browser-bookmark-row{grid-template-columns:1fr;align-items:stretch;}.browser-bookmark-editor{max-height:none;}}

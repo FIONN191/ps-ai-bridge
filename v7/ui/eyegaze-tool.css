@@ -1,0 +1,22 @@
+/* 工具「眼神调整」（eyegaze-tool.js，10-25）。外壳用工具面板现成的 .v7tw-*，这里只补预览画布和两列调节的排法。 */
+.v7eg-view{position:relative; min-height:0}
+.v7eg-cv{position:absolute; left:0; top:0; width:100%; height:100%; display:block; cursor:crosshair; touch-action:none}
+.v7eg-busy{position:absolute; left:0; top:0; right:0; bottom:0; z-index:3; display:flex; align-items:center; justify-content:center;
+  font-size:12px; color:var(--tx2); background:hsl(var(--card-h, 220 28%) 8% / .72); text-align:center; padding:0 16px}
+.v7eg-busy[hidden]{display:none}
+.v7tw-box > .v7tw-boxlbl[hidden]{display:none}
+/* 右边两列：调节项多，按列排；分节标题和说明占整行 */
+.v7eg-params{columns:2; column-gap:14px}
+.v7eg-params > .v7tw-sect, .v7eg-params > .v7tw-hint, .v7eg-params > .v7tw-chips, .v7eg-params > .v7tw-btnrow,
+.v7eg-params > .v7tw-slider, .v7eg-params > .v7tw-tog{break-inside:avoid}
+.v7eg-params > [hidden]{display:none}
+.v7eg-params .v7tw-slider > label{flex-basis:58px}
+.v7eg-params .v7tw-slider > .v7tw-val{flex-basis:40px}
+.v7eg-params [data-eg-status]{white-space:pre-line; column-span:all; margin-bottom:8px}
+/* 预览下面那排按钮一行放下：传回 PS 靠右 */
+.v7eg-view + .v7tw-btnrow{flex-wrap:nowrap}
+.v7eg-view + .v7tw-btnrow > [data-eg-act="send"]{margin-left:auto}
+.v7eg-params [data-eg-status]:empty{display:none}
+.v7eg-params [data-eg-status][data-level="warn"]{border-left-color:hsl(var(--sem-warn)/.8)}
+.v7eg-params [data-eg-status][data-level="err"]{border-left-color:hsl(var(--sem-err)/.8); color:hsl(var(--sem-err)/.95)}
+.v7eg-params [data-eg-status][data-level="ok"]{border-left-color:hsl(var(--sem-ok)/.8)}

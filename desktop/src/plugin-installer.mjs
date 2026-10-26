@@ -206,7 +206,7 @@ function replaceDir(src, dest) {
   fs.cpSync(src, dest, { recursive: true });
 }
 
-export function createInstaller({ sourceDir, extras = [] }) {
+export function createInstaller({ sourceDir, extras = [], folder = FOLDER }) {
   const bundled = readManifest(sourceDir);
   if (!bundled?.id) throw new Error(`插件文件不完整：${sourceDir}`);
   const minMajor = parseInt(bundled.host?.minVersion, 10) || 0;
@@ -229,7 +229,7 @@ export function createInstaller({ sourceDir, extras = [] }) {
       const pluginsDir = path.join(p.root, 'Plug-ins');
       const major = majorOf(p);
       const copies = findCopies(pluginsDir, bundled.id);
-      const ours = copies.find((c) => path.basename(c.dir) === FOLDER) || null;
+      const ours = copies.find((c) => path.basename(c.dir) === folder) || null;
       return {
         name: p.name,
         root: p.root,
@@ -249,21 +249,21 @@ export function createInstaller({ sourceDir, extras = [] }) {
     try {
       const needAdmin = [];
       for (const dir of pluginsDirs) {
-        const dest = path.join(dir, FOLDER);
+        const dest = path.join(dir, folder);
         try { replaceDir(staged, dest); } catch (e) { if (denied(e)) needAdmin.push({ op: 'copy', src: staged, dest }); else throw e; }
       }
       if (needAdmin.length) await elevated(needAdmin);
     } finally {
       fs.rmSync(staged, { recursive: true, force: true });
     }
-    const failed = pluginsDirs.filter((dir) => readManifest(path.join(dir, FOLDER))?.version !== bundled.version);
+    const failed = pluginsDirs.filter((dir) => readManifest(path.join(dir, folder))?.version !== bundled.version);
     if (failed.length) throw new Error(`复制后检查没通过：${failed.join('、')}`);
   }
 
   async function uninstall(pluginsDirs) {
     const needAdmin = [];
     for (const dir of pluginsDirs) {
-      const dest = path.join(dir, FOLDER);
+      const dest = path.join(dir, folder);
       if (!fs.existsSync(dest)) continue;
       try { fs.rmSync(dest, { recursive: true }); } catch (e) { if (denied(e)) needAdmin.push({ op: 'remove', dest }); else throw e; }
     }

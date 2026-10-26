@@ -1,0 +1,431 @@
+/* ═══ ui-main/css/01-base.css —— 主界面主样式第 1 / 8 段 ═══
+   管什么：全局：文字选中策略 · 页面 · 卡片骨架 · 折叠成小灵动岛 · 卡片遮罩 · 叠压标题带
+   2026-10-21 从 ui.html 那一整段 <style> 原样切出来；ui.html 按编号顺序 <link> 进来（顺序 = 原来的先后，别调）。 */
+/* ── 以上是文件说明（拼回 ui.html 时会去掉）── */
+  /* ⚠⚠ 颜色和尺寸代币【全部搬到 ui-pure/tokens.css】了(2026-09-14)。
+     四个页面(主窗口 + 大图/L4/剪影编辑器)共用那一份，别在这儿再定义一遍 ——
+     原来各抄一份已经飘了(`--line` 三个页面三个值)。
+     加新代币、改颜色，都去 tokens.css。 */
+  *{box-sizing:border-box;}
+  /* ══ 文字选中策略(2026-09-11) ══════════════════════════════
+     这是桌面应用不是网页：卡片、按钮、标签、列表项被选成一片蓝色只会碍事，
+     而且【长按拖拽时尤其严重】—— 拖预设排序、拖窗口、拖滑块都会顺手把文字刷蓝。
+     所以默认全不可选，再把真正需要复制的白名单开回来。
+     ⚠ 判断标准只有一条：**这段文字用户可能要发给别人、或粘到别处去**。
+       报错详情要发给开发、日志要贴出来排查、提示词要复制到别的地方 —— 这些必须能选。
+       按钮上写的"开始生成"、标签"分辨率"、卡片标题，选中它们没有任何意义。
+     ⚠ 子窗口(l4 / viewer / 剪影编辑器)早就各自设了全局 none，这里只管主窗口。 */
+  body{user-select:none; -webkit-user-select:none;}
+  /* 白名单：需要复制的内容 */
+  input,textarea,[contenteditable],
+  .error-detail .ed-body,      /* 报错详情：错误码 / 服务器原话 / 堆栈，报错卡里明写了"报给开发" */
+  .log-msg,.log-list,          /* 链路日志：排查时要整段贴出来 */
+  .pd-ta,                      /* 提示词原文(查看原文模式) */
+  .ai-note,.ai-help,.settings-note,   /* 说明文字里常含地址/参数，允许摘抄 */
+  [data-selectable]{
+    user-select:text; -webkit-user-select:text;
+  }
+  /* ⚠ cursor 单独给纯文本区，别写进上面那条 —— 上面那条含 input/textarea，
+     顺手改光标会把输入框的 I 型光标也换掉。按钮/可点项更不能被波及。 */
+  .error-detail .ed-body,.log-msg,.ai-note,.ai-help,.settings-note{cursor:text;}
+  body{margin:0;font-family:'OPPO Sans',-apple-system,"SF Pro","Segoe UI","Microsoft YaHei",sans-serif;color:var(--tx);overflow:hidden;height:100vh;position:relative;
+    /* 界面不透明度只下发给卡片/面板的背景层。绝不能把 opacity 挂在 body：
+       body opacity 会把文字、按钮、预览图和所有交互一起合成后变淡。
+       --ui-opacity 仍由设置页维护，具体背景层按各自的伪元素或 surface 使用它。 */}
+
+  /* ═══ 全局基础 reset（2026-10-22，docs/263 §1.2 / §1.4 / §2.5）═══
+     为什么加这一段：全项目 587 个 flex 规则块里有 269 个没写垂直居中、36 处靠
+     「height = line-height」硬撑、5 处字体写死 Tahoma、19 个文件里 hover 盖掉了 disabled。
+     这些不是一个一个改得完的 —— 写一次全局规矩，以后新加控件自动继承。
+     ⚠ 只给「默认值」，任何具体控件的样式优先级都比这里高，不会被覆盖。 */
+  button,input,select,textarea{
+    font:inherit;              /* 表单控件默认不继承字体 —— 不写就是系统默认字体 */
+    color:inherit;
+    letter-spacing:inherit;    /* 继承字距，避免各处又飘 */
+  }
+  button{
+    display:inline-flex;       /* 文字和图标永远同一中线，不再靠行高硬撑 */
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    line-height:1;             /* 行高不参与居中计算 */
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  /* 禁用的按钮：压淡 + 禁止光标，并且【悬停不再变亮】
+     ⚠ 用 :not(:disabled) 的思路写成「禁用时强制还原」，这样不管各处的 :hover
+       规则写在前面还是后面，都不会把禁用态盖掉（19 个文件就是这么漏的）。 */
+  button:disabled,
+  button[disabled]{
+    opacity:.5;
+    cursor:not-allowed;
+  }
+  button:disabled:hover,
+  button[disabled]:hover,
+  button:disabled:active,
+  button[disabled]:active{
+    background:initial;
+    border-color:initial;
+    transform:none;
+  }
+  /* 所有数字类文本默认等宽：金额、张数、进度、倒计时跳数字时整行不跟着抖。
+     ⚠ 正文中文不受影响（中文数字本来等宽），所以这条可以放心全局。 */
+  body{
+    font-variant-numeric:tabular-nums;
+  }
+  /* ⭐ 2026-10-22（docs/263 第 1 条）：统一的空状态（V7Format.emptyHtml 画的）——说是什么 + 怎么才会有 + 一个按钮 */
+  .v7-empty{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    padding:20px 12px; text-align:center;
+  }
+  .v7-empty-t{ font-size:13px; font-weight:600; color:var(--tx); }
+  .v7-empty-h{ font-size:12px; color:var(--tx2); line-height:1.6; max-width:260px; }
+  .v7-empty-btn{
+    margin-top:8px; height:32px; padding:0 14px; border-radius:8px; font-size:12px; font-weight:600;
+    border:1px solid hsl(var(--accent-hsl, 211 100% 68%) / .55);
+    background:hsl(var(--accent-hsl, 211 100% 68%) / .18); color:var(--tx);
+    transition:background var(--m-fast) var(--ease-soft);
+  }
+  .v7-empty-btn:hover{ background:hsl(var(--accent-hsl, 211 100% 68%) / .32); }
+  .v7-error .v7-empty-t{ color:hsl(var(--sem-err)); }
+  /* ⭐ 2026-10-22（docs/263 第 2 / 17 条）：加载中的灰色占位行（V7Format.skeletonHtml） */
+  .v7-skel{ display:flex; flex-direction:column; gap:2px; padding:4px 0; }
+  .v7-skel-row{ display:flex; align-items:center; gap:10px; padding:8px 10px; }
+  .v7-skel-lines{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+  .v7-skel-box, .v7-skel-bar{
+    display:block; border-radius:4px;
+    background:linear-gradient(90deg, rgba(255,255,255,.05) 25%, rgba(255,255,255,.11) 50%, rgba(255,255,255,.05) 75%);
+    background-size:200% 100%; animation:v7Shim 1.2s linear infinite;
+  }
+  .v7-skel-box{ flex:none; width:36px; height:36px; border-radius:8px; }
+  .v7-skel-bar{ height:12px; }
+  .v7-skel-bar.sm{ height:10px; }
+  @keyframes v7Shim{ from{ background-position:200% 0; } to{ background-position:-200% 0; } }
+
+  /* 卡片背景图(默认渐变, 用户可换成自己的图) */
+  :root{
+    --cardbg:
+      radial-gradient(600px 400px at 25% 30%, #2b4460, transparent 60%),
+      radial-gradient(700px 500px at 78% 68%, #3b2f55, transparent 60%),
+      linear-gradient(120deg,#161a24,#20242f 60%,#181c26);
+  }
+
+  /* 【铁律】本体所有 UI 一律 absolute, 禁用 position:fixed —— fixed 相对视口,
+     Electron 拖窗时会与本体分离("漂移")。全屏冻结层(L4/大图)不走 fixed,
+     而是各自独立开一个盖住整个显示器的窗口 —— 主窗口只有 1020×1100,
+     窗口内的 fixed 铺不满屏幕, 从根上做不到真全屏。
+     anchor 自身 pointer-events:none —— 它是个被子元素撑大的透明容器,
+     若吃鼠标事件会形成"看不见的外框"挡住卡片点击。
+     ⚠ 不要用 .anchor > * {pointer-events:auto} —— 会把隐藏层(zones/detail/
+     preview 的 pointer-events:none)覆盖掉, 反而形成新的隐形挡板。
+     只给真正要交互的元素单独开。 */
+  .anchor{position:absolute; left:60px; top:60px; z-index:5; pointer-events:none;}
+  .v7-primary-nav{position:absolute;left:60px;top:10px;width:460px;max-width:calc(100% - 76px);height:40px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;padding:3px;border:1px solid var(--line);border-radius:8px;background:var(--bg-solid,#20242f);color:var(--tx);z-index:var(--z-nav,840);pointer-events:auto;letter-spacing:0;}
+  .v7-primary-nav button{min-width:0;border:0;border-radius:4px;padding:0 5px;display:flex;align-items:center;justify-content:center;gap:5px;background:transparent;color:var(--tx2);font:inherit;font-size:12px;white-space:nowrap;cursor:pointer;letter-spacing:0;}
+  .v7-primary-nav button svg{flex:none;width:15px;height:15px;pointer-events:none;}
+  .v7-primary-nav button:hover{background:var(--surface-strong);color:var(--tx);}
+  .v7-primary-nav button[aria-current="page"]{background:var(--surface-strong);color:var(--tx);box-shadow:inset 0 -2px 0 var(--accent);}
+  .v7-primary-nav button:focus-visible,.v7-detail-nav button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+  .v7-detail-nav{position:absolute;z-index:4;left:13px;right:13px;top:9px;height:31px;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--line-faint);padding-bottom:5px;color:var(--tx2);letter-spacing:0;}
+  .v7-detail-nav button{width:26px;height:26px;flex:none;display:flex;align-items:center;justify-content:center;padding:4px;border:0;border-radius:4px;background:transparent;color:var(--tx2);cursor:pointer;}
+  .v7-detail-nav button:hover{background:var(--surface-strong);color:var(--tx);}
+  .v7-detail-nav button:disabled{opacity:.3;cursor:default;}
+  .v7-detail-nav button[hidden]{display:none!important;}
+  .v7-detail-nav button svg{width:16px;height:16px;pointer-events:none;}
+  /* ⭐ 2026-10-22（docs/263 三级卡瘦身，用户：「生成台·预设列表·返回 这个东西需要吗？标题需要吗？」）：
+     顶上这行只写【当前这一页的名字】（加粗，代替下面那行重复的大标题）；完整路径「生成台 / 预设列表」挪到悬停提示。
+     下面的 .dc-name 不再显示（它的文字照旧由各页填，导航那行跟着它变 —— 见 ui.html update()）。 */
+  .v7-detail-crumb{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--tx);line-height:16px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
+  .detail-card.has-navigation .dc-scroll{top:43px;padding:10px 16px 16px;border-top-left-radius:0;border-top-right-radius:0;}
+  .detail-card.has-navigation .dc-name{display:none;}
+  .detail-card.workspace-host{left:var(--workspace-left)!important;top:var(--workspace-top)!important;width:var(--workspace-width);height:var(--workspace-height);z-index:50!important;}
+  .detail-card.workspace-host .dc-scroll{padding:8px 12px 12px;overflow:hidden;}
+  .detail-card.workspace-host .dc-slide,.detail-card.workspace-host #dcBody{height:100%;min-height:0;}
+  .detail-card.workspace-host .dc-name{display:none;}
+  .anchor:has(.detail-card.workspace-host) #zones{visibility:hidden!important;pointer-events:none!important;}
+  body.free-mode .v7-primary-nav{left:16px;top:6px;max-width:calc(100% - 32px);height:33px;}
+  @media(max-width:540px){.v7-primary-nav{left:16px;width:calc(100% - 32px);max-width:none;}.v7-primary-nav button{font-size:11px;gap:3px;}.v7-primary-nav button svg{width:13px;height:13px;}}
+  #stack{
+    pointer-events:none;
+    transition:transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-soft);
+  }
+  /* 主卡收拢后的横向药丸。它和顶部拖拽条共用圆角/描边语言，仍然跟随 anchor 拖动。 */
+  .collapse-pill{
+    position:absolute; left:224px; top:0; width:174px; height:34px;
+    display:flex; align-items:center; gap:8px; padding:4px 5px 4px 12px;
+    border-radius:999px; border:1px solid var(--line-strong);
+    background:hsl(var(--card-h, 220 28%) 12% / .9); backdrop-filter:blur(var(--blur)) saturate(1.5);
+    -webkit-backdrop-filter:blur(var(--blur)) saturate(1.5); box-shadow:var(--shadow-mid);
+    opacity:0; pointer-events:none; transform:translateX(-14px) scaleX(.72);
+    transform-origin:left center; transition:opacity var(--dur) var(--ease-soft), transform var(--dur) var(--ease-out);
+    z-index:20; color:var(--tx);
+  }
+  .collapse-pill .pill-icon{font-size:15px; line-height:1; flex-shrink:0;}
+  .collapse-pill .pill-label{font-size:12px; font-weight:600; flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;}
+  .collapse-pill .pill-toggle{
+    display:flex; align-items:center; justify-content:center; width:24px; height:24px;
+    border:1px solid var(--line-faint); border-radius:999px; color:var(--tx);
+    background:rgba(255,255,255,.1); cursor:pointer; font-size:0; line-height:0;
+    transition:background var(--m-fast), transform var(--m-fast) var(--ease-out);
+  }
+  /* 折叠按钮: 仿 macOS 左上角圆点, 放在堆顶主卡右上角。
+     ⚠ z-index 从 20 降到 9（2026-09-13）：压暗层 .bc-dim 现在占 20，
+       卡内一律不许 ≥ 20（见 .bc-dim 那段注释）。9 已经高过卡面上所有东西
+       （齿轮 8 > 卡名/面包屑 6 > 拖拽条 3 > 卡面 2），点击命中不受影响。
+     ⚠ 它本来就该跟着叠压变暗 —— 被压住的卡上那颗圆点还锃亮，正是"亮暗不跟层级"的一部分。 */
+  .collapse-toggle{
+    position:absolute; top:9px; right:18px; z-index:9;
+    display:flex; align-items:center; justify-content:center;
+    width:16px; height:16px; padding:0;
+    /* #stack/anchor 为防止透明外框挡点击而设 none，按钮必须显式恢复命中。 */
+    pointer-events:auto;
+    border:1px solid rgba(255,255,255,.28); border-radius:50%;
+    color:var(--tx); background:rgba(255,255,255,.13);
+    cursor:pointer; font-size:0; line-height:0;
+    box-shadow:0 2px 8px rgba(0,0,0,.22);
+    transition:top var(--m-fast) var(--ease-out), background var(--m-fast), border-color var(--m-fast), transform var(--m-fast) var(--ease-out), opacity var(--dur) var(--ease-soft);
+  }
+  .collapse-toggle::before,
+  .collapse-pill .pill-toggle::before{
+    /* 对称的实心 chevron：不使用文字 V，也不依赖字体字面框，视觉中心与按钮中心一致。 */
+    content:''; display:block; flex:0 0 9px; width:9px; height:6px;
+    background:currentColor;
+    clip-path:polygon(0 0, 50% 70%, 100% 0, 100% 30%, 50% 100%, 0 30%);
+    transform:rotate(180deg); transform-origin:center;
+  }
+  .collapse-toggle[data-collapsed="true"]::before,
+  .collapse-pill .pill-toggle[data-collapsed="true"]::before{transform:rotate(0deg);}
+  .collapse-pill .pill-toggle:hover{background:rgba(255,255,255,.24); transform:scale(1.06);}
+  .collapse-toggle:hover{background:rgba(255,255,255,.24); border-color:rgba(255,255,255,.46); transform:scale(1.08);}
+  .collapse-pill .pill-toggle:active{transform:scale(.94);}
+  .collapse-toggle:active{transform:scale(.94);}
+  /* 折叠时不压扁整个 stack: 其他主卡沿原有堆叠路径向顶卡回收。 */
+  .anchor.collapsed #stack{opacity:1 !important; pointer-events:none;}
+  .anchor.collapsed #stack .block-card:not(.is-current){
+    opacity:0 !important; pointer-events:none !important;
+    transform:translate(0, 0) scale(.96) !important;
+    transition-delay:var(--collapse-delay, 0s);
+  }
+  /* 顶卡原地收成小灵动岛：只缩高度，顶部锚点保持不动。
+     ⚠ pointer-events:none —— 折叠时卡片本身不拦截点击（只留折叠按钮可点，见下面 287 行）。
+       否则 44px 的小岛会挡住下面窗口，必须先点一下岛把焦点移走才能点到下面（2026-09-29 用户反馈）。 */
+  .anchor.collapsed #stack .block-card.is-current{
+    height:44px; border-radius:28px;
+    transform:translateY(0) !important;
+    transition-delay:.18s;
+    cursor:grab;
+    pointer-events:none;
+  }
+  .anchor.collapsed #stack .block-card.is-current.is-dragging{cursor:grabbing;}
+  /* ⭐⭐ 折叠成小灵动岛时，卡面上的东西【一律藏掉】——【通用规则，新卡免登记】(2026-09-13 定案)。
+     ⚠⚠ 这里原来是一张【手写的清单】(.bc-inner / .bc-thumb / .ps-canvas / .ps-crumb / .ps-gear)，
+       注释还写着"以后加新主卡也要来这儿登记"。结果 2026-09-13 加剪影卡卡名 .ps-cardname 时
+       就是没来登记 —— 折叠后那四个字被挤进 44px 的小岛里，和岛中间的项目名撞在一起（用户实测）。
+     ⭐ 用户 2026-09-13 定案：**以后主卡要让用户自己增删/排序**。
+       那"清单 + 记得登记"这条路就是死路 —— 用户加的卡我们根本没机会去登记。
+       所以改成按结构走：**当前卡的直接子元素，除了折叠按钮，全藏**。
+       新卡、新元素自动适用，永远不用回来改这里。
+     ⚠ 唯一的例外是 .collapse-toggle（那是把岛展开回来的唯一出口，藏了就出不去了）。
+       以后如果真有第二个"折叠态也要显示"的东西，在这里加 :not(...)，并写清为什么。
+     ⚠ 小岛中间那行项目名是 .block-card::after（伪元素，不是子元素），不受这条影响。 */
+  .anchor.collapsed #stack .block-card.is-current > *:not(.collapse-toggle){
+    opacity:0 !important; pointer-events:none !important; transition-delay:.08s;
+  }
+  /* 折叠态不再复用展开态 dragbar 的顶部定位：小岛上的 handle 只作视觉提示，
+     真正拖动区域是整张小岛。这样 handle 不会抢走折叠按钮的命中。 */
+  .anchor.collapsed #stack .block-card.is-current .dragbar{
+    opacity:0; pointer-events:none; top:50%;
+    transform:translate(-50%,-50%);
+  }
+  .anchor.collapsed #stack .block-card.is-current::after{
+    /* 折叠态中心显示固定项目名，不再显示主卡标题或展开态 dragbar。 */
+    content:'夏三七的修图轮椅V7'; position:absolute; left:50%; top:50%; z-index:3;
+    max-width:calc(100% - 92px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    pointer-events:none; transform:translate(-50%,-50%);
+    color:var(--tx); font-size:13px; line-height:20px; font-weight:600; letter-spacing:.2px;
+    text-align:center; text-shadow:0 1px 8px rgba(0,0,0,.35);
+    opacity:1; transition-delay:.34s;
+  }
+  /* 每张主卡各自携带一个按钮，按钮跟随该卡的叠压 transform。
+     小岛高 44px，按钮垂直居中：top = (44 - 16) / 2 = 14px。 */
+  .anchor.collapsed #stack .block-card.is-current > .collapse-toggle{
+    top:14px; right:18px; margin:0; transform:scale(1);
+  }
+  .anchor.collapsed #stack .block-card.is-current > .collapse-toggle:hover{
+    transform:scale(1.08);
+  }
+  /* 只有顶层主卡显示折叠按钮，露出的叠压卡不出现重复圆点。 */
+  /* ⚠⚠ 通用护栏（2026-09-13 用户指出）：**被压住的卡，露出来的按钮一律不许点**。
+     setStack 里给非当前卡设了 `pointerEvents='none'`，但那拦不住
+     【子元素显式写了 pointer-events:auto】的情况 —— CSS 里子元素的 auto
+     会突破父级的 none。而 .ps-crumb-all / .ps-gear 恰恰都写了 auto，
+     所以叠压时露在下沿的「全部预设」按钮和齿轮**一直是点得到的**。
+     点下去会切换到那张卡的状态，用户却以为自己点的是当前卡 —— 典型的误触。
+     ⚠ 加新的可交互元素时不用再单独关，这条已经覆盖；但【别在下面写更高优先级的 auto】。 */
+  body:not(.free-mode) #stack .block-card:not(.is-current) *{pointer-events:none !important;}
+  body:not(.free-mode) #stack .block-card:not(.is-current) > .collapse-toggle{
+    opacity:0; pointer-events:none;
+  }
+  /* 折叠态不保留主卡右缘预告/收回光，避免光效停在小岛右侧。 */
+  .anchor.collapsed #stack .edgehint{
+    opacity:0 !important; width:0 !important; animation:none !important;
+  }
+  .anchor.collapsed .zones{opacity:0 !important; pointer-events:none !important; transform:translateX(-40px) !important;}
+  .anchor.collapsed .detail-card{opacity:0 !important; pointer-events:none !important; transform:translateX(-24px) !important;}
+  .anchor.collapsed .collapse-pill{opacity:0; pointer-events:none; transform:translateX(-14px) scaleX(.72);}
+  .anchor.collapsed #stack .block-card.is-current > .collapse-toggle{
+    opacity:1; pointer-events:auto; transform:scale(1);
+  }
+  body.ui-collapsed .tasks,
+  body.ui-collapsed .errors{opacity:0 !important; pointer-events:none; transform:translateY(var(--collapse-dy, -12px)) scale(.96) !important;}
+  .tasks,.errors{transition:opacity var(--dur) var(--ease-soft), transform var(--dur) var(--ease-out);}
+  .anchor:not(.collapsed) .collapse-pill{pointer-events:none;}
+  .block-card{pointer-events:auto;}
+  /*
+     Low background opacity must reveal the desktop in the body of the
+     current card. Lower cards retain the outline left by the rounded card
+     above them (including the shoulders alongside its bottom corners).
+     A horizontal inset loses those shoulders and makes disconnected bars.
+     stack-occlusion.js follows the same outline during card transitions.
+     The current card stays unclipped; 100% and free mode keep their own rules.
+     Keeping the existing card geometry is important for buriedCardAt(),
+     overUI(), and the native drag hit area.
+  */
+  :root[data-stack-opacity-reveal="1"] body:not(.free-mode):not(.free-mode-switching)
+    #stack .block-card:not(.is-current):not(.stack-overflow-hidden){
+    /* Fallback: 300x400 card, 34px step, 28px radius. Upper arcs follow the
+       covering card; lower arcs preserve this card's original outline. */
+    clip-path:var(--stack-occlusion-clip,path("M0 338 A28 28 0 0 0 28 366 H272 A28 28 0 0 0 300 338 V372 A28 28 0 0 1 272 400 H28 A28 28 0 0 1 0 372 Z"));
+    mask-image:var(--stack-occlusion-mask,none);
+    mask-size:100% 100%; mask-repeat:no-repeat; mask-origin:border-box;
+  }
+  :root[data-stack-opacity-reveal="1"] body:not(.free-mode):not(.free-mode-switching)
+    #stack .block-card.stack-overflow-hidden{
+    visibility:hidden !important;
+    pointer-events:none !important;
+  }
+  /* ⚠ .zone/.task 不在这里开 auto —— 父容器(.zones/.tasks)隐藏时是 none,
+     但子元素若单独设 auto 仍会接收事件, 形成看不见的挡板。
+     它们的 pointer-events 由容器的 .show 状态统一控制。 */
+
+  /* ═══ 卡片: 背景是你的图 + 半透明遮罩(文字可读), 不透明窗口外无背景 ═══ */
+  .block-card{
+    position:absolute; top:0; left:0;
+    width:300px; height:400px; border-radius:28px; overflow:hidden;
+    transform-origin:top left;
+    background-color:transparent;            /* 背景图由 BG 模块按 card-N 设置 */
+    background-size:cover; background-position:center;
+    /* ⚠ 背景默认铺到 border-box, 会从半透明边框底下透出 → 圆角外一圈亮边(颜色溢出)。
+       padding-box 让背景只铺到边框内侧。 */
+    background-clip:padding-box;
+    isolation:isolate;                       /* 独立混合上下文, 圆角裁切更干净 */
+    /* ⚠⚠ 这条发丝描边【不能用 border 画】(2026-09-30 实测定案)：
+       卡片可见的底/图全在 .block-card::before 上，而它 position:absolute; inset:0
+       参照的是【父级的 padding box】—— 也就是说它一直只盖到边框内侧，
+       那圈 1px border 从来就没被这层盖住过。
+       · 界面不透明度 100% 时：框里透出的是下层那张卡（深色）→ 看不出来；
+       · 一旦调低（70%/50%）：下层卡被压得很淡，框里透出的换成更亮的背景
+         → 边框整个变成一条【横贯卡片的亮线】（实测 70% 时缝 lum=166、卡内 96，差 +70）。
+       改成 box-shadow 内描边：它就在元素自己的边框盒内绘制，
+       padding box == border box，::before 正好能把这一圈一起盖住，缝消失；
+       而且元素尺寸/内边距一点都不变（用 border 换 outline 会撑大 padding box，动布局）。
+       实测 100/70/50/35 四档不透明度，缝与卡内亮度差全部为 0，100% 观感不变。 */
+    border:0; box-shadow:var(--shadow-heavy), inset 0 0 0 1px rgba(0,0,0,.35);
+    /* ⚠ 不过渡 box-shadow —— 阴影过渡是重绘密集型, 切卡时 5 张同时动阴影会掉帧。
+       折叠时仅顶卡过渡高度/圆角, 其他卡复用 transform/opacity 回收。 */
+    transition:transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-soft),
+      height var(--dur) var(--ease-out);
+    will-change:transform, opacity, height;   /* 常驻合成层, 切卡不掉帧 */
+    user-select:none;
+  }
+  /* Main-card backgrounds live in ::before so the opacity slider never
+     composites the card's text, controls, or thumbnails. */
+  .block-card{background-image:none !important;}
+  /* 遮罩层: 让卡片上的文字/图标可读, 但图仍透出
+     ⭐⭐ 这一层【就是用户看到的"卡片底色"】(2026-09-14 查明)。
+       .block-card 本身是 background-color:transparent —— 真正决定卡片什么颜色的是这层遮罩。
+       所以设置里那个「卡片底色」必须改这里，改 --bg 是没用的（我第一版就改错了地方）。
+     ⚠ 三个色标的不透明度(.7/.45/.6)是刻意的：上下压得重、中间透，
+       让背景图从中段透出来，同时保证顶部标题和底部信息区的文字可读。 */
+  /* ⭐ 2026-10-22（docs/263 第 20 条「渐变只用来做光」，用户拍板）：没设背景图时改成【平铺】同一深浅（.6 = 原来上中下三档的中间值）。
+       默认底现在是统一中性纯色（统一深色底开关已删），上暗-中亮-下暗的竖向渐变铺在纯色上只会显得一块块发脏。
+       ⚠ 写成两个色标相同的 linear-gradient 而不是 background-color：要跟 var(--card-bg-image) 叠成两层，机制不变。
+       ⚠ 设了背景图（.has-bg，下面那条）照旧用渐变 —— 那是压字用的暗角（上面注释说的可读性），算「光影」不算铺色。 */
+  .block-card::before{
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(hsl(var(--card-h, 220 28%) 8% / .6), hsl(var(--card-h, 220 28%) 8% / .6)),
+      var(--card-bg-image, none);
+    background-size:cover;
+    background-position:center;
+    /* ⚠ 与卡片本体对齐（无害，但【不是】修下边缘亮缝的那一步 —— 别误记）。
+       这一层是绝对定位 + inset:0，参照的本来就是父级的 padding box，
+       写不写 background-clip 效果一样；2026-09-30 我先误以为是这里的问题，加了它、缝没变。
+       真正的原因见 .block-card 里 border 改成 box-shadow 内描边那一段。 */
+    background-clip:padding-box;
+    z-index:1;
+    opacity:var(--ui-bg-opacity,1);
+    pointer-events:none;
+    transition:background var(--m-slow),opacity var(--m-fast) var(--ease-soft);
+  }
+  .block-card::after{
+    content:''; position:absolute; left:50%; top:50%; z-index:3;
+    pointer-events:none; opacity:0;
+    transition:opacity var(--m-fast) var(--ease-soft);
+  }
+  /* 有自定义背景图时, 遮罩减淡让图更透出 */
+  .block-card.has-bg::before{
+    background:linear-gradient(180deg, hsl(var(--card-h, 220 28%) 8% / .5), hsl(var(--card-h, 220 28%) 8% / .28) 40%, hsl(var(--card-h, 220 28%) 8% / .42)),
+      var(--card-bg-image, none);
+    background-size:cover; background-position:center;
+  }
+  /* ⭐ 叠压标题带（2026-09-13）：钉在主卡下沿那 34px 露出带里。
+     ⚠ 只有【被压住的】卡才显形（:not(.is-current)）—— 当前卡整张可见，
+       再盖一条标题带就是挡内容。
+     ⚠ z-index 要高过 .bc-inner(z2)，否则会被卡面内容盖住（就是任务卡那个坑）。
+     ⚠ pointer-events:none —— 它纯粹是块标签，绝不能挡住下面卡片的点击判定。 */
+  /* 压暗层：**不是透明，是被压在阴影里**。
+     ⚠⚠ z-index 从 5 提到 20（2026-09-13 用户实测"亮暗不是按叠压层级来的"）。
+       原来写 5 是为了让开一条 z6 的浮层标题带(.bc-stacktitle)，而那条浮层
+       2026-09-13 已经被用户否掉删了 —— 压暗层却没跟着降回去。
+       后果：剪影卡的卡名(z6)、面包屑(z6)、齿轮(z8) 全都【逃过了压暗】，
+       被压在最底下的那张卡反而是整叠里最亮的，深度线索直接反过来。
+     ⭐⭐ 现在的规矩是【通用规则，新卡免登记】：**压暗层必须盖住卡面上的一切**。
+       20 是留足余量的天花板 —— 卡面元素随便用 1~9，不用再算"会不会比压暗层高"。
+       ⚠ 反过来说：**卡里【不许】再出现 z-index ≥ 20 的东西**。
+         真要加(比如卡内浮层)，先想清楚"它凭什么不该跟着叠压变暗"，并在这里写下理由。
+     ⚠ 为什么盖住一切是安全的：当前卡的 opacity 恒为 0（不压暗），
+       而被压住的卡本来就不接受交互（见下面那条 pointer-events 护栏）。
+       压暗层自己是 pointer-events:none，盖住也不挡点击。 */
+  .block-card .bc-dim{
+    position:absolute; inset:0; border-radius:inherit;
+    background:#05070b; opacity:0; pointer-events:none; z-index:20;
+    transition:opacity var(--m-fast) var(--ease-soft);
+  }
+  /* ⚠ 这里原来有个 .bc-stacktitle 浮层（叠压时盖在卡面上显示标题）。
+     2026-09-13 用户否掉了：「不要做主卡片底部卡片，而是直接改 UI」——
+     那条浮层看着像"卡里又套了张卡"。现在标题是各张卡自己布局里的实体元素：
+       生成卡 → .gc-foot（顶部标题搬下来）
+       剪影卡 → .ps-cardname（左下角新建，和右边的「全部预设」同一行）
+     设置卡/外挂卡目前是占位内容，等它们做实了再照这个规矩排。 */
+  .block-card .bc-inner{position:absolute;inset:0;padding:26px;z-index:2;transition:opacity var(--m-fast) var(--ease-soft);}
+  .block-card .bc-icon{font-size:38px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.3));}
+  .block-card .bc-name{font-size:22px;font-weight:600;margin-top:8px;letter-spacing:.5px;}
+  .block-card .bc-desc{font-size:13px;color:var(--tx2);margin-top:6px;line-height:1.6;}
+  /* 主卡核心操作(1级: 最重要操作) + 关键状态 */
+  .block-card .bc-corebtn{
+    position:absolute; left:26px; right:26px; top:50%; transform:translateY(-50%);
+    padding:13px; border-radius:12px; border:none; cursor:pointer;
+    background:rgba(255,255,255,.12); border:1px solid var(--line-strong); color:var(--tx);
+    font-size:15px; font-weight:600; text-align:center;
+    transition:background var(--m-fast), transform var(--m-fast);
+  }
+  .block-card .bc-corebtn:hover{background:rgba(255,255,255,.24); transform:translateY(-50%) scale(1.02);}
+  .block-card .bc-corebtn:active{transform:translateY(-50%) scale(.98);}
+  /* 临时链路卡的任务弹窗触发器: 与核心按钮分层, 不覆盖正式入口。 */
+  .block-card [data-task-test]{top:auto;bottom:20px;transform:none;padding:8px 13px;font-size:12px;}
+  .block-card [data-task-test]:hover{transform:translateY(-1px) scale(1.02);}
+  .block-card [data-task-test]:active{transform:scale(.98);}
+  .block-card .bc-status{
+    position:absolute; left:26px; right:26px; bottom:22px;
+    font-size:13px; color:var(--tx2); text-align:center;
+  }

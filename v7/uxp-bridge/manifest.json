@@ -1,0 +1,23 @@
+{
+  "id": "com.xiasanqi.wheelchair.v7.bridge",
+  "name": "修图轮椅 V7 连接 PS 插件工具",
+  "version": "1.9.22",
+  "main": "index.html",
+  "manifestVersion": 5,
+  "entrypoints": [
+    {
+      "type": "panel",
+      "id": "v7bridgepanel",
+      "label": { "default": "修图轮椅 V7 连接 PS 插件工具" },
+      "minimumSize": { "width": 260, "height": 180 },
+      "maximumSize": { "width": 900, "height": 900 },
+      "preferredFloatingSize": { "width": 320, "height": 240 }
+    }
+  ],
+  "host": { "app": "PS", "minVersion": "24.4.0" },
+  "requiredPermissions": {
+    "localFileSystem": "fullAccess",
+    "network": { "domains": "all" },
+    "launchProcess": { "schemes": ["wheelchair-v7"], "extensions": [] }
+  }
+}

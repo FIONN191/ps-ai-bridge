@@ -1,0 +1,310 @@
+/* Canonical card pages keep the existing L1/L2/L3 geometry and motion. */
+.card-category{display:grid;grid-template-columns:22px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);column-gap:8px;row-gap:2px;align-items:start;width:100%;min-height:64px;padding:9px 10px;text-align:left;border:1px solid var(--line);border-radius:12px;background:var(--surface,hsl(var(--accent-hsl, 211 100% 68%) / .05));color:var(--tx);font:inherit;cursor:pointer;overflow:hidden}
+.card-category .card-category-icon{grid-column:1;grid-row:1 / span 2;width:20px;height:20px;display:flex;align-items:center;justify-content:center;color:var(--accent);opacity:0.95;margin-top:1px}
+.card-category-icon svg{display:block;width:18px;height:18px}
+.card-category strong{grid-column:2;grid-row:1;font-size:12px;font-weight:600;line-height:1.35;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.card-category span:not(.card-category-icon){grid-column:2;grid-row:2;font-size:10px;line-height:1.45;color:var(--tx2);min-width:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.card-category:hover,.card-category:focus-visible{background:var(--surface-strong,hsl(var(--accent-hsl, 211 100% 68%) / .12));border-color:var(--accent)}
+[data-category-fields] .card-category{min-width:0}
+.pz-row[data-factory-tool="true"]{border-left-color:hsl(var(--accent-hsl,211 100% 68%) / .42)}
+.pz-row[data-factory-tool="true"] .pz-row-tag{opacity:0.75}
+/* Interior spacing/type follow docs/14. Shell geometry and guiding motion stay inherited. */
+.card-category{row-gap:4px;padding:8px 12px;border-radius:var(--radius-button);background:var(--surface-faint);transition:background var(--m-fast) var(--ease-soft),border-color var(--m-fast) var(--ease-soft),transform var(--m-fast) var(--ease-out)}
+.card-category strong{font-size:13px;line-height:1.5}
+.card-category span:not(.card-category-icon){font-size:11px;line-height:1.6}
+.card-category:active{transform:scale(.98)}
+.card-category:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[data-category-fields],[data-settings-fields]{gap:8px}
+.bc-fields[data-category-fields],.bc-fields[data-settings-fields]{grid-template-columns:minmax(0,1fr)}
+
+/* A 20px outlined question mark inside a 32px interaction target. */
+.v7-help{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;width:32px;height:32px;min-width:32px;min-height:32px;padding:0;margin:0;border:0;border-radius:999px;background:transparent;color:var(--tx2);font-family:inherit;font-size:11px;font-weight:600;line-height:1;cursor:help;vertical-align:middle;transition:color var(--m-fast) var(--ease-soft),transform var(--m-fast) var(--ease-out)}
+.v7-help::before{content:'';position:absolute;inset:6px;border:1px solid var(--line-strong);border-radius:50%;pointer-events:none}
+.v7-help:hover{color:var(--tx)}
+.v7-help:hover::before{border-color:var(--accent)}
+.v7-help:active{transform:scale(.98)}
+.v7-help:focus-visible{color:var(--tx);outline:2px solid var(--accent);outline-offset:0}
+.v7-help-line{display:flex;justify-content:flex-end;margin:0}
+.v7-help-popup{position:fixed;inset:auto;box-sizing:border-box;width:max-content;max-width:min(320px,calc(100vw - 16px));max-height:calc(100vh - 16px);margin:0;padding:12px 16px;border:1px solid var(--line-strong);border-radius:var(--radius-control);background:var(--bg-solid);color:var(--tx);font-family:inherit;font-size:13px;font-weight:400;line-height:1.6;box-shadow:var(--shadow-mid);overflow-wrap:anywhere;white-space:pre-line;pointer-events:none}
+.v7-help-popup:not([popover]){z-index:var(--z-workbench)}
+
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-panel{min-width:0;gap:16px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-section{display:flex;flex-direction:column;gap:12px;min-width:0;margin:0;padding:12px;border:1px solid var(--line);border-radius:var(--radius-button);background:var(--surface-faint)}
+/* ⭐⭐ 2026-10-14 重排：直铺小标题 — 折叠体去掉卡片框，改用轻量分隔。
+   ⚠ 只作用于 architecture-panel 直接子节（直铺场景），
+     折叠体（.settings-fold 的内层节）不受影响，
+     账号与服务页的 .settings-section 也不受影响。 */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .architecture-panel>.settings-section{padding:0;border:0;border-radius:0;background:transparent;padding-top:12px;border-top:1px solid var(--line-faint)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .architecture-panel>.settings-section:first-child{padding-top:0;border-top:0}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-section-title{display:flex;align-items:center;gap:8px;min-width:0;margin:0;color:var(--tx);font-size:13px;font-weight:600;line-height:1.5;overflow-wrap:anywhere}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-section-title>strong{min-width:0;font:inherit}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-section-title>.v7-help{margin-inline-start:auto}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) summary:has(>.v7-help){position:relative;min-height:32px;padding-inline-end:40px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) summary>.v7-help{position:absolute;right:0;top:4px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-section-title small{font-size:11px;font-weight:400;line-height:1.6;color:var(--tx2)}
+/* ═══════════════════════════════════════════════════════════════════════
+   排版基准统一（2026-10-08，用户："行距、间距、字距也都很混乱"）
+
+   ⚠ 量出来的乱（改前实测）：
+     · 控件高度【32px 和 37px 两种】—— 原生下拉被 ui.html:2240 的 `padding:7px 8px` 撑到 37，
+       而自绘的 .uisel-trigger 是固定 min-height:32 ⇒ 同一行里两个下拉不一样高。
+     · 圆角【8px 和 4px 两种】· 说明文字行高【19.5 / 17.6 / 16.5 三种】。
+   ⚠ 改法：给控件【写死 height:32px】而不是只给 min-height ——
+     两处 CSS 定义（ui.html 与 card-architecture.css）谁赢不该由内边距决定。
+   ⚠ 基准值（一处定死，别在各字段上各写一遍）：
+     控件 32px 高 / 内边距 8px 10px / 圆角 8px / 字号 13px
+     标签 11px 行高 1.5 · 说明 11px 行高 1.6 · 段标题 13px 行高 1.5
+     字段之间 4px · 段内块之间 12px · 段与段之间 16px
+   ═══════════════════════════════════════════════════════════════════════ */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field input:not([type=range]):not([type=checkbox]):not([type=color]),:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field select,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field .uisel-trigger{height:32px;padding:0 10px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field textarea{padding:8px 10px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-grid{grid-template-columns:minmax(0,1fr);gap:12px;min-width:0}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-row{gap:4px;min-width:0;font-size:11px;line-height:1.6}
+/* ⚠ 标签行跟控件同高（32px）—— 只有带「?」的字段才需要 32px 来对齐那个问号图标。 */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field>span{color:var(--tx2);line-height:1.5;overflow-wrap:anywhere}
+/* ⭐⭐ 2026-10-09（用户定）：登录/注册的图形验证码。
+   样式【只写在这里】—— 项目规矩：两处定义 = 文字不一致的根源（docs/147 §2.3）。
+   ⚠ 图是后端自绘的 SVG，塞进这个按钮的 innerHTML；尺寸要在这里收住，
+     否则它按自己带的 width/height 撑开会把一列字段挤歪。 */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-captcha{gap:4px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-captcha-img{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;min-height:44px;padding:4px 10px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface-faint);color:var(--tx2);font:12px/1.5 inherit;cursor:pointer;overflow:hidden}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-captcha-img:hover{border-color:var(--accent)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-captcha-img svg{display:block;max-width:100%;height:36px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-captcha-img:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* ⭐ 2026-10-09：一节内部的二级小标题。
+   用在「现在的情况」里给登录那块起个名字 —— 那一节现在同时装"状态"和"登录"，
+   不加个小标题，登录框会看起来像状态的附属品。 */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-subtitle{margin:12px 0 6px;padding-top:10px;border-top:1px solid var(--line);color:var(--tx);font-size:12px;font-weight:600;line-height:1.5}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field:not(.nsl)>span:first-child{display:flex;align-items:center;min-height:32px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field input:not([type=range]):not([type=checkbox]),:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field select,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field textarea,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field .uisel-trigger{box-sizing:border-box;max-width:100%;min-width:0;min-height:32px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface-faint);color:var(--tx);font-family:inherit;font-size:13px;font-weight:400;line-height:1.5}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field textarea{resize:vertical;min-height:80px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field .uisel-trigger{display:flex;align-items:center;gap:8px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field .uisel-label{min-width:0;white-space:normal;overflow-wrap:anywhere;text-align:left;line-height:1.5}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field input:focus-visible,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field textarea:focus-visible,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field .uisel-trigger:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-color:var(--accent);box-shadow:none}
+/* Place field explanations alongside labels instead of a separate paragraph. */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field:has(>.v7-help){display:grid;grid-template-columns:minmax(0,1fr) 32px;column-gap:8px;align-items:center}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field:has(>.v7-help)>span{grid-column:1;grid-row:1}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field:has(>.v7-help)>.v7-help{grid-column:2;grid-row:1}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field:has(>.v7-help)>input,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field:has(>.v7-help)>select,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field:has(>.v7-help)>textarea,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field:has(>.v7-help)>.uisel-trigger{grid-column:1/-1}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-row>.v7-help{align-self:flex-end}
+/* Keep legacy generic input styles off the custom slider and switch geometry. */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .nsl-head{min-height:32px;align-items:center;gap:8px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .nsl-name{flex:1;min-width:0;white-space:normal;overflow:visible;text-overflow:clip;font-size:11px;line-height:1.6}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .nsl-val{flex:none;order:2;white-space:nowrap;font-size:13px;line-height:1.5}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .nsl-head>.v7-help{order:1}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field .nsl-range{box-sizing:border-box;width:100%;height:4px;min-height:0;padding:0;border:0;margin:8px 0;border-radius:4px;background:linear-gradient(90deg,var(--accent) 0%,var(--accent) var(--fill,0%),var(--line-strong) var(--fill,0%),var(--line-strong) 100%);box-shadow:none}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field .nsl-range:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .tgl{gap:8px;padding:8px;min-height:40px;border-radius:var(--radius-control)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .tgl-label{flex:1;line-height:1.6;overflow-wrap:anywhere}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .tgl>.v7-help{order:1}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .tgl-track{order:2}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-color{gap:8px;padding:8px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-color>.v7-help{order:1}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-color>input,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-color>.sc-reset{order:2;flex:none}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field:has(>input[type=checkbox]){display:flex;flex-direction:row;align-items:center;gap:8px;min-height:40px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field:has(>input[type=checkbox])>span{flex:1;min-width:0}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field>input[type=checkbox]{appearance:none;position:relative;box-sizing:border-box;flex:0 0 36px;width:36px;height:24px;margin:0;padding:0;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface-strong);cursor:pointer;order:2}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field>input[type=checkbox]::before{content:'';position:absolute;width:16px;height:16px;top:3px;left:3px;border-radius:50%;background:var(--tx);transition:transform var(--m-fast) var(--ease-soft)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field>input[type=checkbox]:checked{background:var(--accent)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field>input[type=checkbox]:checked::before{transform:translateX(12px)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-field:has(>input[type=checkbox])>.v7-help{order:1}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .architecture-warning,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-note,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-status{margin:0;color:var(--tx2);font-size:11px;line-height:1.6;overflow-wrap:anywhere}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-status{gap:8px;min-width:0}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-status i{flex:none}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-status>span{min-width:0;overflow-wrap:anywhere}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) [hidden]{display:none!important}
+
+/* ⭐⭐ 2026-10-04 深夜：「连接与账号」改成一页到底。
+ *   ⚠⚠ 左边那排按钮（.v7-workspace-nav）整个删掉了 —— 用户原话：
+ *     "我们已经在右侧做了菜单分割，就不要再在左侧去再做分割了。"
+ *     细分现在全靠【右栏那条时间轴】（见 settings-card.css 的 .scn-subs / .scs）。
+ *   ⚠ .v7-workspace-content 这个容器【名字保留】：老测试在量它的 scrollWidth。 */
+/* ⚠⚠ 2026-10-05 修正：这两条选择器【少了一个空格】，于是从来没生效过。
+ *   原写法 `:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone).v7-service-layout`（连着写）的意思是
+ *   "zone 元素【自己】带这个 class"；而实际上这个 class 是 arrangeServices 加在
+ *   【里面的 .sc-body / .v7-workspace-body】上的（workspaces.js:174）⇔ 选择器永不匹配。
+ *   后果：回落到 workspaces.css:18 的老布局 `grid-template-columns:164px minmax(0,1fr)`
+ *   ——那是【还有左栏导航时】的列宽。左边被锁死 164px（6 个按钮全挤成竖条），
+ *   右边的 1fr 列被 footer 占着（用户截图右侧"连接信息修改后自动保存在本机…"就是它）。
+ *   修法：补一个空格，改成【后代选择器】。
+ *   ⚠ 别改回连着写的写法 —— 这个坑很隐蔽：少一个空格不报错、不警告，只是静默回落到旧布局。 */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .v7-service-layout{display:flex;flex-direction:column;gap:16px;overflow:visible}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .v7-service-layout>.settings-panel{overflow:visible;min-height:0;width:100%}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .v7-workspace-content{height:auto;min-width:0;overflow:visible;padding:0;display:flex;flex-direction:column;gap:12px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .service-inline-footer{display:flex;flex-direction:column;gap:8px;min-width:0;padding-top:12px;border-top:1px solid var(--line);color:var(--tx2);font-size:11px;line-height:1.6;overflow-wrap:anywhere}
+
+/* 服务块 = 标题行（可点开）+ 展开体。
+ * ⚠ 它跟普通 .settings-section 的观感要一样（同一档边框/圆角/底色），
+ *   只有标题行是可点的 —— 不要做成另一种卡片，那又是"两套东西"。 */
+/* ⚠⚠ 2026-10-08：这一族原来还有 .service-block / .service-block-head / .service-block-body
+   三组规则（头/悬停/焦点/箭头/旋转/展开底色/体内边距），跟下面 .settings-fold 那三组
+   【逐条几乎一样】。服务块现在复用折叠的类，所以那三组已删 —— 留两处定义必然走样。
+   ⚠ 如果以后有人想让服务块长得不一样，别再把规则加回来：
+     要么改折叠组件（两边一起变），要么明确给 .service-block 加覆盖并写清为什么。 */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .service-block{padding:0;overflow:hidden}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:8px;min-width:0;margin:0}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-actions>.settings-btn:only-child{grid-column:1/-1}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .history-library-pagination{display:flex;align-items:center;justify-content:center}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .history-library-pagination>.settings-btn{flex:0 0 32px;width:32px;min-height:32px;height:32px;padding:4px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:0;min-height:32px;max-width:100%;padding:4px 12px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface);color:var(--tx);font-family:inherit;font-size:11px;font-weight:600;line-height:1.4;white-space:normal;overflow-wrap:anywhere;transition:background var(--m-fast) var(--ease-soft),border-color var(--m-fast) var(--ease-soft),transform var(--m-fast) var(--ease-out)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-actions>.settings-btn{flex:1 1 96px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-btn:hover:not(:disabled){background:var(--surface-strong);border-color:var(--line-strong)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-btn:active:not(:disabled){transform:scale(.98)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-btn.danger{color:hsl(var(--sem-err));border-color:hsl(var(--sem-err) / .45)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-btn:disabled{cursor:default}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .service-inline-footer [data-service-primary]{font-size:13px;border-radius:var(--radius-button);min-height:40px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .v7-check-row{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;line-height:1.5}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .v7-check-row>span{min-width:0;overflow-wrap:anywhere}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .v7-check-row input{appearance:none;position:relative;flex:0 0 36px;width:36px;height:24px;margin:0;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface-strong);cursor:pointer}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .v7-check-row input::before{content:'';position:absolute;width:16px;height:16px;top:3px;left:3px;border-radius:50%;background:var(--tx);transition:transform var(--m-fast) var(--ease-soft)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .v7-check-row input:checked{background:var(--accent)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .v7-check-row input:checked::before{transform:translateX(12px)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .v7-check-row input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+/* ⭐ 2026-10-06 docs/150 §4.2 + 附录 A：共享折叠组件（foldSection）的单点样式。
+ *   ⚠ 全项目【只此一处】定义折叠样式 —— ui.html 不许再写第二份（docs/147 §2.3）。
+ *   ⚠ 折叠体绝不加 overflow：展开自然撑高，滚动永远归 .sc-body（docs/150 §三-3）。
+ *   ⚠ 展开/收起只切 [hidden] + .open，DOM / data-* 一个不删（§三-1）。 */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-fold{padding:0;overflow:visible}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-fold-head{
+  display:flex;align-items:center;gap:8px;width:100%;min-height:38px;padding:8px 10px;
+  border:0;background:transparent;color:var(--tx);font:inherit;font-size:12px;font-weight:600;
+  text-align:left;cursor:pointer;transition:background var(--m-fast) var(--ease-soft);
+}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-fold-head:hover{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)))}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-fold-head:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-fold-head .settings-section-title{flex:1;min-width:0}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-fold-note{flex:none;max-width:50%;color:var(--tx2);font-size:11px;font-weight:400;line-height:1.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-fold-head .fold-x{
+  flex:none;width:8px;height:8px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+  transform:rotate(-45deg);opacity:.5;transition:transform var(--m-base) var(--ease-out),opacity var(--m-fast);
+}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-fold.open .settings-fold-head{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)))}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-fold.open .settings-fold-head .fold-x{transform:rotate(45deg);opacity:0.95}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-fold-body{display:flex;flex-direction:column;gap:12px;min-width:0;padding:2px 10px 12px;border-top:1px solid var(--line-faint)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-fold-stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+/* ⭐ Phase C（docs/150 §6.1）：「更多服务」= 两列网格，点开的那一格横跨两列。 */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .service-more{margin:4px 0 0;color:var(--tx2);font-size:11px;font-weight:600;line-height:1.5}
+/* ⚠⚠⚠ 2026-10-08（用户："下面那个更多服务也很乱，全部按照折叠的状态去给它重排"、
+   "右侧 6 个菜单的风格都要统一"）：
+   这里原来是【宫格 2 列】（每格 188 宽）+ 展开时横跨两列，跟上面那四个折叠的
+   384 宽不是一套观感 —— 现在收成【单列竖排】，宽度、间距、长相全部跟折叠列表一致。
+   ⚠ 这一族里已经有 .settings-fold 的规则在管长相（组件的类被复用到服务块上了），
+     所以这里【只留布局】，别再写一遍头/体/箭头的样式
+     （docs/147 §2.3：两处定义 = 文字不一致的根源）。
+   ⚠ .service-block 那个类名和 [data-service-tab] 全保留：路由/右栏/测试靠它们找节点。 */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .service-grid{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .service-grid .service-block{min-width:0}
+
+.route-highlight{outline:2px solid var(--accent)!important;outline-offset:3px;animation:route-highlight 1.5s ease-out 2}
+@keyframes route-highlight{50%{outline-color:transparent}}
+/* ⚠ 2026-10-20 删掉了这里的 prefers-reduced-motion 规则：用户 Windows 关了「显示动画」，它会把这条动画静默掐掉（同 reference-card.css 那条的教训） */
+
+/* Center pages use one scrolling card and compact, keyboard-operable tabs. */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .architecture-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;min-width:0;padding:0 0 12px;margin:0 0 12px;border-bottom:1px solid var(--line)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .architecture-tabs>.settings-btn{min-height:36px;padding:6px 8px;background:transparent;border-color:transparent;border-radius:4px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .architecture-tabs>.settings-btn[aria-selected=true]{color:var(--accent);background:var(--surface);border-color:var(--accent)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .architecture-tab-content{display:flex;flex-direction:column;gap:12px;min-width:0;max-width:100%}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .architecture-tab-content>.settings-section,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .architecture-tab-content .settings-section .settings-section,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .architecture-panel>.settings-section>.settings-panel>.settings-section,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .service-extra .settings-section{padding:0;border:0;border-radius:0;background:transparent}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .architecture-tab-content .settings-panel{display:flex;flex-direction:column;gap:16px;min-width:0}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone)[data-records-center]>.architecture-tab-content>.layout-manager,:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone)[data-records-center]>.architecture-tab-content>.account-center-embedded{min-width:0;max-width:100%}
+
+/* Presets keep their one long L2 list and the existing whole-content motion. */
+.pzone .pz-head{padding:12px;gap:8px}
+.pzone .pz-title{font-size:13px;gap:8px}
+.pz-title>svg{flex:none}
+.pzone .pz-tools{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.pz-tools>.pz-tb{display:flex;flex-direction:column;gap:4px;min-height:48px;height:auto;padding:4px;min-width:0;border-radius:var(--radius-control);font-size:11px;background:var(--surface-faint)}
+.pz-tools>.pz-tb svg{flex:none;width:16px;height:16px}
+.pz-tools>.pz-tb span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.5}
+.pzone .pz-tools>.pz-tb{flex-direction:row;gap:2px;min-height:24px;height:24px;padding:0 1px;font-size:10px}
+.pzone .pz-tools>.pz-tb svg{width:12px;height:12px}
+.pz-tools>.pz-tb:hover{background:var(--surface)}
+.pz-tb:focus-visible,.pz-star:focus-visible,.pz-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.pzone .pz-search{padding:8px 12px 0}
+.pzone .pz-input{height:32px;font-size:13px;background:var(--surface-faint)}
+.pzone .pz-list{padding:4px 8px}
+.pzone .pz-row{min-height:36px;gap:4px;padding:4px}
+.pzone .pz-row-title{font-size:13px}
+.pzone .pz-row-tag{font-size:11px}
+.pzone .pz-star{width:32px;height:32px;padding:0;border:0;border-radius:var(--radius-control);background:transparent;justify-content:center;cursor:pointer}
+.pzone .pz-foot{padding:8px 12px;font-size:11px}
+.pd-body .pd-field-label{display:flex;align-items:center;gap:8px;font-size:11px;line-height:1.6;min-width:0}
+.pd-body .pd-field-label>.v7-help{margin-left:auto}
+.pd-body .pd-slider-head{align-items:center;gap:8px;min-height:32px}
+.pd-body .pd-slider-name{font-size:13px;white-space:normal;line-height:1.5}
+.pd-body .pd-slider-val{margin-left:auto}
+.pd-body .pd-field-input{font-size:13px;padding:8px;min-height:32px;line-height:1.5;background:var(--surface-faint)}
+.pd-body .pd-sliders{gap:12px}
+/* ⚠ 2026-10-14：不再覆盖 .tight 的 display — ui.html 把它改成两列网格了。
+   只保留 gap 覆盖，让间距跟 pd-body 里的其他控件对齐。 */
+.pd-body .pd-sliders.tight{gap:8px 8px}
+.pd-body .pd-range{height:8px;margin-top:8px}
+.pd-body .pd-range::-webkit-slider-thumb{width:16px;height:16px}
+.pd-body .v7-tool-launch{display:flex;flex-direction:column;gap:16px;padding:16px;border:1px solid var(--line);border-radius:var(--radius-button);background:var(--surface-faint)}
+.v7-tool-launch .v7-tool-context{display:flex;align-items:center;gap:8px;min-width:0;font-size:11px;color:var(--tx2)}
+.v7-tool-context>svg{flex:none}
+.v7-tool-context>span{min-width:0;overflow-wrap:anywhere}
+.v7-tool-launch .v7-tool-state{margin:0;font-size:13px;line-height:1.6;color:var(--tx);overflow-wrap:anywhere}
+.v7-tool-launch .v7-tool-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:0;margin:0;list-style:none}
+.v7-tool-steps li{font-size:11px;line-height:1.6;color:var(--tx2);text-align:center;min-width:0}
+.v7-tool-steps li>svg{display:block;margin:0 auto 4px}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .v7-tool-launch [data-tool-open]{width:100%;min-height:40px;border-radius:var(--radius-button);font-size:15px;color:var(--tx);background:hsl(var(--accent-hsl) / .24);border-color:var(--accent)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .pd-foot .pd-tool-return{font-size:13px;gap:8px;border-radius:var(--radius-button);min-height:36px}
+/* AI 修图痕迹检测候选：列表项直接负责把 Photoshop 画布定位到该区域。 */
+.v7-seam-results{display:flex;flex-direction:column;gap:8px;padding-top:4px;border-top:1px solid var(--line-faint)}
+.v7-seam-results[hidden]{display:none}
+.v7-seam-results-head{display:flex;align-items:center;gap:8px;min-height:22px;color:var(--tx)}
+.v7-seam-results-head strong{font-size:12px;font-weight:650}
+.v7-seam-results-count{margin-left:auto;font-size:10px;color:var(--tx2)}
+.v7-seam-results-help{margin:0;font-size:10px;line-height:1.55;color:var(--tx2)}
+.v7-seam-results-list{display:flex;flex-direction:column;gap:5px;max-height:260px;overflow:auto;padding-right:2px}
+.v7-seam-result{display:flex;align-items:center;gap:8px;width:100%;min-width:0;padding:8px 9px;border:1px solid var(--line-faint);border-radius:8px;background:hsl(var(--accent-hsl, 211 100% 68%) / .035);color:var(--tx);font:inherit;text-align:left;cursor:pointer;transition:background var(--m-fast),border-color var(--m-fast),transform var(--m-fast)}
+.v7-seam-result:hover{background:hsl(var(--accent-hsl) / .12);border-color:hsl(var(--accent-hsl) / .38)}
+.v7-seam-result:active{transform:scale(.99)}
+.v7-seam-result:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.v7-seam-result:disabled{opacity:0.75;cursor:wait}
+.v7-seam-result.is-selected{background:hsl(var(--accent-hsl) / .15);border-color:hsl(var(--accent-hsl) / .62);box-shadow:0 0 0 1px hsl(var(--accent-hsl) / .12) inset}
+.v7-seam-result-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:#46d6cc;box-shadow:0 0 8px rgba(70,214,204,.35)}
+.v7-seam-result-dot.joint{background:#ff5264;box-shadow:0 0 8px rgba(255,82,100,.38)}
+.v7-seam-result-dot.precision{background:#ff9a3a;box-shadow:0 0 8px rgba(255,154,58,.35)}
+.v7-seam-result-dot.seam{background:#ce68ff;box-shadow:0 0 8px rgba(206,104,255,.35)}
+.v7-seam-result-main{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.v7-seam-result-title{font-size:11px;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
+.v7-seam-result-meta{font-size:10px;line-height:1.35;color:var(--tx2);white-space:normal;overflow-wrap:anywhere}
+.v7-seam-result-action{flex:0 0 auto;font-size:10px;color:var(--accent);white-space:nowrap}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   「检查连接」这类主按钮（2026-10-08 新增）
+
+   ⚠ 为什么要有 .settings-btn-primary：
+     用户原话"我填一个API key和URL，我找这个检查按钮我找特别久"。
+     两个原因，各治一个：
+       ① 它原来在最底下，隔着 8 个别的输入框 ⇒ 现在挪到 Key 的紧下面（改的是 markup）。
+       ② 它跟旁边所有按钮长得一模一样（都是 .settings-btn）⇒ 一眼扫过去认不出来。
+          给它主题色底 + 稍粗的字，让它在按钮堆里【看得出来是这一页的主操作】。
+   ⚠ 只给"这一页只有一件事要做"的那种按钮用。到处都是主按钮 = 没有主按钮。
+   ⚠ 颜色走代币（--accent 是 hex，--accent-hsl 是三段式）——
+     要带透明度必须用 --accent-hsl，直接 hsl(var(--accent) / .2) 是【无效颜色】（踩过）。
+   ═══════════════════════════════════════════════════════════════════════ */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-btn-primary{
+  background:hsl(var(--accent-hsl) / .22);border-color:hsl(var(--accent-hsl) / .55);
+  color:var(--tx);font-weight:600;
+}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-btn-primary:hover{background:hsl(var(--accent-hsl) / .3);border-color:hsl(var(--accent-hsl) / .7)}
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-btn-primary:active{transform:scale(.99)}
+/* ⚠ 「检查连接 + 取消」这一对：主按钮占大份、取消只占它需要的那点 ——
+   两个都撑满一半的话，"取消"看着跟主操作同样重要。 */
+:is(#dcBody,#settingsZone,#generationZone,#feedbackZone,#communityZone) .settings-actions-inline{grid-template-columns:minmax(0,1fr) auto}
+/* 2026-10-18 深夜：RunningHub 还没接线（ui.html 的 RUNNINGHUB_OFF），设置卡那一节的输入框和按钮灰掉 */
+.v7-rh-off{opacity:0.5;filter:grayscale(1);pointer-events:none;}
+/* 2026-10-18 深夜：报错堆 / 任务堆最上面那张卡左上角的垃圾桶（一键清，ui.html 的 stackTrashSync） */
+.v7-stack-trash{position:absolute;left:-7px;top:-7px;z-index:30;width:26px;height:26px;padding:0;display:grid;place-items:center;border-radius:50%;border:1px solid var(--line);background:hsl(var(--card-h, 220 28%) 16% / .96);color:var(--tx2);cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:auto;transition:background var(--m-fast) var(--ease-soft),color var(--m-fast) var(--ease-soft),transform var(--m-fast) var(--ease-out);}
+.v7-stack-trash:hover{background:hsl(0 70% 45%);color:#fff;transform:scale(1.08);}
+.v7-stack-trash:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.v7-rh-off-line{color:#f0b429;font-weight:600;}
+/* ⭐ 2026-10-18 深夜：设置 → 外观 →「界面大小」（ui-scale.js） */
+#settingsZone .v7-uiscale{display:flex;flex-direction:column;gap:8px;min-width:0}
+#settingsZone .v7-uiscale-top{display:flex;align-items:center;gap:10px;min-width:0}
+#settingsZone .v7-uiscale-top input[type=range]{flex:1 1 auto;min-width:0}
+#settingsZone .v7-uiscale-value{flex:none;min-width:44px;text-align:right;font-size:13px;color:var(--tx)}
+#settingsZone .v7-uiscale-chips{display:flex;gap:6px;flex-wrap:wrap}

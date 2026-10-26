@@ -1,0 +1,382 @@
+/* ═══ ui-main/css/07-presets.css —— 主界面主样式第 7 / 8 段 ═══
+   管什么：剪影画布 · 卡名 · 千问开关 · 打字就搜 · 小图标 · 预设二级列表 · 提示词二级 / 三级卡
+   2026-10-21 从 ui.html 那一整段 <style> 原样切出来；ui.html 按编号顺序 <link> 进来（顺序 = 原来的先后，别调）。 */
+/* ── 以上是文件说明（拼回 ui.html 时会去掉）── */
+  /* ═══════════════════════════════════════════════════════════
+     预设系统 (docs/28_预设系统设计.md)
+     一级 = 剪影画布 / 二级 = 单张预设列表卡 / 三级 = 提示词框
+     ⚠ 数值一律从 docs/14_UI规范 的代币里取, 不随手写新值。
+     ═══════════════════════════════════════════════════════════ */
+
+  /* ── 一级: 剪影画布 ── */
+  /* ⚠ top 必须避开拖动横条(.dragbar 在 10~24px)和折叠按钮(.collapse-toggle 9~25px)。
+     面包屑原本放顶上, 正好压住横条 → 面板拖不动。改成底部一条: 左边面包屑, 右边齿轮。
+     好处是整个上半部都归剪影, 人形能画得更大。 */
+  .ps-canvas{
+    position:absolute; left:12px; right:12px; top:30px; bottom:42px;
+    z-index:2; overflow:hidden; border-radius:12px;
+  }
+  /* 内层承担推近/平移, 高亮层是它的子元素所以自动跟着走。
+     ⚠ 尺寸和位置由 JS 算(preset-ui.js 的 layoutCanvas): 必须按【素材自己的长宽比】
+     等比放进来并居中, 不能 width/height:100% 铺满 —— 铺满 = 按卡片形状拉伸,
+     人会横向变胖 26%(2026-09-10 实测)。这里只给个兜底初值。 */
+  .ps-canvas-inner{
+    position:absolute; left:0; top:0; width:100%; height:100%;
+    transform-origin:0 0; will-change:transform;
+  }
+  .ps-canvas-empty{
+    position:absolute; left:0; top:50%; width:100%;
+    transform:translateY(-50%); text-align:center;
+    font-size:13px; color:var(--tx2); padding:0 20px; line-height:1.7;
+  }
+  .ps-asset{position:absolute;}
+  .ps-asset-img{
+    width:100%; height:100%; object-fit:fill; display:block;
+    pointer-events:none; -webkit-user-drag:none; user-select:none;
+  }
+  /* 高亮: 一块纯色 + 拿选区图当遮罩。
+     ⚠ 颜色从 --glow-hsl 走(有背景图跟图, 没有回落一级蓝), 不写死 —— 同二级/三级的光。
+     ⚠ mask-image 由 JS 设(preset-ui.js), 不写在 HTML 的 style 属性里: CSP 的
+       style-src-attr 曾把内联 style 整个拦掉(docs/12 坑25)。 */
+  .ps-asset-hl{
+    position:absolute; left:0; top:0; width:100%; height:100%;
+    background:hsl(var(--glow-hsl, var(--glow-card)) / .42);
+    opacity:0; pointer-events:none;
+    transition:opacity var(--m-fast) var(--ease-soft);
+  }
+  .ps-hover-label{
+    position:absolute; z-index:calc(var(--z-mask,850) + 1150); pointer-events:none; white-space:nowrap;
+    padding:3px 8px; border-radius:8px;
+    background:hsl(var(--card-h, 220 28%) 7% / .88); border:1px solid var(--line-strong);
+    color:var(--tx); font-size:11px; box-shadow:var(--shadow-light);
+  }
+  /* ⭐⭐ 剪影卡的卡名（2026-09-13）：左下角，和右边的「全部预设 · N 条」同一行。
+     ⚠ 必须在叠压露出的那 34px 里 —— 这是叠压时唯一能认出这张卡的东西。
+     ⚠ pointer-events:none：纯标签，不能挡剪影画布的点击命中。 */
+  /* ⚠⚠ 2026-09-13 修（用户实测"左下角标题没对齐"）：要和别的主卡的卡名严格同位。
+     ① left 16 → 26：生成卡 .gc-foot 和设置卡/外挂卡 .bc-foot 都是 left:26px，
+        差这 10px 的后果是切卡时标题横着跳一下。
+     ② align-items 从 center 改成 flex-start：那两张卡的底栏是 align-items:baseline
+        （因为要和右边 10px 的小字对齐基线），baseline 会把这一行顶到行盒上沿；
+        而 center 是垂直居中 —— 同样 26px 的行、同样 16px 的字，两者差约 3px。
+        单个元素时 flex-start 和那边的 baseline 落点一致。 */
+  .ps-cardname{
+    position:absolute; left:26px; bottom:10px; height:26px; z-index:6;
+    display:flex; align-items:flex-start;
+    font-size:15px; font-weight:600; letter-spacing:.4px; color:var(--tx);
+    text-shadow:0 1px 3px rgba(0,0,0,.6);
+    pointer-events:none; white-space:nowrap;
+  }
+  /* ⚠ left 从 14 → 106：给左下角的卡名让位，否则「全部预设」按钮会压在卡名上。
+     106 = 卡名起点 26 + "剪影预设"四个字约 66 + 间距 14。
+     ⚠ 卡名的 left 改了(16→26)，这里必须跟着改，否则又会压上去。 */
+  .ps-crumb{
+    position:absolute; left:106px; right:48px; bottom:10px; height:26px; z-index:6;
+    display:flex; align-items:center; justify-content:flex-end; gap:6px; overflow:hidden;
+  }
+  /* ⭐ 千问模式开关（2026-10-15）：卡片左上角（底栏太窄塞不下），开着时用主题色，一眼看得出现在是哪一套。
+     ⚠ 容器 pointer-events:none —— 只让按钮本身能点，不挡剪影画布的命中。 */
+  /* ⭐ 2026-10-18（用户：「千问的那个按钮做成和那个 bar 一样高，然后上下对齐」）：
+     跟顶部拖动横条（.dragbar：top 10px、高 14px）同一个上沿、同一个高度。⚠ 改 .dragbar 的 top/height 要连这里一起改。 */
+  .ps-qwen{ position:absolute; left:14px; top:10px; height:14px; z-index:7; pointer-events:none; display:flex; align-items:stretch; }
+  .ps-crumb-qwen{
+    box-sizing:border-box; height:14px; display:inline-flex; align-items:center;
+    border:1px solid var(--line); background:rgba(255,255,255,.06);
+    color:var(--tx2); border-radius:999px; padding:0 9px; line-height:1;
+    font-size:10px; font-family:inherit; cursor:pointer; pointer-events:auto;
+    white-space:nowrap; transition:background var(--m-fast), color var(--m-fast), border-color var(--m-fast); flex:0 0 auto;
+  }
+  .ps-crumb-qwen:hover{ background:rgba(255,255,255,.12); color:var(--tx); }
+  .ps-crumb-qwen.on{ background:hsl(var(--accent-hsl, 211 100% 68%) / .28); border-color:hsl(var(--accent-hsl, 211 100% 68%) / .7); color:var(--tx); font-weight:600; }
+  .ps-crumb-all{
+    border:1px solid var(--line); background:rgba(255,255,255,.06);
+    color:var(--tx2); border-radius:8px; padding:2px 9px;
+    font-size:11px; font-family:inherit; cursor:pointer; pointer-events:auto;
+    white-space:nowrap; transition:background var(--m-fast), color var(--m-fast);
+    display:inline-flex; align-items:center; gap:5px;   /* 图标+文字对齐(2026-09-14) */
+  }
+  .ps-crumb-all:hover{background:rgba(255,255,255,.14); color:var(--tx);}
+  /* ⚠ 2026-10-20（用户截图：「全部预设 · 300 条」时左边的按钮被挤出去、跟卡名打架、被框切掉）：
+     底栏放不下时让它自己缩、文字出省略号，不再往左撑出 .ps-crumb（那边 overflow:hidden 会直接切）。 */
+  .ps-crumb-all{min-width:0; max-width:100%; flex:0 1 auto;}
+  .ps-crumb-all > span{min-width:0; overflow:hidden; text-overflow:ellipsis;}
+  /* ⭐ 2026-10-20 卡面「打字就搜」（用户定，代替原来底栏最左边那个放大镜）：
+     鼠标在剪影卡上、软件窗口是当前窗口时，光标悄悄放进这个框（看不见，但得在原位能拿焦点 —— 不然中文输入法起不来）；
+     打了字才显出来，画布底边往上让一截（.ps-searching）。Esc / 删光 / 点 × = 收起。逻辑在 preset-ui.js 的 bindCardSearch。 */
+  .ps-card-search{
+    position:absolute; left:26px; right:26px; bottom:44px; height:30px; z-index:6; box-sizing:border-box;
+    display:flex; align-items:center; gap:6px; padding:0 4px 0 10px;
+    border:1px solid var(--line-strong); border-radius:8px; background:hsl(var(--card-h, 220 28%) 7% / .72); color:var(--tx2);
+    opacity:0; pointer-events:none; transition:opacity var(--m-fast) var(--ease-soft);
+  }
+  .ps-card-search.on{opacity:1; pointer-events:auto;}
+  .ps-card-search-input{flex:1; min-width:0; height:100%; padding:0; border:0; outline:0; background:transparent; color:var(--tx); font:inherit; font-size:12px;}
+  .ps-card-search-input::placeholder{color:var(--tx2); opacity:0.75;}
+  .ps-card-search-x{all:unset; cursor:pointer; flex:0 0 22px; width:22px; height:22px; border-radius:50%; text-align:center; line-height:21px; font-size:15px; color:var(--tx2);}
+  .ps-card-search-x:hover{color:var(--tx); background:rgba(255,255,255,.1);}
+  .block-card.ps-searching .ps-canvas{bottom:80px;}
+  .ps-crumb-back{
+    width:18px; height:18px; flex:0 0 18px; padding:0; line-height:1;
+    border:1px solid var(--line-strong); border-radius:50%;
+    background:rgba(255,255,255,.12); color:var(--tx);
+    font-size:12px; font-family:inherit; cursor:pointer; pointer-events:auto;
+  }
+  .ps-crumb-back:hover{background:rgba(255,255,255,.24);}
+  /* ⚠ 图标+文字混排(2026-09-14)：用 inline-flex + gap 对齐，
+     不要靠空格或 margin —— 图标是 SVG，基线对不齐，看起来会一高一低。
+     min-width:0 + 子 span 的省略号，保证长名字还能截断。 */
+  .ps-crumb-cur{
+    font-size:12px; color:var(--tx); white-space:nowrap; overflow:hidden;
+    display:inline-flex; align-items:center; gap:5px; min-width:0;
+  }
+  .ps-crumb-cur > span{overflow:hidden; text-overflow:ellipsis;}
+  /* ⭐ 这个齿轮是【全项目小图标交互的基准】(用户 2026-09-14 点名)：
+     悬停 → 背景提亮 + 转 45°；按下 → 回缩。克制、跟手、.15s。
+     新加的小图标按钮都照这个来。 */
+  .ps-gear{
+    position:absolute; right:14px; bottom:10px; z-index:8;
+    width:26px; height:26px; padding:0; border-radius:50%;
+    border:1px solid var(--line-strong); background:rgba(255,255,255,.12);
+    color:var(--tx); font-size:13px; line-height:1; cursor:pointer;
+    pointer-events:auto; box-shadow:var(--shadow-light);
+    display:flex; align-items:center; justify-content:center;   /* SVG 居中(2026-09-14) */
+    transition:background var(--m-fast), transform var(--m-fast) var(--ease-out);
+  }
+  .ps-gear:hover{background:rgba(255,255,255,.24); transform:rotate(45deg);}
+  /* ⚠ 按下时保持那 45° —— 只叠加缩放。不写 rotate 的话按下瞬间会"转回去"再弹，很跳。 */
+  .ps-gear:active{transform:rotate(45deg) scale(.92);}
+  /* 工具总入口是画布里的真实素材，键盘聚焦只描亮剪影轮廓。 */
+  .ps-asset[data-tool-hub]:focus-visible{outline:none;filter:drop-shadow(0 0 4px hsl(var(--accent-hsl) / .8));}
+
+  /* ── 二级: 单张预设列表卡 ──
+     ⚠ 高度 400 = 跟主卡齐平(用户定案)。宽度沿用二级的 200，
+       所以 .zones 那条 4×88+3×16=400 的算式在预设卡下不适用 —— 它只有这一张卡。 */
+  .zone.pzone{height:400px; cursor:default;}
+  /* ── 路线 A 的提示词二级卡(#promptZone): 200 宽, 完整内容纵向排 ── */
+  .zone.qzone .z-body{display:flex; flex-direction:column; padding:0; gap:0; height:100%; overflow:hidden;}
+  .qz-body .qz-scroll{flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:10px 10px 8px; scrollbar-width:none;}
+  /* 紧凑版: 头部标题+副标题一行, 按钮挪到底部一排 */
+  .qz-body .pd-head{flex-direction:column; align-items:stretch; gap:4px; margin-bottom:8px; padding-bottom:8px;}
+  .qz-body .pd-head-btns{display:none;}                 /* 头部不放按钮, 放底栏 */
+  .qz-body .pd-head-title{font-size:12px;}
+  .qz-body .pd-head-tools{margin-left:0;}
+  .pd-head-tools > .pd-hist-btn{margin-left:auto;}   /* 时钟靠这一行最右 */   /* 二级头部是竖排：参数条 + 时钟靠左，跟截图里原来的位置一致 */
+  .qz-body .pd-ta{min-height:180px; font-size:11px; padding:8px 9px; border-radius:8px;}
+  .qz-body .pd-field-label{font-size:10px;}
+  .qz-body .pd-field-input{font-size:11px; padding:4px 7px;}
+  .qz-body .pd-sliders{gap:8px;}
+  .qz-body .pd-slider-name{font-size:11px;}
+  .qz-body .pd-slider-val{font-size:10px;}
+  .qz-body .pd-range{margin-top:3px;}
+  .qz-body .pd-memory{margin-top:8px; padding-top:6px;}
+  .qz-body .pd-memory-btn{font-size:10px; padding:4px;}
+  /* 底栏: 常驻不随内容滚。⭐ 2026-10-24（V7待办/03，照 UI 对照手册 03「主次分开」）：
+     原来四个一样大的块（看不出哪个是主操作）。现在「开始计算」一个主按钮占满剩余宽度、带字；
+     另存 / 前置动作 / 清空（和切原文）收成 32px 方形图标按钮。高度统一 32（手册按钮三档 24/32/40 的常规档），间距 8。 */
+  .qz-foot{flex:0 0 auto; display:flex; gap:8px; padding:8px; border-top:1px solid var(--line-faint);}
+  .qz-foot .pd-hb{flex:0 0 28px; width:28px; height:28px;}   /* 二级只有约 200px 宽：次要图标用手册给的 28px，主按钮才放得下「开始计算」四个字 */
+  .qz-foot .pd-hb-run{flex:1 1 auto; width:auto; min-width:0; gap:6px; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden;}
+  /* ── 三级的提示词卡: 跟二级同一套排布(2026-09-11) ──
+     ⚠ 卡片本身已经有 .dc-name 当标题了, pd-head 里那个标题是重复的 —— 藏掉,
+       否则一张卡上两个"提示词"(用户截图)。按钮也统一挪到底栏, 跟二级一致。
+     ⚠ 只作用于 #dcBody 里的提示词卡; 三级的其它内容(设置/链路/生成面板)不受影响,
+       它们不走 pd-head 这套结构。 */
+  #dcBody .pd-head-title{display:none;}
+  #dcBody .pd-head-btns{display:none;}
+  /* ⭐⭐ 三级提示词卡的骨架：头部固定 + 内容可滚 + 底栏常驻（2026-09-14）。
+     ⚠ 只在【提示词卡】上生效（靠 :has(.pd-foot) 限定）——
+       三级还承载设置页、链路面板等别的内容，那些是整页滚动的，
+       无差别套上 flex 骨架会把它们的布局搞乱。
+     ⚠ dc-scroll 本身是 position:absolute inset:0，高度已经确定，
+       所以这里的 flex:1 有明确的参照，不会塌。 */
+  .detail-card .dc-scroll:has(.pd-foot){
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .detail-card .dc-slide:has(.pd-foot){display:flex;flex-direction:column;flex:1;min-height:0;}
+  .detail-card .dc-slide:has(.pd-foot) .dc-name{flex:0 0 auto;}
+  #dcBody:has(.pd-foot){ display:flex; flex-direction:column; flex:1; min-height:0; }
+  #dcBody .pd-head{flex:0 0 auto;}
+  /* 中间内容区：吃掉剩余高度并自己滚。⚠ min-height:0 不能少 ——
+     flex 子项默认 min-height:auto，内容超了会把容器撑大而不是出滚动条。 */
+  #dcBody:has(.pd-foot) .pd-body{
+    flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
+  }
+
+  /* ⭐⭐ 三级的按钮底栏【必须常驻】(2026-09-14 用户要求：和二级一样)。
+     原来是 `margin-top:14px` —— 底栏排在滚动流里，
+     提示词一长就被内容顶到看不见的地方，得滚到底才找得到"开始计算"。
+     二级(.qz-foot)早就是对的：外层 flex 纵向 + 内容区 flex:1 可滚 + 底栏 flex:0 0 auto。
+     现在三级照抄同一套骨架。
+     ⚠ 骨架分两段：这里是底栏，滚动区在 `#dcBody .pd-body` 那条。 */
+  /* ⭐ 2026-10-22（docs/263 三级卡瘦身，用户：「底下四个按钮需要做这么大吗」）：34px/13px → 32px/12px，间距收紧；
+     还是一排四个、位置不变（只是不再抢眼），常驻底部的规矩照旧 */
+  #dcBody .pd-foot{
+    flex:0 0 auto;                       /* 不参与压缩，永远在底部 */
+    display:flex; gap:8px;
+    padding-top:8px; border-top:1px solid var(--line-faint);
+  }
+  /* 2026-10-24（V7待办/03）：跟二级同一套「主次分开」—— 开始计算占满带字，其余 32px 方形图标 */
+  #dcBody .pd-foot .pd-hb{flex:0 0 32px; width:32px; height:32px; font-size:12px;}
+  #dcBody .pd-foot .pd-hb-run{flex:1 1 auto; width:auto; min-width:0; gap:6px; font-weight:600; white-space:nowrap; overflow:hidden;}
+  .zone.pzone .z-body{
+    display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start;
+    padding:0; gap:0; height:100%; overflow:hidden;
+  }
+  .pz-head{
+    flex:0 0 auto; padding:10px 10px 8px; display:flex; flex-direction:column; gap:7px;
+    border-bottom:1px solid var(--line-faint);
+  }
+  .pz-title{
+    font-size:13px; font-weight:600; color:var(--tx); white-space:nowrap; overflow:hidden;
+    display:flex; align-items:center; gap:6px; min-width:0;   /* 同 .ps-crumb-cur，图标+文字对齐 */
+  }
+  .pz-title > span{overflow:hidden; text-overflow:ellipsis;}
+  .pz-tools{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px;}
+  .pz-tb{
+    flex:1; height:22px; padding:0; border-radius:8px;
+    border:1px solid var(--line); background:rgba(255,255,255,.06);
+    color:var(--tx2); font-size:11px; font-family:inherit; cursor:pointer;
+    /* ⚠ SVG 图标必须 flex 居中(docs/14 5.6.4)，只靠 line-height 会偏上偏左 */
+    display:flex; align-items:center; justify-content:center;
+    transition:background var(--m-fast), color var(--m-fast), transform var(--m-fast) var(--ease-out);
+  }
+  /* card-architecture.css 给旧版三列工具条设置了 min-height:48px；
+     这里用同等选择器明确覆盖，保证四个常用动作真正一行显示。 */
+  .pz-tools>.pz-tb{min-height:22px;height:22px;flex-direction:row;padding:0 2px;white-space:nowrap;}
+  .pz-tb:hover{background:rgba(255,255,255,.16); color:var(--tx);}
+  /* ⭐ 小图标的"点按反馈"(用户 2026-09-14 要求)：按下去回缩一点，松手弹回。
+     基准是剪影卡右下角那个齿轮 —— 克制、跟手。 */
+  .pz-tb:active{transform:scale(.92);}
+  /* ⭐⭐ 2026-10-14（用户定）：张数 / 抗截断是"最高频切换"的两个参数，
+     提到【预设卡二级右上角】+【提示词卡右上角】。两处共用这一套类名。
+     ⚠ 紧凑优先：这一条要能挤进 200px 宽的头行，不许换行、不许把标题压没。 */
+  .pz-quick,.pd-quick{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;min-width:0;}
+  .pd-quick{margin-left:auto;}
+  /* ⭐ 预设列表卡头行：标题（弹性收缩，超长省略）+ 快捷调参条（靠右固定）。
+     ⚠ 200px 宽，必须 nowrap —— 换行会把整个头撑成两行，把列表挤下去。 */
+  .pz-quickrow{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-width:0;}
+  .pz-quickrow>.pz-title{flex:1 1 auto;min-width:0;}
+  .pz-quickrow>.pz-quick{flex:0 0 auto;margin-left:auto;}
+  /* ⭐ 2026-10-19（docs/250 第 8 条，用户定）：三个「点一下换一下」的小按钮（张数只能滚轮调），比原来 −/+ 和三连按钮窄得多。
+     同一个外形：22px 高、圆角 8、跟「全部预设」同底色；张数那颗多一个「可滚」的提示（悬停描边亮一点）。 */
+  .qk-chip{display:inline-flex;align-items:center;justify-content:center;gap:1px;height:22px;min-width:26px;padding:0 6px;
+    border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.06);color:var(--tx);
+    font-family:inherit;font-size:10px;line-height:1;white-space:nowrap;flex:none;cursor:pointer;
+    font-variant-numeric:tabular-nums;transition:background var(--m-fast),border-color var(--m-fast);}
+  .qk-chip:hover{background:rgba(255,255,255,.14);}
+  .qk-chip:active{transform:scale(.94);}
+  .qk-chip[hidden]{display:none;}
+  .qk-chip.qk-batch{cursor:ns-resize;color:var(--tx2);}
+  .qk-chip.qk-batch b{color:var(--tx);font-weight:600;min-width:10px;text-align:center;}
+  .qk-chip.qk-batch:hover,.qk-chip.qk-batch:focus-visible{border-color:hsl(var(--accent-hsl, 211 100% 68%) / .7);outline:none;}
+  .qk-chip.qk-batch:active{transform:none;}
+  /* ⭐ 2026-10-19（docs/250 第 8 条）：二级右上角「最近用过的提示词」按钮 + 最近视图里的行 */
+  .pz-recent-btn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:none;padding:0;
+    border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.06);color:var(--tx2);cursor:pointer;
+    transition:background var(--m-fast),color var(--m-fast),border-color var(--m-fast);}
+  .pz-recent-btn:hover{background:rgba(255,255,255,.14);color:var(--tx);}
+  .pz-recent-btn.on{background:hsl(var(--accent-hsl, 211 100% 68%) / .28);border-color:hsl(var(--accent-hsl, 211 100% 68%) / .7);color:var(--tx);}
+  .pz-recent-row{display:block;width:100%;text-align:left;padding:7px 8px;margin:0 0 4px;border:1px solid transparent;border-radius:8px;
+    background:rgba(255,255,255,.04);color:var(--tx);font-family:inherit;cursor:pointer;}
+  .pz-recent-row:hover{background:rgba(255,255,255,.10);border-color:var(--line);}
+  .pz-recent-text{font-size:11px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+    overflow-wrap:anywhere;white-space:pre-wrap;}
+  .pz-recent-meta{margin-top:3px;font-size:10px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pz-recent-empty{padding:18px 6px;color:var(--tx2);font-size:11px;line-height:1.6;text-align:center;}
+  /* ⭐ 2026-10-22（用户：时钟要跟调节参数同一行）：时钟不再浮在提示词框右上角，
+     挪进头部 .pd-head-tools，排在张数 / 抗截断 / 尺寸后面（preset-ui.js headHtml）。
+     以前给它在框里让出的右边一条 / 顶上一行都撤掉。 */
+  .pd-body{position:relative;}
+  .pd-head-tools{display:flex; align-items:center; gap:4px; flex:0 0 auto; margin-left:auto; min-width:0;}
+  .pd-body[data-prompt-view="history"]{display:flex; flex-direction:column; gap:8px; padding:6px 0 0;}
+  .pd-hist-title{display:flex; align-items:center; gap:6px; height:22px; font-size:12px; color:var(--tx2);}
+  .pd-hist-q{flex:0 0 auto;}
+  .pd-hist-list{flex:0 0 auto; min-width:0;}
+  .pd-hist-more{all:unset; box-sizing:border-box; align-self:center; cursor:pointer; padding:4px 12px; border-radius:8px; border:1px solid var(--line); font-size:11px; color:var(--tx2);}
+  .pd-hist-more:hover{color:var(--tx); background:rgba(255,255,255,.08);}
+  .pd-hist-more[hidden]{display:none;}
+  .pz-tool-body{display:flex;flex:1;min-height:0;overflow:hidden;}
+  .pz-tool-view{flex:1;min-height:0;overflow-y:auto;padding:12px 8px 8px;}
+  .pz-tool-group-head{display:flex;flex-direction:column;gap:3px;padding:2px 2px 9px;color:var(--tx);}
+  .pz-tool-group-head strong{font-size:13px;}
+  .pz-tool-group-head span{font-size:10px;color:var(--tx2);line-height:1.4;}
+  .pz-tool-groups,.pz-tool-entry-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 8px;align-content:start;}
+  .pz-tool-group,.pz-tool-entry{appearance:none;min-width:0;width:100%;min-height:104px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;text-align:center;padding:8px 0;border:0;border-radius:0;background:transparent;color:var(--tx);cursor:pointer;font:inherit;}
+  .pz-tool-group:hover,.pz-tool-entry:hover{background:transparent;color:var(--tx);}
+  .pz-tool-group-icon,.pz-tool-entry-icon{width:48px;height:48px;display:grid;place-items:center;flex:0 0 48px;background:transparent;color:var(--tx2);transition:color var(--m-fast) ease,filter var(--m-fast) ease;}
+  .pz-tool-group:hover .pz-tool-group-icon,.pz-tool-entry:hover .pz-tool-entry-icon,.pz-tool-group:focus-visible .pz-tool-group-icon,.pz-tool-entry:focus-visible .pz-tool-entry-icon{color:var(--tx);filter:drop-shadow(0 0 8px hsl(var(--glow-hsl,var(--accent-hsl)) / .45));}
+  .pz-tool-group:focus-visible,.pz-tool-entry:focus-visible{outline:1px solid hsl(var(--accent-hsl) / .6);outline-offset:2px;border-radius:8px;}
+  .pz-tool-group-copy,.pz-tool-entry-copy{min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .pz-tool-group strong,.pz-tool-entry strong{font-size:11px;font-weight:600;}
+  .pz-tool-group small,.pz-tool-entry small{font-size:10px;color:var(--tx2);line-height:1.4;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .pz-tool-back{display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;color:var(--tx2);font:inherit;font-size:10px;padding:0 2px 8px;cursor:pointer;}
+  .pz-tool-back:hover{color:var(--tx);}
+  .pz-search{flex:0 0 auto; padding:8px 10px 0;}
+  .pz-search.hidden{display:none;}
+  .pz-input{
+    width:100%; height:24px; box-sizing:border-box;
+    background:rgba(255,255,255,.08); border:1px solid var(--line-strong);
+    border-radius:8px; color:var(--tx); padding:0 8px; font-size:11px;
+    font-family:inherit; outline:none;
+  }
+  .pz-input:focus{border-color:hsl(var(--glow-hsl, var(--glow-zone)) / .8);}
+  .pz-list{flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:6px;}
+  .pz-row{
+    display:flex; align-items:center; gap:6px;
+    padding:5px 7px; border-radius:8px; cursor:pointer;
+    border:1px solid transparent; background:transparent;
+    transition:background var(--m-fast), transform var(--m-fast) var(--ease-out);
+  }
+  /* 按下反馈(2026-09-14)。⚠ 幅度要很小 —— 列表行是满宽的，缩多了整行都在跳。
+     ⚠ 这条不能影响拖拽排序：拖动时 JS 会设自己的 transform，
+       而 :active 在拖动中一直成立 —— 所以只缩 .99，肉眼几乎看不出打架。 */
+  .pz-row:active{transform:scale(.99);}
+  /* ⚠ 悬停色要压淡, 别跟选中色一样 —— 否则用户会以为总有一行是选中的
+     (这条坑在 orbit 面板上栽过, 记忆: wheelchair-orbit-hover-vs-selected-color) */
+  /* ⚠ 悬停【不】高亮成选中的样子(用户 2026-09-11 定案): 悬停只给极淡的底, 选中才亮光带。
+     之前悬停就亮跟三级一样, 用户以为鼠标划到哪就选中了哪。 */
+  .pz-row:hover{background:rgba(255,255,255,.04);}
+  /* 选中 = 行内【左右缘各一条】向内渐隐的光带(.z-selglow 同款语言), 颜色跟主题走。
+     用 ::before/::after 画在行自己身上, 随行一起滚。行内文字是 z2, 光带 z1 —— 统一层级。 */
+  .pz-row{position:relative; isolation:isolate;}
+  .pz-row > *{position:relative; z-index:2;}
+  .pz-row::before, .pz-row::after{
+    content:''; position:absolute; top:0; bottom:0; width:38%; pointer-events:none; z-index:1;
+    border-radius:8px; opacity:0; transition:opacity var(--m-fast) var(--ease-soft);
+  }
+  .pz-row::before{left:0;  background:linear-gradient(90deg,  hsl(var(--glow-hsl, var(--glow-zone)) / .55), transparent);}
+  .pz-row::after {right:0; background:linear-gradient(270deg, hsl(var(--glow-hsl, var(--glow-zone)) / .55), transparent);}
+  .pz-row.sel::before, .pz-row.sel::after{opacity:1;}
+  .pz-row.sel{background:rgba(255,255,255,.04);}
+  .pz-row.dragging{background:rgba(255,255,255,.16); box-shadow:var(--shadow-light); z-index:5; position:relative;}
+  /* 收藏星：.on = 已收藏(实心)，默认 = 没收藏(空心)。图形在 icons.js 的 starFilled/starOutline。
+     ⚠ 这是真正的【选中态】—— 和悬停态要分得开(用户定过：悬停色不能等于选中色)。 */
+  .pz-star{
+    flex:0 0 auto; font-size:11px; color:var(--tx2); line-height:1; padding:1px 2px;
+    display:inline-flex; align-items:center;                    /* SVG 居中 */
+    transition:color var(--m-fast), transform var(--m-fast) var(--ease-out);
+  }
+  .pz-star.on{color:#ffcf6b;}
+  .pz-star:hover{color:#ffdf9b;}
+  .pz-star:active{transform:scale(.88);}
+  .pz-row-title{flex:1; font-size:12px; color:var(--tx); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  /* ⚠ SVG 图标要 flex 居中：只给 line-height 不够，字形按基线摆会偏上偏左(docs/14 5.6.4) */
+  .pz-row-tag{flex:0 0 auto; font-size:10px; opacity:0.5; display:inline-flex; align-items:center;}
+  .pz-empty{padding:22px 12px; text-align:center; font-size:11px; color:var(--tx2); line-height:1.7;}
+  /* 一条预设都没有时的引导按钮 —— 这时候用户最需要"从 V6 搬家"，做显眼点 */
+  .pz-empty-btn{
+    display:flex; align-items:center; justify-content:center; gap:6px;  /* 图标+文字(2026-09-14) */
+    width:100%; margin-top:8px; padding:8px 6px;
+    border:1px solid hsl(var(--glow-hsl, var(--glow-zone)) / .55);
+    background:hsl(var(--glow-hsl, var(--glow-zone)) / .28);
+    color:var(--tx); border-radius:8px; font-size:12px; font-family:inherit; cursor:pointer;
+    transition:background var(--m-fast), transform var(--m-fast) var(--ease-out);
+  }
+  .pz-empty-btn:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .45);}
+  .pz-empty-btn:active{transform:scale(.97);}   /* 按下反馈(2026-09-14) */
+  .pz-empty-btn.sub{
+    border-color:var(--line); background:rgba(255,255,255,.06); color:var(--tx2); font-size:11px;
+  }
+  .pz-empty-btn.sub:hover{background:rgba(255,255,255,.14); color:var(--tx);}
+  .pz-foot{flex:0 0 auto; padding:6px 10px 8px; font-size:10px; color:var(--tx2); border-top:1px solid var(--line-faint);}
+

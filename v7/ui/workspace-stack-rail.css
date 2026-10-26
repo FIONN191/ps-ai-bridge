@@ -1,0 +1,16 @@
+/* Ordinary notices keep their original nodes and free-mode coordinates.
+   A workspace owns the reading area; explicit L3/L4 decisions still interrupt. */
+body.v7-workspace-stacks-summary #tasks,
+body.v7-workspace-stacks-summary #tasks *,
+body.v7-workspace-stacks-summary #errors:not(.has-blocking):not([data-v7-confirmation]):not(:has(.ec-l3,.ec-l4)),
+body.v7-workspace-stacks-summary #errors:not(.has-blocking):not([data-v7-confirmation]):not(:has(.ec-l3,.ec-l4)) *{visibility:hidden!important;pointer-events:none!important}
+.v7-workspace-stack-rail{display:flex;align-items:center;gap:6px;flex:none;padding:0 0 8px;color:var(--tx2);font-size:11px;line-height:1.5;letter-spacing:0}
+.detail-card.workspace-host .dc-scroll:has(>.v7-workspace-stack-rail){display:flex;flex-direction:column}
+.detail-card.workspace-host .dc-scroll:has(>.v7-workspace-stack-rail)>.dc-slide{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.detail-card.workspace-host .dc-scroll:has(>.v7-workspace-stack-rail) #dcBody{flex:1;min-height:0}
+.v7-workspace-stack-rail button{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:28px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface-faint);color:var(--tx);font:inherit;cursor:pointer}
+.v7-workspace-stack-rail button:hover{border-color:var(--accent);background:var(--surface)}
+.v7-workspace-stack-rail button:disabled{opacity:0.5;cursor:default}
+.v7-workspace-stack-rail button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.v7-workspace-stack-rail>span{margin-left:auto;font-size:10px;color:var(--tx2)}
+.v7-stack-revealed{filter:drop-shadow(0 0 5px var(--accent))}

@@ -1,0 +1,284 @@
+/* ═══ ui-main/css/08-prompt-input.css —— 主界面主样式第 8 / 8 段 ═══
+   管什么：攒光切主卡 · 记录卡攒光带 · 三级提示词框 · 提示词输入区 · 参数说明 · 下拉框尺寸 · 版本菜单 · 预设小对话框
+   2026-10-21 从 ui.html 那一整段 <style> 原样切出来；ui.html 按编号顺序 <link> 进来（顺序 = 原来的先后，别调）。 */
+/* ── 以上是文件说明（拼回 ui.html 时会去掉）── */
+  /* ── 「到底再推」攒光切主卡 ──
+     预设二级是列表，滚轮得归它用；但那样就没法在二级上切主卡了。
+     解法(用户 2026-09-11 定案)：滚到顶/底之后每多滚一下，边缘的光就亮一分，
+     攒满就切主卡；反向滚一下立刻清零。
+     —— 把一条看不见的规则变成看得见的进度条，用户不用记特例，光自己会教他。
+     视觉 DNA 跟 .edgehint / .zone-glow 同源：越推越宽越亮，颜色跟主题走。 */
+  /* ⚠ 这里【不要】写 transition。高度和透明度全由 rAF 每帧算(见 pzTick) ——
+     再叠一层 CSS 过渡就是两套插值互相打架，表现是"光跟不上手 / 一顿一顿的"。 */
+  .pz-edge{
+    position:absolute; left:0; right:0; height:0; opacity:0;
+    pointer-events:none; z-index:7;
+    will-change:height, opacity;
+  }
+  .pz-edge.top{
+    top:0;
+    background:linear-gradient(180deg, hsl(var(--glow-hsl, var(--glow-zone)) / .9), transparent);
+  }
+  .pz-edge.bottom{
+    bottom:0;
+    background:linear-gradient(0deg, hsl(var(--glow-hsl, var(--glow-zone)) / .9), transparent);
+  }
+  /* 临界亮线: 只在快攒满时才明显(p 的三次方), 等于"马上就要切了"的最后一提示 */
+  .pz-edge::after{
+    content:''; position:absolute; left:0; right:0; height:2px;
+    background:hsl(var(--glow-hsl, var(--glow-zone)) / 1);
+    box-shadow:0 0 8px 1px hsl(var(--glow-hsl, var(--glow-zone)) / .8);
+    opacity:var(--edge-bright, 0);
+  }
+  .pz-edge.top::after{top:0;}
+  .pz-edge.bottom::after{bottom:0;}
+
+  /* ── 记录卡：攒光带贴【一级卡片本体的圆弧】─────────────────────────
+     用户 2026-10-09：「我要求的是你在圆弧的最底和最底…
+                    现在显得有点太粗糙了，下面还空一块」。
+     ⚠ 为什么单写这一条：
+       卡片本体是 overflow:hidden + border-radius:28px，光带贴 bottom:1px 时
+       **两端会被圆弧裁成直角**（看着毛）。光带自己也得跟着弯，两端才收得干净。
+     ⚠ 用 left/right:1px + 同值圆角，让光带的形状跟卡片对齐 ——
+       **别去改 .pz-edge 的公共样式**（预设卡那边贴的是 .zone，现在看着是对的，别动它）。
+     ⚠ 只作用于【记录卡】这一处：`.block-card[data-card="history"] > .pz-edge`。 */
+  .block-card[data-card="history"] > .pz-edge{left:1px; right:1px;}
+  .block-card[data-card="history"] > .pz-edge.top{border-radius:28px 28px 0 0;}
+  .block-card[data-card="history"] > .pz-edge.bottom{border-radius:0 0 28px 28px;}
+  /* 圆角处那条 2px 临界亮线也跟着弯 —— 不然它两端会露直角 */
+  .block-card[data-card="history"] > .pz-edge.top::after{border-radius:28px 28px 0 0;}
+  .block-card[data-card="history"] > .pz-edge.bottom::after{border-radius:0 0 28px 28px;}
+
+  /* ── 三级: 提示词框 ── */
+  .pd-head{
+    display:flex; align-items:center; gap:8px; margin-bottom:12px;
+    padding-bottom:10px; border-bottom:1px solid var(--line-faint);
+  }
+  .pd-head-info{flex:1; min-width:0;}
+  .pd-head-title{font-size:13px; font-weight:600; color:var(--tx); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .pd-head-btns{flex:0 0 auto; display:flex; gap:5px;}
+  .pd-hb{
+    width:24px; height:24px; padding:0; border-radius:8px;
+    border:1px solid var(--line); background:rgba(255,255,255,.08);
+    color:var(--tx); font-size:11px; line-height:1; font-family:inherit; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;   /* SVG 居中(2026-09-14) */
+    transition:background var(--m-fast), transform var(--m-fast);
+  }
+  .pd-hb:hover{background:rgba(255,255,255,.2);}
+  .pd-hb:active{transform:scale(.94);}
+  .pd-hb-run{background:hsl(var(--accent-hsl, 211 100% 68%) / .35); border-color:hsl(var(--accent-hsl, 211 100% 68%) / .6);}
+  .pd-hb-run:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .55);}
+  @keyframes pdFire{0%{transform:scale(1);}40%{transform:scale(1.22);}100%{transform:scale(1);}}
+  .pd-hb.firing{animation:pdFire var(--m-slow) var(--ease-out);}
+
+  .pd-ta{
+    width:100%; min-height:230px; box-sizing:border-box; resize:vertical;
+    background:rgba(255,255,255,.06); border:1px solid var(--line);
+    border-radius:12px; color:var(--tx); padding:10px 11px;
+    font-size:12px; line-height:1.65; font-family:inherit; outline:none;
+  }
+  .pd-ta:focus{border-color:hsl(var(--glow-hsl, var(--glow-detail)) / .7);}
+
+  .pd-fields{display:flex; flex-direction:column; gap:8px; margin-bottom:12px;}
+  .pd-field{display:flex; flex-direction:column; gap:4px;}
+  .pd-field-label{font-size:11px; color:var(--tx2);}
+  .pd-field-input{
+    width:100%; box-sizing:border-box; resize:vertical; min-height:26px;
+    background:rgba(255,255,255,.06); border:1px solid var(--line);
+    border-radius:8px; color:var(--tx); padding:5px 8px;
+    font-size:12px; line-height:1.55; font-family:inherit; outline:none;
+  }
+  .pd-field-input:focus{border-color:hsl(var(--glow-hsl, var(--glow-detail)) / .7);}
+  .pd-workflow-params{display:flex;flex-direction:column;gap:8px;margin-top:12px;min-width:0;}   /* 2026-10-24：间距只用 4 的倍数（UI 对照手册 08） */
+  .pd-workflow-extra{border-top:1px solid var(--line);padding-top:8px;min-width:0;}
+  .pd-workflow-extra summary{font-size:12px;color:var(--tx2);cursor:pointer;padding:4px 0;}
+  .pd-workflow-extra .pd-field{margin-top:8px;}
+  /* ⚠ 提示词框【不许】被压成一个小方块（2026-09-28 用户实测：工作流预设的框只有 100 高，
+     容器还剩 199px 空着不用 —— 利用率太低）。改成让它【吃掉内容区剩余高度】：
+     空间多就长高，字段多就缩矮，但有下限保护，不会挤到看不见。
+     min-height 只兜底，真正的尺寸由 flex 分配。 */
+  [data-workflow-preset]:not([data-workflow-preset=""]) .pd-ta{min-height:132px;}
+
+  /* ⭐⭐⭐ 提示词输入区：两态两做法（2026-09-28 用户定案）
+     ⚠ 用户原话："如果单纯只是输入提示词，或者把 JSON 格式的映射转为输入提示词的状态，
+       就直接取消外框这一设定；如果是可以填写内容的提示词，那就直接做自适应缩放。"
+     也就是：
+       A) 纯提示词 / JSON 原文 → **取消外框**，正好铺满可写区（不大不小）
+       B) 有可填内容（滑块 / 填空 / 工作流参数）→ **自适应缩放**，吃掉剩余高度
+     ⚠ 判据用 `data-prompt-view`（preset-ui.js 的 fillDetail 打的），**不要数子元素个数**：
+       真实预设几乎都带一个"工作流参数"块，子元素永远不止一个，
+       用 `:only-child` 判断的话 A 态永远命中不了（实测 15/15 全带）。
+     ⚠ 高度链：.dc-scroll(flex列) → .dc-slide(flex列) → #dcBody(flex列) → .pd-body → .pd-ta
+       中间任何一层不是 flex 列，flex:1 就吃不到空间（先前踩过两次）。 */
+
+  /* 内容区：纵向弹性分配 */
+  #dcBody .pd-body:has(> .pd-ta){
+    display:flex; flex-direction:column; gap:8px; min-height:0;
+  }
+  /* 提示词框之外的字段保持自然高度，不跟提示词抢 */
+  #dcBody .pd-body:has(> .pd-ta) > .pd-field,
+  #dcBody .pd-body:has(> .pd-ta) > .pd-slider,
+  #dcBody .pd-body:has(> .pd-ta) > .pd-fields,
+  #dcBody .pd-body:has(> .pd-ta) > .pd-head{
+    flex:0 0 auto;
+  }
+  /* 工作流参数块：⭐ 2026-10-24（V7待办/03，反馈 #7 #16）不再限高、不再自己滚 ——
+     原来 max-height:46% + 自己滚：参数多的时候挤在 130px 的小框里，「更多参数」展开了也看不到，
+     滚轮又被预设二级的全局监听拿去滚外层，小框永远滚不动。现在整页一个滚动（#dcBody 是 .pd-body，二级是 .qz-scroll）。 */
+  #dcBody .pd-body:has(> .pd-ta) > .pd-workflow-params{
+    flex:0 0 auto; min-height:0; overflow:visible; max-height:none;
+  }
+
+  /* ── A) 纯提示词 / JSON 原文：取消外框，正好铺满 ── */
+  #dcBody .pd-body[data-prompt-view="text"]{gap:0; padding:0;}
+  #dcBody .pd-body[data-prompt-view="text"] > .pd-ta{
+    border:0;                    /* ⭐ 取消外框 */
+    background:transparent;
+    border-radius:0;
+    box-shadow:none;
+    flex:1 1 auto;
+    min-height:0;                /* 正好贴合：不多不少 */
+    height:auto; max-height:none;
+    resize:none;                 /* 高度交给容器，手动拖会跟它打架 */
+  }
+  /* A 态下工作流参数仍然可用（2026-10-24：跟着整页滚，不再自己滚） */
+  #dcBody .pd-body[data-prompt-view="text"] > .pd-workflow-params{
+    flex:0 0 auto; min-height:0; overflow:visible; max-height:none;
+  }
+
+  /* ── B) 有可填内容：提示词框吃掉剩余空间，参数块自然高度，放不下就整页滚 ──
+     ⭐ 2026-10-24（V7待办/03）：原来参数块 flex-basis:40% + 自己滚（理由见 git 历史：为了让提示词框 flex:1 1 0 有正空间可吃）。
+       问题是参数多时 40% 装不下、只能在小框里滚，而小框收不到滚轮。
+       现在：提示词框 flex:1 0 120px（有空就长、最矮 120 看得见几行）；参数块 flex:0 0 auto；外层 .pd-body 自己滚。
+       参数少 ⇒ 提示词框正好吃满；参数多 ⇒ 提示词框 120、整页往下滚就看到参数。 */
+  #dcBody .pd-body[data-prompt-view="params"] > .pd-ta{
+    flex:1 0 120px;
+    min-height:120px;
+    height:auto; max-height:none;
+    resize:none;
+  }
+  #dcBody .pd-body[data-prompt-view="params"] > .pd-workflow-params{
+    flex:0 0 auto;
+    min-height:0; max-height:none; overflow:visible;
+  }
+
+  /* 二级提示词框（右滑那条路）同一套：容器是 .qz-scroll
+     ⚠ 高度链：.qz-body(flex列) → .qz-scroll(flex:1) → .pd-body → .pd-ta */
+  .qz-body .qz-scroll:has(> .pd-body){
+    display:flex; flex-direction:column; min-height:0;
+  }
+  .qz-body .qz-scroll > .pd-body{
+    /* 2026-10-24（V7待办/03）：flex-shrink 0 —— 内容比 .qz-scroll 高时不再被压扁塞进去，而是撑出来让 .qz-scroll 整页滚 */
+    display:flex; flex-direction:column; gap:8px; min-height:0; flex:1 0 auto;
+  }
+  .qz-body .pd-body > .pd-field,
+  .qz-body .pd-body > .pd-slider,
+  .qz-body .pd-body > .pd-fields,
+  .qz-body .pd-body > .pd-head{
+    flex:0 0 auto;
+  }
+  .qz-body .pd-body > .pd-workflow-params{flex:0 0 auto; min-height:0; overflow:visible; max-height:none;}
+  .qz-body .pd-body[data-prompt-view="text"]{gap:0; padding:0;}
+  .qz-body .pd-body[data-prompt-view="text"] > .pd-ta{
+    border:0; background:transparent; border-radius:0; box-shadow:none;
+    flex:1 1 auto; min-height:0; height:auto; max-height:none; resize:none;
+  }
+  .qz-body .pd-body[data-prompt-view="params"] > .pd-ta{
+    flex:1 0 120px; min-height:120px; height:auto; max-height:none; resize:none;
+  }
+
+  .pd-sliders{display:flex; flex-direction:column; gap:10px;}
+  .pd-sliders.tight{gap:6px;}
+  /* ⭐⭐ 2026-10-14（用户定）：参数多的时候【换两列】而不是一列往下堆。
+     用户原话："有的预设它可调参数很多，有的预设它可调参数很少。然后有时候会导致
+     需要换行需要滚轮往下滚……我希望给这个参数加上一个自适应。"
+     + "两列只在三级生效不行，你在二级也得生效。"
+     ⚠ 参照 V6 的做法（tile-forge.css 的 .forge-square-grid）：
+        `display:grid; grid-template-columns:1fr 1fr;` —— 就是两列等宽，不做花哨的自适应。
+     ⚠ .tight 原本就是"参数超过 6 个"的标记（见 preset-ui.js 的 params.length>6），
+       正好当作"挤了才换两列"的判据，不用再引入新开关。
+     ⚠ minmax(0,1fr) 不能省：写成 1fr 时，长参数名会把列撑破、整个网格外溢。 */
+  .pd-sliders.tight{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px 8px;}
+  /* 两列时每个参数占一格，内部仍是纵向：名字+数值一行、滑块一行 */
+  .pd-sliders.tight>.pd-slider{display:flex; flex-direction:column; min-width:0; gap:0;}
+  .pd-slider-head{display:flex; align-items:baseline; justify-content:space-between; gap:8px;}
+  /* ⭐ 参数说明直接显示，不只放 title（2026-09-14）——
+     这些参数用户光看名字不知道该调哪个，而且没人会去悬停每一项。
+     压到 10px / --tx2，不跟参数本身抢注意力。 */
+  .pd-field-desc{font-size:10px; line-height:1.5; color:var(--tx2); margin-top:3px;}
+  .pd-slider-name{font-size:12px; color:var(--tx); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .pd-slider-val{font-size:11px; color:var(--tx2); font-variant-numeric:tabular-nums; flex:0 0 auto;}
+  .pd-range{
+    -webkit-appearance:none; appearance:none; width:100%; height:4px; margin-top:5px;
+    border-radius:4px; outline:none; cursor:pointer;
+    background:linear-gradient(to right,
+      hsl(var(--glow-hsl, var(--glow-detail)) / .9) 0%,
+      hsl(var(--glow-hsl, var(--glow-detail)) / .9) var(--fill,0%),
+      rgba(255,255,255,.12) var(--fill,0%), rgba(255,255,255,.12) 100%);
+  }
+  .pd-range::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:13px; height:13px; border-radius:50%;
+    background:#fff; border:1px solid rgba(0,0,0,.25); box-shadow:var(--shadow-light); cursor:pointer;
+  }
+  .pd-memory{margin-top:14px; padding-top:10px; border-top:1px solid var(--line-faint);}
+  .pd-memory-btn{
+    width:100%; padding:6px; border-radius:8px;
+    border:1px solid var(--line); background:rgba(255,255,255,.06);
+    color:var(--tx2); font-size:11px; font-family:inherit; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:5px;  /* 图标+文字对齐(2026-09-14) */
+    transition:background var(--m-fast), transform var(--m-fast) var(--ease-out);
+  }
+  .pd-memory-btn:active{transform:scale(.97);}   /* 按下反馈(2026-09-14) */
+  .pd-memory-btn:hover{background:rgba(255,255,255,.14); color:var(--tx);}
+
+  /* ── 标准下拉框：通用样式已搬到 ui-select.css（2026-10-20，子窗口也要用）；这里只留跟位置有关的尺寸 ── */
+  /* 设置页那种小号字段里, 触发器跟 input 同高同字号 */
+  .settings-field .uisel-trigger{min-height:0; padding:7px 8px; border-radius:8px; border-color:var(--line); background:rgba(0,0,0,.2); font-size:12px;}
+  .ai-fields .uisel-trigger{min-height:0; padding:6px 8px; font-size:11px;}
+  /* ⚠ 2026-10-07：生成卡的模型名单里，"疑似非生图"的项画成灰色 ——
+     但【仍可点选】（用户定："疑似的模型就全部灰色显示，用户点到这个地方然后就启用"）。
+     跟 .off 的区别：.off 是禁用的、这个只是"提示你它可能不是生图模型"。 */
+  .uisel-item[data-v7tier="other"]{opacity:.5;}
+  .uisel-item[data-v7tier="other"]:hover{opacity:.75;}
+  /* ⭐ 2026-10-19（docs/251 第 7 条④）：任务卡小眼睛的版本菜单 —— 借下拉框的面板和行样式，行里左名字右状态 */
+  .color-menu{min-width:190px;}
+  .color-menu .cm-row{display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%;
+    border:0; background:none; font:inherit; text-align:left; color:var(--tx);}
+  .color-menu .cm-row:hover,.color-menu .cm-row:focus-visible{background:rgba(255,255,255,.06); outline:none;}
+  .color-menu .cm-state{font-size:11px; color:var(--tx2); flex:none;}
+  .color-menu .cm-row.cur .cm-state{color:var(--tx);}
+  .task .t-act.t-eye.busy{opacity:0.75;}
+
+  /* ── 预设系统自己的小对话框 ──
+     ⚠ 必须 Portal 到 body: fixed 层被有 transform 的祖先困住会缩成一小块
+       (记忆: fixed 全屏层被 transform 祖先困住)。preset-ui.js 里是 appendChild(document.body)。 */
+  .ps-dlg-ov{
+    position:fixed; left:0; top:0; right:0; bottom:0; z-index:var(--z-workbench,9000);
+    background:rgba(6,8,12,.62); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .ps-dlg{
+    width:340px; max-width:86vw; padding:20px;
+    background:hsl(var(--card-h, 220 28%) 9% / .97); border:1px solid var(--line-strong);
+    border-radius:12px; box-shadow:var(--shadow-heavy); color:var(--tx);
+  }
+  .ps-dlg-title{font-size:15px; font-weight:600; margin-bottom:12px;}
+  .ps-dlg-hint{font-size:11px; color:var(--tx2); line-height:1.7; margin-bottom:12px; white-space:pre-wrap;}
+  .ps-dlg-row{display:flex; flex-direction:column; gap:5px; margin-bottom:12px;}
+  .ps-dlg-label{font-size:11px; color:var(--tx2);}
+  .ps-dlg-input{
+    width:100%; box-sizing:border-box; height:30px;
+    background:rgba(255,255,255,.07); border:1px solid var(--line-strong);
+    border-radius:8px; color:var(--tx); padding:0 9px; font-size:12px;
+    font-family:inherit; outline:none;
+  }
+  .ps-dlg-input:focus{border-color:hsl(var(--glow-hsl, var(--glow-detail)) / .8);}
+  select.ps-dlg-input{padding:0 6px;}
+  .ps-dlg-btns{display:flex; gap:8px; justify-content:flex-end; margin-top:4px;}
+  .ps-dlg-btn{
+    padding:7px 15px; border-radius:12px; font-size:12px; font-family:inherit; cursor:pointer;
+    border:1px solid var(--line-strong); background:rgba(255,255,255,.12); color:var(--tx);
+  }
+  .ps-dlg-btn:hover{background:rgba(255,255,255,.22);}
+  .ps-dlg-ok{background:hsl(var(--accent-hsl, 211 100% 68%) / .5); border-color:hsl(var(--accent-hsl, 211 100% 68%) / .8);}
+  .ps-dlg-ok:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .7);}

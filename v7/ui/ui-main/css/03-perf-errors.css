@@ -1,0 +1,319 @@
+/* ═══ ui-main/css/03-perf-errors.css —— 主界面主样式第 3 / 8 段 ═══
+   管什么：性能监视面板 · 报错卡 · 报错详情层 · 报错卡光效
+   2026-10-21 从 ui.html 那一整段 <style> 原样切出来；ui.html 按编号顺序 <link> 进来（顺序 = 原来的先后，别调）。 */
+/* ── 以上是文件说明（拼回 ui.html 时会去掉）── */
+  /* ═══ 性能监视面板 ═══
+     ⚠⚠ 2026-10-05 用户实测报的：「调试卡片中一旦打开了性能监测，性能监测会立马
+       作为报错菜单弹出，让我确认或者取消。我无论点确认还是取消，那个性能监测都会消失掉。」
+     真因：openPerfCard 用的是 UI.dialog —— 那是【报错系统的 L3 确认卡】
+       （addErrorCard，天生带"确认/取消"两个按钮、进报错堆、点完就消失）。
+     性能监视是【一块要一直挂着的表】，不是"要用户做决定的事"。
+     ⇒ 它不该住在报错堆里，给它自己一层浮层（和参考图弹窗一个待遇）。
+     ⚠ 层级 829：在 popupLock(830) 之下 —— 它是个"看数据"的面板，
+       不该盖住任何需要做决定的东西。
+     ⚠ 不进报错堆还有个好处：报错堆是【滚轮切换】的，性能面板混进去会把
+       用户真正要处理的报错挤走。 */
+  .perf-panel{
+    /* ⚠ 2026-10-07：默认位置从"右下角"改成【右侧空白区】。
+       为什么：右下角那块（窗口 1020×1100 时是 665,954）挨着屏幕底边、又跟卡片区挤在一起，
+       用户实测觉得"它老在眼前晃"；而卡片堆右边本来就有好几百像素的空档。
+       改完仍在窗口右边，离顶部悬浮条（约 548 宽）和卡片堆（约 x<360）都不重叠。
+       ⚠ 拖过之后位置由 settingsRuntime.perfPanelPos 决定（见 openPerfCard 里的 bindDrag）。 */
+    position:fixed; right:16px; top:70px; width:340px; max-width:calc(100vw - 32px);
+    z-index:calc(var(--z-stage,800) + 29); display:flex; flex-direction:column; gap:8px; padding:12px 14px;
+    border:1px solid var(--line-strong); border-radius:var(--radius-button);
+    background:var(--bg-solid); color:var(--tx); box-shadow:var(--shadow-mid);
+    font-size:12px; line-height:1.5;
+  }
+  .perf-panel[hidden]{ display:none; }
+  /* ⚠ 2026-10-07：标题栏可以拖（见 openPerfCard 里的 bindDrag）。
+     抓手样式 + 拖动期间禁掉文本选择（不然后面那片字会被一拖全选，看着像卡死）。
+     touch-action:none 是给触屏/触控板的，不然 pointermove 会被浏览器拿去滚页面。 */
+  .perf-panel .pp-head[data-perf-drag]{ cursor:move; touch-action:none; user-select:none; }
+  .perf-panel.dragging{ user-select:none; }
+  .perf-panel.dragging .pp-detail{ pointer-events:none; }
+  .perf-panel .pp-head{ display:flex; align-items:baseline; gap:8px; }
+  .perf-panel .pp-head h4{ margin:0; font-size:13px; font-weight:600; flex:1; min-width:0; }
+  .perf-panel .pp-x{ flex:none; width:24px; height:24px; border:0; border-radius:var(--radius-control);
+    background:transparent; color:var(--tx2); cursor:pointer; font-size:15px; line-height:1; }
+  .perf-panel .pp-x:hover{ background:var(--surface); color:var(--tx); }
+  .perf-panel .pp-line{ color:var(--tx2); word-break:break-word; }
+  .perf-panel .pp-detail{ margin:0; white-space:pre-line; font-family:inherit; font-size:11px;
+    color:var(--tx2); max-height:40vh; overflow:auto; }
+  .perf-panel .pp-toggle{ align-self:flex-start; border:1px solid var(--line-strong);
+    border-radius:var(--radius-control); background:transparent; color:var(--tx2);
+    font-size:11px; padding:3px 8px; cursor:pointer; }
+  .perf-panel .pp-toggle:hover{ background:var(--surface); color:var(--tx); }
+
+  .errors{
+    position:absolute; top:0; left:60px;       /* ⚠ absolute(铁律6.5): fixed 在拖拽时会漂移, top 由 JS 动态设置(updateStackPositions) */
+    z-index:calc(var(--z-stack,830) + 1);                               /* ⚠ 必须 > popupLock(830) 但 < .tasks(835), L4 报错卡盖过遮罩, 但任务卡在报错卡上方 */
+    pointer-events:none;                       /* 容器不接收事件, 由子卡接收 */
+  }
+  .errors.has-blocking{z-index:calc(var(--z-workbench,9000) + 1);}
+  /* 2026-10-22：报错超过 4 条时，堆底部标一句「还有 N 条」（以前多出来的就这么看不见了）
+     第二批：它是按钮，点开列出全部报错（点一条翻到最上面，× 关掉） */
+  .errors-more{
+    position:absolute; left:0; height:24px; padding:0 10px; border-radius:999px;
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:11px; line-height:1; color:#ffb3b3; background:rgba(255,107,107,.14);
+    border:1px solid rgba(255,107,107,.4); pointer-events:auto; white-space:nowrap; cursor:pointer;
+    transition:background var(--m-fast) var(--ease-soft);
+  }
+  .errors-more:hover{ background:rgba(255,107,107,.24); }
+  .errors-more:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .errors-more-list{
+    position:absolute; left:0; width:300px; max-height:240px; overflow-y:auto; padding:4px;
+    border-radius:12px; border:1px solid var(--line-strong);
+    background:var(--bg-solid,#20242f); box-shadow:var(--shadow-mid);
+    pointer-events:auto; animation:errMoreIn var(--m-base) var(--ease-out) both;
+  }
+  @keyframes errMoreIn{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
+  .errors-more-row{ display:flex; align-items:center; gap:4px; border-radius:8px; }
+  .errors-more-row:hover{ background:rgba(255,255,255,.05); }
+  .errors-more-row.is-top .errors-more-go{ color:var(--tx); font-weight:600; }
+  .errors-more-go{
+    flex:1; min-width:0; height:32px; padding:0 10px; justify-content:flex-start;
+    border:0; background:transparent; color:var(--tx2); font-size:12px; text-align:left;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:8px;
+  }
+  .errors-more-go:hover{ color:var(--tx); }
+  .errors-more-x{
+    flex:none; width:24px; height:24px; padding:0; border:0; border-radius:8px;
+    background:transparent; color:var(--tx3);
+  }
+  .errors-more-x:hover{ background:rgba(255,255,255,.1); color:var(--tx); }
+  /* ═══ 报错卡: 默认窄卡, 向右滑动展开显示详细内容 ═══ */
+  /* ═══ 报错卡: 跟任务卡同款尺寸和样式 ═══ */
+  .error-card{
+    position:absolute; top:0; left:0;
+    width:300px; height:100px;                 /* 固定尺寸, 跟任务卡接近 */
+    border-radius:28px; padding:15px;
+    background:hsl(var(--card-h, 220 28%) 11% / calc(.78 * var(--ui-bg-opacity,1)));
+    backdrop-filter:blur(var(--blur)) saturate(1.5);
+    -webkit-backdrop-filter:blur(var(--blur)) saturate(1.5);
+    border:1px solid var(--line);
+    transform-origin:top left; pointer-events:auto;
+    transition:transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-soft);
+    will-change:transform, opacity;
+    box-shadow:var(--shadow-mid);
+  }
+  /* Error-card custom images are painted by this layer; the message remains
+     outside it at full opacity. */
+  .error-card{background-image:none !important;}
+  .error-card::before{
+    content:'';position:absolute;inset:0;border-radius:inherit;z-index:0;
+    background:var(--card-bg-image,none);background-size:cover;background-position:center;
+    opacity:var(--ui-bg-opacity,1);pointer-events:none;
+  }
+  /* L1 胶囊: 更矮, 横排图标+文字 */
+  /* 光效独立裁切，避免卡片不能 overflow:hidden 时从圆角外溢出。
+     右侧详情层在 error-card 外部，不会被这一层裁掉。 */
+  .error-light-clip,
+  .task-light-clip{
+    position:absolute; inset:0; overflow:hidden; border-radius:28px;
+    pointer-events:none; z-index:2; isolation:isolate;
+  }
+  /* ⚠ 报错卡内容提到光裁切层(z2)之上 —— 统一层级(2026-09-11): 光永远压在文字/按钮之下。
+     任务卡对应的是 .task > .t-head/.t-bar/.t-sub{z-index:3}。 */
+  .error-card .ec-header, .error-card .ec-desc{position:relative; z-index:3;}
+
+  .error-card.ec-l1{
+    height:50px;
+    padding:12px 16px;
+  }
+  /* 报错卡内容区: 图标+标题在同一行, 描述在下方 */
+  .error-card .ec-header{
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:6px;
+  }
+  .error-card .ec-ico{
+    font-size:20px; line-height:1; flex-shrink:0;
+  }
+  .error-card .ec-ico.ok{ color:hsl(var(--sem-ok)); }
+  .error-card .ec-ico.info{ color:hsl(var(--sem-info)); }
+  .error-card .ec-ico.warn{ color:hsl(var(--sem-warn)); }
+  .error-card .ec-ico.err{ color:hsl(var(--sem-err)); }
+  .error-card .ec-title{
+    flex:1;
+    font-size:13px;
+    font-weight:600;
+    color:var(--tx);
+    line-height:1.3;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .error-card .ec-desc{
+    font-size:12px;
+    color:var(--tx2);
+    line-height:1.4;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  /* L1 胶囊特殊处理: 只有图标+文字一行 */
+  .error-card.ec-l1 .ec-header{
+    margin-bottom:0;
+  }
+  .error-card.ec-l1 .ec-title{
+    font-size:13px;
+    font-weight:500;
+  }
+  .error-card.ec-l1 .ec-desc{
+    display:none;  /* L1 不显示描述 */
+  }
+  /* ⭐ 2026-10-22（docs/263 第 6 条）：胶囊右边的操作按钮（「撤销」） */
+  .error-card.ec-l1 .ec-title{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .error-card .ec-action{
+    flex:none; height:24px; padding:0 10px; margin-left:8px; border-radius:8px;
+    border:1px solid hsl(var(--accent-hsl, 211 100% 68%) / .55);
+    background:hsl(var(--accent-hsl, 211 100% 68%) / .18); color:var(--tx);
+    font-size:12px; font-weight:600; pointer-events:auto;
+    transition:background var(--m-fast) var(--ease-soft);
+  }
+  .error-card .ec-action:hover{ background:hsl(var(--accent-hsl, 211 100% 68%) / .32); }
+  /* 模态弹窗里的撤销条（弹窗开着时外面的报错堆点不到，见 offerUndo 的 host） */
+  .v7-undo-inline{
+    position:sticky; bottom:8px; z-index:5; margin:8px auto 0;
+    display:flex; align-items:center; gap:10px; width:max-content; max-width:100%;
+    padding:6px 8px 6px 12px; border-radius:12px;
+    background:var(--bg-solid,#20242f); border:1px solid var(--line-strong); box-shadow:var(--shadow-mid);
+    font-size:12px; color:var(--tx); animation:errMoreIn var(--m-base) var(--ease-out) both;
+  }
+  .v7-undo-inline button{
+    height:24px; padding:0 10px; border-radius:8px; font-size:12px; font-weight:600;
+    border:1px solid hsl(var(--accent-hsl, 211 100% 68%) / .55); background:hsl(var(--accent-hsl, 211 100% 68%) / .18); color:var(--tx);
+  }
+  .v7-undo-inline button:hover{ background:hsl(var(--accent-hsl, 211 100% 68%) / .32); }
+
+  /* ═══ 报错详情层: 紧贴报错卡右缘弹出, 高度与报错卡齐平 ═══ */
+  .error-detail{
+    /* ⚠ 2026-10-03 晚：308 → 340。同 .task-preview —— 弹出间隔统一到跟
+       【一级主卡 → 二级】那套一致（用户要求"预览卡和报错详情卡的间隔跟主卡一致"）。 */
+    position:absolute; top:0; left:340px;   /* 间隔同 #zones（卡宽 300 + 40） */
+    height:100px;                            /* 高度与报错卡一致 */
+    width:320px;                             /* 详情层宽度 */
+    z-index:calc(var(--z-detail,10000) + 2);                           /* 高于任务预览 */
+    opacity:0; pointer-events:none;
+    transform:translateX(-24px);
+    transition:opacity var(--m-base) var(--ease-soft), transform var(--dur) var(--ease-out);
+
+    background:rgb(24 28 36 / calc(.92 * var(--ui-bg-opacity,1)));
+    backdrop-filter:blur(var(--blur)) saturate(1.5);
+    -webkit-backdrop-filter:blur(var(--blur)) saturate(1.5);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px;
+    box-shadow:var(--shadow-mid);
+
+    /* 左右结构(2026-09-11)：左边内容可滚，右边按钮列纵向排。
+       以前是上下结构、按钮横着占满底部一整行 —— 100px 高的卡被按钮吃掉 52px，
+       内容只剩两行，而详情动辄十几行。改成左右后内容区拿到整整 68px 高。 */
+    display:flex; flex-direction:row; align-items:stretch; gap:12px;
+  }
+  .error-detail.show{
+    opacity:1; pointer-events:auto; transform:translateX(0);
+  }
+  .error-detail .ed-body{
+    font-size:13px;
+    color:var(--tx2);
+    line-height:1.6;
+    flex:1; min-width:0;         /* min-width:0 是必须的：flex 子项默认不肯缩到内容宽度以下，长文本会把按钮挤出卡外 */
+    overflow-y:auto;
+    scrollbar-width:none;
+    /* ⚠ 详情是用 \n 拼的(error-report.js buildDetail)，不加 pre-wrap 全挤成一行。
+       2026-09-11 截图里就是这样：「原因：… 当时的情况：… 服务器：…」连成一坨。 */
+    white-space:pre-wrap; word-break:break-word;
+  }
+  .error-detail .ed-btns{
+    display:flex; flex-direction:column; justify-content:center; gap:6px;
+    flex:0 0 auto;               /* 宽度由最宽的那个按钮撑开，不参与压缩 */
+  }
+  .error-detail .ed-btn{
+    width:100%;                  /* 同一列里的按钮一样宽 */
+    font-size:13px;
+    padding:7px 14px;            /* 上下 7：两个按钮 30+30+间隙 6 = 66，刚好塞进 68px 的内容高 */
+    border-radius:8px;
+    cursor:pointer;
+    background:rgba(255,255,255,.12);
+    border:1px solid var(--line-faint);
+    color:var(--tx);
+    transition:var(--m-fast);
+    text-align:center;
+    white-space:nowrap;          /* 按钮文字不折行，否则「放弃这些任务」会被掰成两行撑高 */
+  }
+  .error-detail .ed-btn:hover{ background:rgba(255,255,255,.24); }
+  .error-detail .ed-btn:active{ transform:scale(.96); }   /* 按下反馈(2026-09-14) */
+  .error-detail .ed-btn.primary{
+    background:hsl(var(--sem-info) / .85);
+    border-color:transparent;
+    font-weight:600;
+  }
+  .error-detail .ed-btn.primary:hover{ background:hsl(var(--sem-info)); }
+  .error-detail .ed-btn.danger{
+    background:hsl(var(--sem-err) / .85);
+    border-color:transparent;
+    font-weight:600;
+  }
+  .error-detail .ed-btn.danger:hover{ background:hsl(var(--sem-err)); }
+
+  /* ═══ 报错卡光效: 完全仿照任务卡的光效系统 ═══ */
+  /* ⚠ 报错卡圆角28px, 光效圆角必须匹配, 且光效层必须完整覆盖整个卡片右侧 */
+  .error-glow{
+    position:absolute; right:0; top:0; bottom:0; width:0;
+    pointer-events:none; z-index:1;
+   /* 统一层级(2026-09-11): 光 z1 < 内容 z2, 光永远压在文字/按钮之下 */
+    background:linear-gradient(270deg,
+      hsl(var(--glow-hsl, var(--glow-task)) / 1) 0%,
+      hsl(var(--glow-hsl, var(--glow-task)) / .6) 55%,
+      hsl(var(--glow-hsl, var(--glow-task)) / 0) 100%);
+    border-top-right-radius:28px; border-bottom-right-radius:28px;
+    opacity:0;
+  }
+  .error-bright{
+    position:absolute; right:0; top:0; bottom:0; width:3px;
+    pointer-events:none; z-index:1;
+   /* 同层, DOM 在后自然盖光带 */
+    background:linear-gradient(180deg, transparent, hsl(var(--glow-hsl, var(--glow-task)) / 1), transparent);
+    border-top-right-radius:28px; border-bottom-right-radius:28px;
+    opacity:0;
+  }
+  /* 报错卡宽 300(同任务卡) → 光带峰宽 44px(同任务卡比例) */
+  @keyframes errorGlowSweep{
+    0%   { opacity:0; width:0px; }
+    16%  { opacity:1; width:44px; }
+    40%  { opacity:1; width:44px; }
+    55%  { opacity:0.5; width:18px; }
+    100% { opacity:0; width:0px; }
+  }
+  .error-glow.glow{ animation:errorGlowSweep var(--dur, .6s) var(--ease-out) forwards; }
+  @keyframes errorBrightSweep{
+    0%   { opacity:0; }
+    16%  { opacity:0.95; }
+    40%  { opacity:0.95; }
+    55%  { opacity:0.3; }
+    100% { opacity:0; }
+  }
+  .error-bright.glow{ animation:errorBrightSweep var(--dur, .6s) var(--ease-out) forwards; }
+
+  /* 报错卡预告光: 鼠标在报错卡右侧边缘时, 右缘跟着渐亮(预告要展开详情) */
+  .error-edgehint{
+    position:absolute; top:0; bottom:0; right:0; width:0;
+    pointer-events:none; z-index:1;
+   /* 统一层级: 与光带同层 */
+    background:linear-gradient(270deg,
+      hsl(var(--glow-hsl, var(--glow-task)) / .35) 0%,
+      hsl(var(--glow-hsl, var(--glow-task)) / 0) 100%);
+    opacity:0;
+    transition:opacity var(--m-fast) linear;
+    border-top-right-radius:28px; border-bottom-right-radius:28px;
+    clip-path:inset(0 0 0 0 round 0 28px 28px 0);  /* ⚠ 强制裁切到右侧圆角, 防止光效溢出 */
+  }
+  .error-edgehint::after{
+    content:''; position:absolute; top:0; bottom:0; right:0; width:3px;
+    background:linear-gradient(180deg, transparent, hsl(var(--glow-hsl, var(--glow-task)) / .6), transparent);
+    border-top-right-radius:28px; border-bottom-right-radius:28px;
+  }
+

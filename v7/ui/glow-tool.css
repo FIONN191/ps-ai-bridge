@@ -1,0 +1,17 @@
+.glow-editor{width:min(850px,94vw);max-height:92vh;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--bg-solid);color:var(--tx);box-shadow:var(--shadow-heavy);backdrop-filter:blur(var(--blur));overflow:auto}
+.glow-editor::backdrop{background:var(--bg);backdrop-filter:blur(5px)}
+.glow-editor h2{margin:0 0 8px;font-size:17px}
+.glow-editor .glow-help,.glow-editor .glow-status{font-size:12px;line-height:1.65;opacity:0.75}
+.glow-comparison{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.glow-comparison figure{margin:0;min-width:0;text-align:center;font-size:12px}
+.glow-comparison img{display:block;width:100%;height:min(38vh,340px);object-fit:contain;background:var(--surface-faint);border-radius:8px;margin-bottom:5px}
+.glow-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px}
+.pd-body .glow-controls{grid-template-columns:1fr}
+.glow-controls label{display:block;font-size:12px;min-width:0}
+.glow-controls input[type=range]{width:100%}
+.glow-controls select{width:100%;margin-top:5px}
+.glow-controls small{display:block;opacity:0.75;line-height:1.5}
+.glow-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.glow-editor button{cursor:pointer;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;padding:7px 12px}
+.glow-editor button:disabled{opacity:0.5;cursor:wait}
+@media(max-width:520px){.glow-controls{grid-template-columns:1fr}.glow-editor{padding:12px}.glow-comparison img{height:24vh}}

@@ -1,0 +1,52 @@
+<!DOCTYPE html><html><head>
+  <meta charset="utf-8">
+  <title>WASM 加载测试</title>
+</head>
+<body>
+  <h1>WASM 加载测试</h1>
+  <pre id="log"></pre>
+  <script type="module">
+    const log = document.getElementById('log');
+    function L(s) { log.textContent += s + '\n'; console.log(s); }
+
+    try {
+      L('1. 加载 vision_bundle.js...');
+      const { FaceLandmarker, FilesetResolver } = await import('/ui-pure/vendor/mediapipe-tasks-vision-1.1.1/vision_bundle.js');
+      L('2. vision_bundle.js 加载成功');
+
+      L('3. 初始化 FilesetResolver...');
+      const vision = await FilesetResolver.forVisionTasks('/ui-pure/vendor/mediapipe-tasks-vision-1.1.1/wasm');
+      L('4. FilesetResolver 初始化成功');
+
+      L('5. 创建 FaceLandmarker...');
+      const landmarker = await FaceLandmarker.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: '/ui-pure/vendor/mediapipe-tasks-vision-1.1.1/face_landmarker.task', delegate: 'CPU' },
+        runningMode: 'IMAGE',
+        numFaces: 4,
+        minFaceDetectionConfidence: 0.3,
+        minFacePresenceConfidence: 0.3,
+        minTrackingConfidence: 0.3,
+      });
+      L('6. FaceLandmarker 创建成功');
+
+      // 创建一个测试图（纯色 100x100）
+      const canvas = document.createElement('canvas');
+      canvas.width = 100;
+      canvas.height = 100;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#888';
+      ctx.fillRect(0, 0, 100, 100);
+
+      L('7. 检测测试图...');
+      const res = landmarker.detect(canvas);
+      L('8. 检测完成，人脸数: ' + (res.faceLandmarks?.length || 0));
+
+      L('\n✅ WASM 加载测试通过');
+    } catch (e) {
+      L('\n❌ 出错: ' + e.message);
+      L('Stack: ' + e.stack);
+    }
+  </script>
+
+
+</body></html>

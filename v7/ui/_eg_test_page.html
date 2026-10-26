@@ -1,0 +1,30 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>眼神调整 Worker 测试</title>
+<script>
+let worker, seq = 0;
+const waiting = new Map();
+function ensure() {
+  if (worker) return worker;
+  worker = new Worker('/ui-pure/eyegaze-worker.js');
+  worker.onmessage = ev => {
+    const m = ev.data;
+    if (m.progress) { console.log('进度', m.progress); return; }
+    const w = waiting.get(m.id);
+    if (!w) return;
+    waiting.delete(m.id);
+    w(m);
+  };
+  worker.onmessageerror = e => console.log('消息解不开', e);
+  worker.onerror = e => { console.log('worker 出错', e.message, e.filename, e.lineno); for (const w of waiting.values()) w({ ok: false, error: 'worker 出错：' + (e.message || e) }); waiting.clear(); };
+  return worker;
+}
+function ask(msg, transfer) { return new Promise(res => { const id = ++seq; waiting.set(id, res); ensure().postMessage(Object.assign({ id }, msg), transfer || []); }); }
+window.warm = async () => { const t0 = performance.now(); const r = await Promise.race([ask({ cmd: 'warm' }), new Promise(res => setTimeout(() => res({ ok: false, error: '60 秒没回' }), 90000))]); return { ok: r.ok, error: r.error, ms: Math.round(performance.now() - t0) }; };
+window.runCase = async (src, up, ov, key) => {
+  const bytes = await (await fetch(src)).arrayBuffer();
+  const t0 = performance.now();
+  const r = await ask({ cmd: 'prepare', bytes, up, ov: ov || null, key, wantLandmarks: true }, [bytes]);
+  r.ms = Math.round(performance.now() - t0);
+  return r;
+};
+</script></head><body></body></html>

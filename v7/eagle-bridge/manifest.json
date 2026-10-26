@@ -1,0 +1,11 @@
+{
+  "id": "WHEELCHAIRV7ARCHIVE",
+  "version": "1.0.0",
+  "platform": "all",
+  "arch": "all",
+  "name": "V7 Eagle Archive Bridge",
+  "logo": "/logo.png",
+  "keywords": ["V7", "archive"],
+  "devTools": false,
+  "main": { "url": "index.html", "width": 680, "height": 520, "minWidth": 500, "minHeight": 400, "resizable": true, "multiple": false, "runAfterInstall": false }
+}

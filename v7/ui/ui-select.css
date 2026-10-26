@@ -1,0 +1,60 @@
+/* ═══ 标准下拉框（ui-select.js）的样式 ═══
+   2026-10-20 从 ui.html 的 <style> 里整段搬出来：剪影编辑器等子窗口也要用同一个下拉框（原来那边是系统原生下拉，
+   选项面板是系统画的一块白纸，跟界面不搭）。主窗口和子窗口都 <link> 这个文件。
+   ⭐ 同日：聚焦框 / 当前项那条光带改用主题色（--accent-hsl）。原来用的是三级光效色（--glow-detail 紫），
+     用户改主题色时下拉框不跟着变。
+   ⚠ 跟具体位置有关的尺寸（设置页小号字段、AI 字段、生成卡算力行…）还留在 ui.html，这里只放通用的。 */
+/* ── 标准下拉框(ui-select.js) ──
+   原生 <select> 藏起来当值的载体; 触发器长得跟输入框一样; 面板跟卡片同款毛玻璃。
+   当前项左侧一条光带(.z-selglow 同款语言), 悬停极淡底。 */
+select.uisel-native{position:absolute !important; width:1px !important; height:1px !important; opacity:0 !important; pointer-events:none !important; overflow:hidden !important; clip:rect(0 0 0 0);}
+.uisel-trigger{
+  display:flex; align-items:center; justify-content:space-between; gap:6px;
+  width:100%; box-sizing:border-box; height:32px; min-height:32px; padding:0 9px;
+  background:rgba(255,255,255,.07); border:1px solid var(--line-strong); border-radius:8px;
+  color:var(--tx); font-size:12px; font-family:inherit; text-align:left; cursor:pointer;
+  transition:border-color var(--m-fast), background var(--m-fast);
+}
+.uisel-trigger:hover{background:rgba(255,255,255,.11);}
+.uisel-trigger:focus{outline:none; border-color:hsl(var(--accent-hsl, 211 100% 68%) / .8);}
+.uisel-trigger.open{border-color:hsl(var(--accent-hsl, 211 100% 68%) / .8); background:rgba(255,255,255,.1);}
+.uisel-trigger:disabled{opacity:0.5; cursor:not-allowed;}
+.uisel-label{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+/* ⚠ 展开时靠 rotate(180deg) 翻转 —— SVG 同样能翻，不用换图形。
+   加 flex 是因为 SVG 按基线摆会偏上（docs/14 5.6.4）。 */
+.uisel-arrow{flex:0 0 auto; font-size:11px; color:var(--tx2);
+  display:inline-flex; align-items:center; justify-content:center;
+  transition:transform var(--m-fast) var(--ease-out);}
+.uisel-trigger.open .uisel-arrow{transform:rotate(180deg);}
+.uisel-panel{
+  position:fixed; z-index:var(--z-menu,9500); overflow-y:auto; padding:5px;
+  /* ⚠⚠⚠ 2026-10-07 用户实测："现在所有的下拉框不跟随着我们的卡片颜色在动。"（他点名是"系统层级的问题"）
+     真因：这里原来是【写死的】rgba(18,21,28,.96)（一个暗蓝灰）——
+       主题色/卡片底色怎么改它都不动。而它 Portal 到 body 上，
+       又拿不到卡片的上下文 ⇒ 看着就是"一块跟界面没关系的外来面板"。
+     ⇒ 改成跟卡片同一套口径：底用 --bg-solid（用户选的颜色本体），
+       再叠一层 hsl(var(--card-h) …) 的暗遮罩（跟卡片底盘/顶带那套一致，见 engines-card.css 的说明）。
+       --card-h 只含色相+饱和、亮度各处自留，所以这里写 11%（比卡片的 8% 略深，面板要压住下面的内容）。
+     ⚠ 别改回写死的颜色 —— 那是这个 bug 的本身。 */
+  /* 2026-10-22（docs/263 第 20 条）：.97→.93 的渐变改平铺（取 .95），面板整块就是实色 */
+  background:linear-gradient(hsl(var(--card-h,220 28%) 11% / .95), hsl(var(--card-h,220 28%) 11% / .95)), var(--bg-solid);
+  backdrop-filter:blur(24px) saturate(1.5); -webkit-backdrop-filter:blur(24px) saturate(1.5);
+  border:1px solid var(--line-strong); border-radius:12px; box-shadow:var(--shadow-heavy);
+  scrollbar-width:none;
+  animation:uiselIn var(--m-fast) var(--ease-out);
+}
+@keyframes uiselIn{from{opacity:0; transform:translateY(-4px);} to{opacity:1; transform:none;}}
+.uisel-panel.up{animation-name:uiselInUp;}
+@keyframes uiselInUp{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+.uisel-item{
+  position:relative; padding:6px 9px 6px 12px; border-radius:8px; font-size:12px; color:var(--tx);
+  cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.uisel-item::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:34%; border-radius:8px; pointer-events:none;
+  background:linear-gradient(90deg, hsl(var(--accent-hsl, 211 100% 68%) / .55), transparent);
+  opacity:0; transition:opacity var(--m-fast);
+}
+.uisel-item.hover{background:rgba(255,255,255,.06);}
+.uisel-item.cur::before{opacity:1;}
+.uisel-item.off{opacity:0.3; cursor:not-allowed;}

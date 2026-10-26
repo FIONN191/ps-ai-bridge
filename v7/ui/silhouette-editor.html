@@ -1,0 +1,1177 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8">
+<title>剪影素材编辑器</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="ui-select.css">
+<link rel="stylesheet" href="icons.css">
+<style nonce="__TAURI_STYLE_NONCE__">
+  /* ⚠ 这个窗口盖满整个显示器, 且是透明置顶窗口(同 L4 / 大图)。
+     窗口里不放业务判断 —— 主窗口把整包数据送过来, 这边只管摆, 保存再送回去。 */
+  *{box-sizing:border-box;margin:0;padding:0;}
+  /* ⚠ --tx / --tx2 / --accent / --line 来自 tokens.css（head 里先引入）。
+     下面只留这个窗口【特有】的两个：
+       --bg    这个窗口的底比主窗口实得多(.94 vs .55) —— 它是全屏工作区，不是浮在 PS 上的面板
+       --line2 强描边。⚠ 等价于 tokens 里的 --line-strong，值也一样，
+               但这个文件里用了 20 多处，这轮不顺手改名（改名属于重构，不在颜色收敛的范围内）。 */
+  :root{
+    --bg:hsl(var(--card-h, 220 28%) 8% / .94);
+    --panel:rgba(255,255,255,.05);
+    --line2:rgba(255,255,255,.18);
+  }
+  html,body{width:100%;height:100%;overflow:hidden;background:transparent;
+    font-family:'OPPO Sans',"Microsoft YaHei","PingFang SC",-apple-system,sans-serif;color:var(--tx);
+    user-select:none;-webkit-user-select:none;}
+  #shade{position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(6,8,12,.86);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+  /* ⚠ 不能写 inset:0 —— UXP/部分内核下会缩成左上角(记忆里踩过)。四边全写。 */
+
+  #wrap{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;flex-direction:column;padding:26px;gap:14px;}
+  #top{display:flex;align-items:center;gap:12px;flex:0 0 auto;}
+  #top h1{font-size:17px;font-weight:600;}
+  #top .sub{font-size:12px;color:var(--tx2);}
+  #top .sp{flex:1;}
+
+  #main{flex:1;display:flex;gap:14px;min-height:0;}
+  .col{background:var(--bg);border:1px solid var(--line);border-radius:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;min-height:0;}
+  #libCol{width:250px;flex:0 0 250px;}
+  #canvasCol{flex:1;min-width:0;align-items:center;justify-content:center;}
+  #propCol{width:270px;flex:0 0 270px;}
+  .col-head{padding:14px 16px 10px;font-size:13px;font-weight:600;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:8px;}
+  .col-head .n{color:var(--tx2);font-weight:400;font-size:11px;}
+  .col-body{flex:1;overflow-y:auto;padding:10px;min-height:0;}
+  .col-foot{padding:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;}
+
+  /* 素材库 */
+  .lib-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;cursor:pointer;
+    border:1px solid transparent;}
+  .lib-item:hover{background:rgba(255,255,255,.07);}
+  .lib-item.sel{background:hsl(var(--accent-hsl, 211 100% 68%) / .18);border-color:hsl(var(--accent-hsl, 211 100% 68%) / .45);}
+  .lib-item .th{width:30px;height:30px;flex:0 0 30px;border-radius:6px;background:rgba(255,255,255,.06);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .lib-item .th img{max-width:100%;max-height:100%;object-fit:contain;}
+  .lib-item .nm{flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .lib-item .ct{font-size:10px;color:var(--tx2);}
+  .lib-item.hidden-asset .nm{opacity:.4;text-decoration:line-through;}
+
+  /* 画布 */
+  #stageWrap{position:relative;flex:1;display:flex;align-items:center;justify-content:center;width:100%;padding:16px;min-height:0;}
+  #stage{position:relative;background:
+      linear-gradient(45deg,rgba(255,255,255,.035) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.035) 75%),
+      linear-gradient(45deg,rgba(255,255,255,.035) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.035) 75%);
+    background-size:22px 22px;background-position:0 0,11px 11px;
+    border:1px solid var(--line2);border-radius:14px;overflow:hidden;}
+  .ast{position:absolute;cursor:move;}
+  .ast img{width:100%;height:100%;object-fit:fill;display:block;pointer-events:none;-webkit-user-drag:none;}
+  .ast.sel{outline:2px solid var(--accent);outline-offset:1px;}
+  .ast .hd{position:absolute;width:11px;height:11px;background:var(--accent);border:2px solid #0d1017;
+    border-radius:50%;}
+  .ast .hd.br{right:-6px;bottom:-6px;cursor:nwse-resize;}
+  #stage .guide{position:absolute;background:hsl(var(--accent-hsl, 211 100% 68%) / .55);pointer-events:none;}
+
+  .cbar{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);flex:0 0 auto;
+    align-items:center;justify-content:center;width:100%;}
+
+  /* 属性 */
+  .prow{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+  .prow label{font-size:11px;color:var(--tx2);}
+  .prow input[type=text],.prow input[type=number]{background:rgba(255,255,255,.07);border:1px solid var(--line2);
+    border-radius:8px;color:var(--tx);padding:7px 9px;font-size:12px;font-family:inherit;outline:none;}
+  .prow input:focus{border-color:var(--accent);}
+  .prow .two{display:flex;gap:8px;}
+  .prow .two input{flex:1;min-width:0;}
+  .maskprev{width:100%;height:90px;border:1px dashed var(--line2);border-radius:8px;
+    display:flex;align-items:center;justify-content:center;overflow:hidden;background:rgba(0,0,0,.25);}
+  .maskprev img{max-width:100%;max-height:100%;object-fit:contain;}
+  .hintbox{font-size:11px;color:var(--tx2);line-height:1.65;background:rgba(255,255,255,.04);
+    border:1px solid var(--line);border-radius:10px;padding:10px 11px;white-space:pre-wrap;}
+
+  /* ⚠ inline-flex + gap：按钮里是「图标 + 文字」两个 span，
+     靠空格分隔的话 SVG 和汉字基线对不齐，会一高一低（2026-09-14 图标改造）。 */
+  .btn{background:rgba(255,255,255,.12);border:1px solid var(--line2);border-radius:10px;color:var(--tx);
+    padding:8px 13px;font-size:12px;font-family:inherit;cursor:pointer;transition:background .14s,transform .12s;
+    display:inline-flex;align-items:center;justify-content:center;gap:5px;}
+  .btn:hover{background:rgba(255,255,255,.2);}
+  .btn:active{transform:scale(.97);}
+  .btn.pri{background:hsl(var(--accent-hsl, 211 100% 68%) / .85);border-color:hsl(var(--accent-hsl, 211 100% 68%) / .95);color:#08121f;font-weight:600;}
+  .btn.pri:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / 1);}
+  .btn.danger{background:rgba(226,90,90,.22);border-color:rgba(226,90,90,.5);}
+  .btn.danger:hover{background:rgba(226,90,90,.36);}
+  .btn:disabled{opacity:.35;cursor:not-allowed;}
+  .btn.wide{width:100%;}
+
+  #bottom{flex:0 0 auto;display:flex;gap:10px;justify-content:flex-end;align-items:center;}
+  #status{flex:1;font-size:12px;color:var(--tx2);}
+
+  /* 导入向导 */
+  #wiz{position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(6,8,12,.8);
+    display:none;align-items:center;justify-content:center;z-index:50;}
+  #wiz.on{display:flex;}
+  #wizBox{width:620px;max-height:86%;overflow-y:auto;background:var(--bg);border:1px solid var(--line2);
+    border-radius:20px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.6);}
+  #wizBox h2{font-size:15px;margin-bottom:10px;}
+  #wizBox .step{display:flex;gap:12px;margin:14px 0;align-items:flex-start;}
+  #wizBox .num{width:20px;height:20px;flex:0 0 20px;border-radius:50%;background:hsl(var(--accent-hsl, 211 100% 68%) / .25);
+    border:1px solid hsl(var(--accent-hsl, 211 100% 68%) / .6);font-size:11px;display:flex;align-items:center;justify-content:center;}
+  #wizBox .stx{font-size:12px;line-height:1.75;color:var(--tx2);}
+  #wizBox .stx b{color:var(--tx);}
+  .drop{border:1px dashed var(--line2);border-radius:12px;padding:14px;text-align:center;font-size:12px;
+    color:var(--tx2);cursor:pointer;margin-top:6px;}
+  .drop:hover{border-color:var(--accent);color:var(--tx);}
+  .drop.has{border-style:solid;border-color:hsl(var(--accent-hsl, 211 100% 68%) / .6);color:var(--tx);}
+  .wizrow{display:flex;gap:14px;margin-top:6px;}
+  .wizrow > div{flex:1;}
+  #wizWarn{font-size:11px;color:#ffcf87;line-height:1.7;margin-top:10px;display:none;}
+  #wizBtns{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
+
+  /* ── 预设管理（2026-10-15）──
+     第四栏：按组看预设、挪组、改名、复制、删除；左边素材库底下多两项「未分类」「最近删除」。
+     ⚠ 改动只在本窗口暂存，点保存才由主窗口一次写库（同素材那套边界）。 */
+  #presetCol{width:340px;flex:0 0 340px;}
+  .pc-tools{padding:10px 10px 8px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px;flex:0 0 auto;}
+  .pc-search{width:100%;background:rgba(255,255,255,.07);border:1px solid var(--line2);border-radius:8px;color:var(--tx);
+    padding:7px 9px;font-size:12px;font-family:inherit;outline:none;user-select:text;-webkit-user-select:text;}
+  .pc-search:focus{border-color:var(--accent);}
+  .pc-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-height:28px;}
+  .btn.sm{padding:5px 9px;font-size:11px;border-radius:8px;}
+  .pc-all{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx2);cursor:pointer;margin-right:2px;}
+  .pc-all input,.pc-row input[type=checkbox]{width:14px;height:14px;cursor:pointer;flex:0 0 auto;margin:0;}
+  .pc-move{background:rgba(255,255,255,.07);border:1px solid var(--line2);border-radius:8px;color:var(--tx);
+    padding:5px 6px;font-size:11px;font-family:inherit;outline:none;max-width:130px;color-scheme:dark;cursor:pointer;}
+  .pc-move:disabled{opacity:.35;cursor:not-allowed;}
+  /* 自制下拉（ui-select.js）的触发器：原生 select 藏起来后，看得见的是它 —— 尺寸跟原来的「移到…」一样，别撑满整行 */
+  .pc-move+.uisel-trigger{width:auto;max-width:130px;min-height:0;flex:0 1 auto;padding:5px 6px;font-size:11px;background:rgba(255,255,255,.07);border-color:var(--line2);}
+  .pc-row{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:8px;border:1px solid transparent;cursor:grab;}
+  .pc-row:hover{background:rgba(255,255,255,.06);}
+  .pc-row.on{background:hsl(var(--accent-hsl, 211 100% 68%) / .14);border-color:hsl(var(--accent-hsl, 211 100% 68%) / .35);}
+  .pc-row.locked{cursor:default;}
+  .pc-row.locked .t{opacity:.55;}
+  .pc-row .t{flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pc-row .star{color:#ffd66b;font-size:11px;flex:0 0 auto;}
+  .pc-tag{font-size:10px;padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.08);color:var(--tx2);flex:0 0 auto;white-space:nowrap;}
+  .pc-tag.new{background:rgba(120,210,140,.18);color:#9fe0ae;}
+  .pc-tag.del{background:rgba(226,90,90,.22);color:#ffb8b8;}
+  .pc-tag.chg{background:hsl(var(--accent-hsl, 211 100% 68%) / .22);color:var(--tx);}
+  .pc-ren{flex:1;min-width:0;background:rgba(255,255,255,.1);border:1px solid var(--accent);border-radius:6px;color:var(--tx);
+    padding:3px 6px;font-size:12px;font-family:inherit;outline:none;user-select:text;-webkit-user-select:text;}
+  .pc-hint{font-size:11px;color:var(--tx2);line-height:1.6;}
+  .lib-sep{height:1px;background:var(--line);margin:8px 4px;}
+  .lib-item.pseudo .th{font-size:15px;}
+  /* ⚠ 不能叫 .drop —— 导入向导的选图框早就用了 .drop（带 padding/居中/虚线框），撞名会把整行撑高、内容挤到中间（截图抓到过） */
+  .lib-item.pc-target,.ast.pc-target{background:hsl(var(--accent-hsl, 211 100% 68%) / .3);border-color:var(--accent);}
+  .ast.pc-target{outline:2px dashed var(--accent);outline-offset:2px;}
+  #pcGhost{position:fixed;left:0;top:0;pointer-events:none;z-index:60;padding:6px 10px;border-radius:8px;display:none;
+    background:hsl(var(--accent-hsl, 211 100% 68%) / .92);color:#08121f;font-size:12px;font-weight:600;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);white-space:nowrap;}
+</style>
+</head>
+<body>
+<div id="shade"></div>
+<div id="wrap">
+  <div id="top">
+    <h1>剪影素材编辑器</h1>
+    <span class="sub" id="topSub">拖动摆位 · 右下角拖动缩放 · 右侧改名字和图标 · 「预设」一栏管每个组里的预设</span>
+    <span class="sp"></span>
+    <button class="btn" id="btnHelp">怎么做素材？</button>
+    <!-- 保命出口: 这个窗口盖满整块屏幕, 必须永远有一个关得掉的按钮 -->
+    <button class="btn danger" id="btnEsc" title="立刻关掉这个窗口（不保存）"><span data-icon-static="close" data-icon-size="13">✕</span><span>关闭</span></button>
+  </div>
+
+  <div id="main">
+    <div class="col" id="libCol">
+      <div class="col-head">素材库 <span class="n" id="libCount"></span></div>
+      <div class="col-body" id="libBody"></div>
+      <div class="col-foot">
+        <button class="btn wide pri" id="btnAdd">＋ 导入素材（一对图）</button>
+        <button class="btn wide" id="btnExport" title="先保存当前摆位，再把整套素材导出成一个文件，然后关闭本窗口。导出路径会显示在主面板上。"><span data-icon-static="arrowUp" data-icon-size="13">↑</span><span>保存并整套导出</span></button>
+        <button class="btn wide" id="btnReset" title="把内置那 17 块人体重新切一次，摆回出厂位置。你自己加的素材不动。"><span data-icon-static="revert" data-icon-size="13">↺</span><span>恢复内置人体摆位</span></button>
+      </div>
+    </div>
+
+    <div class="col" id="canvasCol">
+      <div id="stageWrap"><div id="stage"></div></div>
+      <div class="cbar">
+        <button class="btn" id="btnFit">回到全景</button>
+        <button class="btn" id="btnTidy">自动整理</button>
+        <button class="btn" id="btnFront">置顶</button>
+        <button class="btn" id="btnBack">置底</button>
+      </div>
+    </div>
+
+    <div class="col" id="presetCol">
+      <div class="col-head"><span id="pcTitle">预设</span> <span class="n" id="pcCount"></span></div>
+      <div class="pc-tools">
+        <input type="text" class="pc-search" id="pcSearch" placeholder="搜预设名字（所有组一起搜）">
+        <div class="pc-bar" id="pcBar"></div>
+      </div>
+      <div class="col-body" id="pcBody"></div>
+      <div class="col-foot"><div class="pc-hint" id="pcHint">勾选后用上面的按钮，或者直接把预设拖到左边的组上。双击名字改名。改完点右下角「保存」才算数。</div></div>
+    </div>
+
+    <div class="col" id="propCol">
+      <div class="col-head">属性</div>
+      <div class="col-body" id="propBody">
+        <div class="hintbox">左边点一个素材，或者在画布上点它。</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="bottom">
+    <div id="status"></div>
+    <button class="btn" id="btnCancel">取消</button>
+    <button class="btn pri" id="btnSave">保存</button>
+  </div>
+</div>
+
+<div id="pcGhost"></div>
+
+<!-- 导入向导 -->
+<div id="wiz">
+  <div id="wizBox">
+    <h2>做一个剪影素材</h2>
+    <div class="step"><div class="num">1</div><div class="stx">
+      在 <b>Photoshop</b> 里新建一个文档，把你想要的东西画出来（一个头、一只手、一把剑都行）。<br>
+      <b>背景必须是透明的</b> —— 别留白底。存成 <b>PNG</b>。这是「<b>显示图</b>」，就是你在剪影上看到的那一层。
+    </div></div>
+    <div class="step"><div class="num">2</div><div class="stx">
+      <b>不要关文档</b>，新建一个图层，把<b>想让人点得到的范围</b>整个涂上颜色（什么颜色都行，纯色就好）。<br>
+      把显示图那层<b>关掉</b>，只留这个色块，再存一张同样大小的 PNG。这是「<b>选区图</b>」。
+    </div></div>
+    <div class="step"><div class="num">3</div><div class="stx">
+      两张图<b>尺寸必须一样</b>。下面分别选进来，起个名字配个图标就行了。<br>
+      <span style="color:#8fd4a0;">小技巧：选区图可以比显示图涂得胖一点，点起来更好点。</span>
+    </div></div>
+
+    <div class="wizrow">
+      <div>
+        <div style="font-size:11px;color:var(--tx2);margin-bottom:4px;">显示图（透明底）</div>
+        <div class="drop" id="dropDisp">点这里选图</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--tx2);margin-bottom:4px;">选区图（涂色块）</div>
+        <div class="drop" id="dropMask">点这里选图</div>
+      </div>
+    </div>
+    <div class="wizrow">
+      <div class="prow" style="margin-top:12px;">
+        <label>名字（也是这个部位的分类名）</label>
+        <input type="text" id="wizName" placeholder="比如：翅膀">
+      </div>
+      <div class="prow" style="margin-top:12px;">
+        <label>图标（一个 emoji）</label>
+        <input type="text" id="wizIcon" placeholder="图标" maxlength="4">
+      </div>
+    </div>
+    <div id="wizWarn"></div>
+    <div id="wizBtns">
+      <button class="btn" id="wizCancel">取消</button>
+      <button class="btn pri" id="wizOk" disabled="">加进来</button>
+    </div>
+  </div>
+</div>
+
+<script src="reload-guard.js"></script>
+<script src="icons.js"></script>
+<!-- ⭐ 2026-10-20：「移到…」下拉框换成跟主窗口同一个自制下拉（原来是系统原生下拉，选项面板是系统画的白纸） -->
+<script src="ui-select.js"></script>
+<script src="tauri-child-adapter.js"></script>
+<script>
+// 图标：把 HTML 里 [data-icon-static] 的位置渲染成 SVG（2026-09-14）
+try{ if(window.ICON) ICON.mountStatic(); }catch(_){ }
+
+(function(){
+  'use strict';
+
+  // ── 页面出错必须看得见 ──
+  // ⚠ 这个窗口是独立子窗口，没有控制台转发(主窗口那套 console-message 钩子够不到这儿)。
+  //   一抛异常就是"界面空着但一个字的错都没有" —— 正是 CLAUDE.md 铁律 16 说的静默失效。
+  //   2026-09-11 就栽过一次(一个变量名把 esc 函数覆盖了，素材库整个空)。
+  //   所以：任何未捕获的错误都直接糊到状态栏上，并把详情送回 Rust 控制台。
+  function reportErr(where, err){
+    var msg = '[编辑器] ' + where + ': ' + (err && (err.stack || err.message) || err);
+    try { console.error(msg); } catch(_){}
+    try {
+      if (window.__TAURI__ && window.__TAURI__.core) window.__TAURI__.core.invoke('debug_log',{message:msg});
+    } catch(_){}
+    var el = document.getElementById('status');
+    if (el) el.textContent = '⚠ 出错了：' + (err && err.message || err) + '（右上角 ✕ 可以关掉）';
+  }
+  window.addEventListener('error', function(e){ reportErr('未捕获异常', e.error || e.message); });
+  window.addEventListener('unhandledrejection', function(e){ reportErr('未处理的 Promise', e.reason); });
+
+  // ── 数据 ──
+  var assets = [];          // [{id,name,icon,x,y,w,h,z,display,mask,count,displayChanged,maskChanged,_new}]
+  // Metadata received from the main window.  It is echoed on every save so
+  // the main window can reject a result from an old account/editor session.
+  var editorMeta = {};
+  var sel = null;           // 选中的 id
+  // ⚠ 画布长宽比跟【主窗口传过来的】走, 绝不能写死成卡片的 300/400。
+  //   素材坐标是相对画布的百分比, 这边比例跟主窗口对不上, 你在编辑器里摆好的位置
+  //   回到剪影上就是歪的/拉伸的(2026-09-10 主窗口就栽在写死比例上)。
+  var ASPECT = 2/3;         // 兜底值 = V6 人体图 2000×3000
+
+  var stage = document.getElementById('stage');
+  var stageWrap = document.getElementById('stageWrap');
+  var libBody = document.getElementById('libBody');
+  var propBody = document.getElementById('propBody');
+  var statusEl = document.getElementById('status');
+
+  // ── 预设管理的数据（2026-10-15）──
+  // items 是本窗口的工作副本，每条 = 一条预设 + 它在这次编辑里的状态：
+  //   live 原样在库里 / copy 新复制（还没存）/ deleting 待删除 / trash 在「最近删除」里 /
+  //   restoring 待恢复 / purging 待彻底删除
+  // 保存时 buildPresetEdits() 拿它跟原值比，只回"改了什么"；主窗口 applyPresetEdits 一个事务写完。
+  var UNSORTED = '__unsorted';          // 主窗口会把真值送过来（payload.unsortedId）
+  var TRASH_VIEW = '__trash__';         // 只是本窗口的视图名，不是组
+  var items = [];
+  var groupSel = null;                  // 预设栏正在看哪个组（素材 id / UNSORTED / TRASH_VIEW）
+  var checked = {};                     // 勾选：key → true
+  var pcFilter = '';
+  var renaming = null;                  // 正在改名的那条的 key
+  var copySerial = 0;
+  var pcBody = document.getElementById('pcBody');
+  var pcBar = document.getElementById('pcBar');
+  var pcSearch = document.getElementById('pcSearch');
+  var pcGhost = document.getElementById('pcGhost');
+
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function setStatus(t){ statusEl.textContent = t || ''; }
+  function editorEnvelope(data){
+    var out = {};
+    Object.keys(editorMeta || {}).forEach(function(k){ out[k] = editorMeta[k]; });
+    Object.keys(data || {}).forEach(function(k){ out[k] = data[k]; });
+    return out;
+  }
+  function uid(){ return 'a_' + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4); }
+
+  // ── 画布尺寸: 保持 300:400, 尽量填满可用区 ──
+  function layoutStage(){
+    var r = stageWrap.getBoundingClientRect();
+    var availW = r.width - 32, availH = r.height - 32;
+    if (availW <= 0 || availH <= 0) return;
+    var w = availH * ASPECT, h = availH;
+    if (w > availW) { w = availW; h = availW / ASPECT; }
+    stage.style.width = Math.round(w) + 'px';
+    stage.style.height = Math.round(h) + 'px';
+    renderStage();
+  }
+  window.addEventListener('resize', layoutStage);
+
+  // ── 渲染 ──
+  function renderAll(){ renderLib(); renderStage(); renderProp(); renderPresets(); }
+
+  function renderLib(){
+    libBody.innerHTML = '';
+    // ⚠ 数量要把隐藏的分开报，否则"18 个"和画布上看到的对不上，用户会以为丢了
+    var hid = assets.filter(function(x){ return x.hidden; }).length;
+    document.getElementById('libCount').textContent =
+      assets.length + ' 个' + (hid ? ('（' + hid + ' 个已隐藏）') : '');
+    // 高亮跟着"正在看的组"走：在画布空白处点一下会取消选中素材，但预设栏还停在那个组上
+    var cur = sel || groupSel;
+    assets.slice().sort(function(a,b){return (b.z||0)-(a.z||0);}).forEach(function(a){
+      var d = document.createElement('div');
+      // .hidden-asset 的样式（名字划掉+变淡）早就写在 CSS 里了，一直没人用 —— 2026-09-14 接上
+      d.className = 'lib-item' + (a.id===cur ? ' sel' : '') + (a.hidden ? ' hidden-asset' : '');
+      d.dataset.group = a.id;            // 拖预设过来时靠它认"放进哪个组"
+      var n = groupCount(a.id);
+      d.innerHTML = '<div class="th"><img src="'+esc(a.display)+'"></div>' +
+                    '<div class="nm">'+esc((a.icon||'')+' '+a.name)+'</div>' +
+                    '<div class="ct">'+(n?n+'条':'')+'</div>';
+      d.addEventListener('click', function(){ sel = a.id; selectGroup(a.id); });
+      libBody.appendChild(d);
+    });
+    // 两个不是素材的"组"：没归属的预设、删掉还能找回来的预设。它们不上画布、没有属性。
+    var sep = document.createElement('div'); sep.className = 'lib-sep'; libBody.appendChild(sep);
+    [[UNSORTED, '', '未分类'], [TRASH_VIEW, '', '最近删除']].forEach(function(g){
+      var d = document.createElement('div');
+      d.className = 'lib-item pseudo' + (!sel && groupSel===g[0] ? ' sel' : '');
+      d.dataset.group = g[0];
+      var n = g[0]===TRASH_VIEW ? items.filter(inTrashView).length : groupCount(g[0]);
+      d.innerHTML = '<div class="th">'+g[1]+'</div><div class="nm">'+g[2]+'</div><div class="ct">'+(n?n+'条':'')+'</div>';
+      d.addEventListener('click', function(){ sel = null; selectGroup(g[0]); });
+      libBody.appendChild(d);
+    });
+  }
+
+  function renderStage(){
+    stage.innerHTML = '';
+    var sw = stage.clientWidth, sh = stage.clientHeight;
+    if (!sw || !sh) return;
+    assets.slice().sort(function(a,b){return (a.z||0)-(b.z||0);}).forEach(function(a){
+      var el = document.createElement('div');
+      el.className = 'ast' + (a.id===sel ? ' sel' : '');
+      el.dataset.id = a.id;
+      el.style.left   = (a.x*100)+'%';
+      el.style.top    = (a.y*100)+'%';
+      el.style.width  = (a.w*100)+'%';
+      el.style.height = (a.h*100)+'%';
+      el.style.zIndex = String(1+(a.z||0));
+      // ⚠ 隐藏的在【编辑器里】压成半透明，不是真藏起来 ——
+      //   真藏了用户就点不到它、没法取消隐藏（把退路堵死了）。
+      //   剪影卡那边才是真的不渲染。
+      if (a.hidden) el.style.opacity = '0.28';
+      var img = document.createElement('img');
+      img.src = a.display; img.draggable = false;
+      el.appendChild(img);
+      if (a.id===sel){
+        var hd = document.createElement('div');
+        hd.className = 'hd br';
+        el.appendChild(hd);
+      }
+      stage.appendChild(el);
+    });
+    // ⛔⛔ 这里【绝对不能】调 bindDrag()。
+    //   #stage 是常驻元素(只换 innerHTML)，每调一次就往它身上多挂一套 pointer 监听；
+    //   而 pointermove handler 里又会调 renderStage → 监听数【每动一下翻一倍】，
+    //   每个还都在重建 17 个带 dataURL 的 <img> → 拖一下就硬卡死，
+    //   窗口又是 3840×2160 全屏置顶，整个屏幕被一个卡死的窗口盖住、退都退不出去。
+    //   2026-09-11 实测踩到。bindDrag 现在只在启动时调一次(用事件委托，不依赖子元素)。
+  }
+
+  function renderProp(){
+    var a = byId(sel);
+    if (!a){ propBody.innerHTML = '<div class="hintbox">左边点一个素材，或者在画布上点它。</div>'; return; }
+    propBody.innerHTML =
+      '<div class="prow"><label>名字（分类名）</label><input type="text" id="pName" value="'+esc(a.name)+'"></div>' +
+      '<div class="prow"><label>图标</label><input type="text" id="pIcon" maxlength="4" value="'+esc(a.icon||'')+'"></div>' +
+      '<div class="prow"><label>位置 X / Y（%）</label><div class="two">' +
+        '<input type="number" id="pX" step="0.5" value="'+(a.x*100).toFixed(1)+'">' +
+        '<input type="number" id="pY" step="0.5" value="'+(a.y*100).toFixed(1)+'"></div></div>' +
+      '<div class="prow"><label>大小 宽 / 高（%）</label><div class="two">' +
+        '<input type="number" id="pW" step="0.5" value="'+(a.w*100).toFixed(1)+'">' +
+        '<input type="number" id="pH" step="0.5" value="'+(a.h*100).toFixed(1)+'"></div></div>' +
+      '<div class="prow"><label>层级（大的盖住小的）</label><input type="number" id="pZ" step="1" value="'+(a.z||0)+'"></div>' +
+      '<div class="prow"><label>选区图（能点的范围）</label><div class="maskprev"><img src="'+esc(a.mask)+'"></div></div>' +
+      (groupCount(a.id) ? '<div class="hintbox">这个部位下有 <b>'+groupCount(a.id)+'</b> 条预设（在「预设」一栏里管）。删掉它，预设不会丢，会转到「未分类」。</div>' : '') +
+      // ⭐ 隐藏（2026-09-14 用户要求）：不想在剪影上看到它，但又不想删。
+      //   ⚠ 和删除的区别必须写在界面上 —— 否则用户不知道该用哪个。
+      '<div class="prow" style="margin-top:12px;">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
+        '<input type="checkbox" id="pHidden"'+(a.hidden?' checked':'')+' style="width:15px;height:15px;cursor:pointer;">' +
+        '<span>在剪影上隐藏它</span></label>' +
+        '<div class="hintbox" style="margin-top:6px;">隐藏只是不显示，<b>数据和预设都还在</b>，随时能打开。<br>' +
+        '想彻底去掉才用下面的删除。</div>' +
+      '</div>' +
+      '<button class="btn wide danger" id="pDel" style="margin-top:6px;">删除这个素材</button>';
+
+    function bindNum(id, key, scale){
+      var el = document.getElementById(id);
+      el.addEventListener('input', function(){
+        var v = parseFloat(el.value);
+        if (isNaN(v)) return;
+        a[key] = scale ? v/100 : v;
+        renderStage(); renderLib();
+      });
+    }
+    document.getElementById('pName').addEventListener('input', function(){ a.name = this.value; renderLib(); });
+    document.getElementById('pIcon').addEventListener('input', function(){ a.icon = this.value; renderLib(); });
+    bindNum('pX','x',true); bindNum('pY','y',true); bindNum('pW','w',true); bindNum('pH','h',true);
+    bindNum('pZ','z',false);
+    document.getElementById('pHidden').addEventListener('change', function(){
+      a.hidden = this.checked;
+      // ⚠ 三处都要刷：画布(藏起来) / 列表(名字划掉) / 状态行(告诉他要保存)
+      renderStage(); renderLib();
+      setStatus(a.hidden ? ('已隐藏「'+a.name+'」（记得点保存）')
+                         : ('已显示「'+a.name+'」（记得点保存）'));
+    });
+    document.getElementById('pDel').addEventListener('click', function(){
+      var n = groupCount(a.id);
+      var msg = n ? ('删掉「'+a.name+'」？下面 '+n+' 条预设不会丢，会转到「未分类」。')
+                  : ('删掉「'+a.name+'」？');
+      if (!confirm(msg)) return;
+      assets = assets.filter(function(x){ return x.id !== a.id; });
+      // 它下面的预设现在算在「未分类」里（effCat 认不出这个组了），预设栏跟过去让用户看见它们去哪了
+      if (groupSel === a.id) groupSel = UNSORTED;
+      sel = null; renderAll(); setStatus('已删除 ' + a.name + '（记得点保存）');
+    });
+  }
+
+  function byId(id){ for (var i=0;i<assets.length;i++) if (assets[i].id===id) return assets[i]; return null; }
+
+  // ════════════════════════════════════════════════════════════
+  //  预设管理（2026-10-15 用户定：先做预设管理；「组」= 剪影部位）
+  //  ⚠ 跟素材一样：这里只暂存，保存时把"改了什么"送回主窗口，主窗口一个事务写库。
+  //  ⚠ 监听全部在 bindPresetUI() 里【只挂一次】（事件委托），渲染函数里绝不挂监听 ——
+  //    本窗口 2026-09-11 就因为渲染里重复挂监听，拖一下翻倍、整屏卡死退不出去。
+  // ════════════════════════════════════════════════════════════
+  function groupExists(id){ return id === UNSORTED || !!byId(id); }
+  // 组被删了（或者本来就认不出）的预设算在「未分类」里 —— 跟主窗口 deleteAsset 的处理一致
+  function effCat(it){ return groupExists(it.category) ? it.category : UNSORTED; }
+  // 能不能往里放预设：工具总入口 / 工具剪影点开是工具大卡，放进去就找不到了（主窗口送 presetTarget）
+  function isTarget(id){ if (id === UNSORTED) return true; var a = byId(id); return !!a && a.presetTarget !== false; }
+  function alive(it){ return it.state === 'live' || it.state === 'copy' || it.state === 'restoring'; }
+  function inTrashView(it){ return it.state === 'deleting' || it.state === 'trash' || it.state === 'purging'; }
+  function groupCount(id){ var n = 0; items.forEach(function(it){ if (alive(it) && effCat(it) === id) n++; }); return n; }
+  function byKey(k){ for (var i=0;i<items.length;i++) if (items[i].key === k) return items[i]; return null; }
+  function groupName(id){
+    if (id === UNSORTED) return '未分类';
+    var a = byId(id); return a ? ((a.icon ? a.icon + ' ' : '') + a.name) : '（已删的组）';
+  }
+  function clearChecks(){ checked = {}; renaming = null; }
+  function selectGroup(id){ groupSel = id; clearChecks(); renderAll(); }
+
+  function loadPresets(payload){
+    if (payload.unsortedId) UNSORTED = String(payload.unsortedId);
+    items = []; checked = {}; renaming = null; pcFilter = ''; pcSearch.value = '';
+    (Array.isArray(payload.presets) ? payload.presets : []).forEach(function(p){
+      items.push({ key:'p:'+p.id, id:p.id, title:String(p.title||''), origTitle:String(p.title||''),
+        category:p.category, origCategory:p.category, kind:p.kind||'prompt', locked:!!p.locked,
+        builtin:!!p.builtin, needsReview:!!p.needsReview, starred:!!p.starred, order:(typeof p.order==='number'?p.order:null),
+        preview:String(p.preview||''), updatedAt:String(p.updatedAt||''), state:'live' });
+    });
+    (Array.isArray(payload.trash) ? payload.trash : []).forEach(function(t){
+      items.push({ key:'t:'+t.id, id:t.id, title:String(t.title||''), origTitle:String(t.title||''),
+        category:t.fromCategory, origCategory:t.fromCategory, fromCategory:t.fromCategory, deletedAt:String(t.deletedAt||''),
+        preview:String(t.preview||''), state:'trash' });
+    });
+  }
+
+  // 当前这一栏显示哪些
+  function visibleItems(){
+    var list;
+    if (pcFilter) {
+      var f = pcFilter.toLowerCase();
+      var inTrash = groupSel === TRASH_VIEW;
+      list = items.filter(function(it){ return (inTrash ? inTrashView(it) : alive(it)) && it.title.toLowerCase().indexOf(f) >= 0; });
+    } else if (groupSel === TRASH_VIEW) list = items.filter(inTrashView);
+    else if (groupSel) list = items.filter(function(it){ return alive(it) && effCat(it) === groupSel; });
+    else list = [];
+    // 同主窗口 sortGroup：收藏在前 → 原排序 → 名字；回收站里新删的在前
+    return list.sort(function(a,b){
+      if (groupSel === TRASH_VIEW && !pcFilter) return String(b.deletedAt||'9').localeCompare(String(a.deletedAt||'9'));
+      if (!!a.starred !== !!b.starred) return a.starred ? -1 : 1;
+      var ao = a.order == null ? 1e9 : a.order, bo = b.order == null ? 1e9 : b.order;
+      if (ao !== bo) return ao - bo;
+      return a.title.localeCompare(b.title, 'zh');
+    });
+  }
+  function checkedVisible(){ return visibleItems().filter(function(it){ return checked[it.key]; }); }
+
+  function itemTags(it){
+    var t = [];
+    if (it.locked) t.push(['出厂·不能动', '']);
+    if (it.state === 'copy') t.push(['新复制', 'new']);
+    if (it.state === 'restoring') t.push(['恢复', 'new']);
+    if (it.state === 'deleting') t.push(['待删除', 'del']);
+    if (it.state === 'purging') t.push(['待彻底删除', 'del']);
+    if (it.state === 'live' && effCat(it) !== it.origCategory) t.push(['挪过来的', 'chg']);
+    if (it.state === 'live' && it.title !== it.origTitle) t.push(['改了名', 'chg']);
+    if (it.builtin) t.push(['内置', '']);
+    if (it.needsReview) t.push(['待验证', '']);
+    if (pcFilter && alive(it)) t.push([groupName(effCat(it)), '']);
+    if (it.state === 'trash') t.push(['原在 ' + groupName(it.fromCategory), '']);
+    return t;
+  }
+
+  function renderPresets(){
+    var title, hint = '';
+    var trashView = groupSel === TRASH_VIEW;
+    if (pcFilter) title = '搜「' + pcFilter + '」' + (trashView ? '（最近删除里）' : '');
+    else if (trashView) title = '最近删除';
+    else if (groupSel) title = groupName(groupSel);
+    else title = '预设';
+    var list = visibleItems();
+    document.getElementById('pcTitle').textContent = title;
+    document.getElementById('pcCount').textContent = groupSel || pcFilter ? (list.length + ' 条') : '';
+
+    // 工具条：普通组 = 全选 / 移到… / 改名 / 复制 / 删除；最近删除 = 全选 / 恢复 / 彻底删除
+    var on = list.filter(function(it){ return checked[it.key]; });
+    var movable = on.filter(function(it){ return alive(it) && !it.locked; });
+    var all = list.length && list.every(function(it){ return it.locked || checked[it.key]; }) && list.some(function(it){ return !it.locked; });
+    var bar = '<label class="pc-all"><input type="checkbox" data-pc="all"' + (all ? ' checked' : '') + (list.length ? '' : ' disabled') + '>全选</label>';
+    if (trashView) {
+      bar += '<button class="btn sm" data-pc="restore"' + (on.length ? '' : ' disabled') + '>恢复</button>' +
+             '<button class="btn sm danger" data-pc="purge"' + (on.some(function(it){ return it.state === 'trash'; }) ? '' : ' disabled') + '>彻底删除</button>';
+    } else {
+      var opts = '<option value="">移到…</option>';
+      assets.slice().sort(function(a,b){return (b.z||0)-(a.z||0);}).forEach(function(a){
+        if (isTarget(a.id)) opts += '<option value="' + esc(a.id) + '">' + esc((a.icon ? a.icon + ' ' : '') + a.name) + '</option>';
+      });
+      opts += '<option value="' + esc(UNSORTED) + '">未分类</option>';
+      bar += '<select class="pc-move" data-pc="move"' + (movable.length ? '' : ' disabled') + '>' + opts + '</select>' +
+             '<button class="btn sm" data-pc="rename"' + (movable.length === 1 ? '' : ' disabled') + '>改名</button>' +
+             '<button class="btn sm" data-pc="copy"' + (on.some(function(it){ return (it.state === 'live' || it.state === 'copy') && !it.locked; }) ? '' : ' disabled') + '>复制</button>' +
+             '<button class="btn sm danger" data-pc="del"' + (movable.length ? '' : ' disabled') + '>删除</button>';
+    }
+    pcBar.innerHTML = bar;
+
+    if (!groupSel && !pcFilter) hint = '左边点一个组（或者在画布上点一块），这里就列出它里面的预设。';
+    else if (!list.length) {
+      if (pcFilter) hint = '没搜到。';
+      else if (trashView) hint = '「最近删除」是空的。删掉的预设会在这里放 30 天（最多 200 条），随时能恢复。';
+      else if (!isTarget(groupSel)) hint = '这一块是工具剪影，点开是工具大卡，不放预设。';
+      else hint = '这个组里还没有预设。可以从别的组勾选几条「移到」这里，或者直接拖过来。';
+    }
+    if (hint) { pcBody.innerHTML = '<div class="hintbox">' + esc(hint) + '</div>'; return; }
+
+    var html = '';
+    list.forEach(function(it){
+      var tip = it.title + (it.preview ? '\n\n' + it.preview + (it.preview.length >= 200 ? '…' : '') : '');
+      if (it.state === 'trash' && it.deletedAt) tip += '\n\n删除于 ' + it.deletedAt.slice(0, 16).replace('T', ' ');
+      if (it.locked) tip += '\n\n出厂预设（工具用的），不能挪、不能删。';
+      html += '<div class="pc-row' + (checked[it.key] ? ' on' : '') + (it.locked ? ' locked' : '') + '" data-key="' + esc(it.key) + '" title="' + esc(tip) + '">' +
+        '<input type="checkbox" data-ck' + (checked[it.key] ? ' checked' : '') + (it.locked ? ' disabled' : '') + '>' +
+        (it.starred ? '<span class="star">★</span>' : '') +
+        (renaming === it.key
+          ? '<input type="text" class="pc-ren" id="pcRen" maxlength="120" value="' + esc(it.title) + '">'
+          : '<span class="t">' + esc(it.title || '未命名') + '</span>') +
+        itemTags(it).map(function(t){ return '<span class="pc-tag' + (t[1] ? ' ' + t[1] : '') + '">' + esc(t[0]) + '</span>'; }).join('') +
+        '</div>';
+    });
+    pcBody.innerHTML = html;
+    var ren = document.getElementById('pcRen');
+    if (ren) { ren.focus(); ren.select(); }
+  }
+
+  // ── 动作（全部只改 items，点保存才写库）──
+  function moveTo(list, target){
+    if (!isTarget(target)) return;
+    var n = 0;
+    list.forEach(function(it){ if (alive(it) && !it.locked && effCat(it) !== target) { it.category = target; n++; } });
+    clearChecks(); renderAll();
+    setStatus(n ? ('已把 ' + n + ' 条预设挪到「' + groupName(target) + '」（记得点保存）') : '它们本来就在「' + groupName(target) + '」里');
+  }
+  function copyItems(list){
+    var n = 0;
+    list.forEach(function(it){
+      if (it.locked || !(it.state === 'live' || it.state === 'copy')) return;
+      items.push({ key:'c:' + (++copySerial), sourceId: it.state === 'copy' ? it.sourceId : it.id,
+        title: it.title + ' 副本', origTitle: '', category: effCat(it), origCategory: null, kind: it.kind,
+        locked:false, builtin:false, needsReview: it.needsReview, starred:false, order:null, preview: it.preview, state:'copy' });
+      n++;
+    });
+    clearChecks(); renderAll();
+    setStatus(n ? ('复制了 ' + n + ' 条，名字后面带「副本」，双击能改（记得点保存）') : '');
+  }
+  function deleteItems(list){
+    var n = 0;
+    list.forEach(function(it){
+      if (it.locked || !alive(it)) return;
+      if (it.state === 'copy') { items.splice(items.indexOf(it), 1); n++; return; }   // 还没存的副本直接扔
+      if (it.state === 'restoring') { it.state = 'trash'; it.category = it.fromCategory; it.title = it.origTitle; n++; return; }
+      it.state = 'deleting'; n++;
+    });
+    clearChecks(); renderAll();
+    setStatus(n ? ('删了 ' + n + ' 条。保存后进「最近删除」，30 天内能恢复；保存前在「最近删除」里点恢复就撤回') : '');
+  }
+  function restoreItems(list){
+    var n = 0;
+    list.forEach(function(it){
+      if (it.state === 'deleting') { it.state = 'live'; n++; return; }        // 还没保存的删除 → 直接撤回
+      if (it.state === 'trash' || it.state === 'purging') {
+        it.state = 'restoring';
+        it.category = groupExists(it.fromCategory) && isTarget(it.fromCategory) ? it.fromCategory : UNSORTED;
+        n++;
+      }
+    });
+    clearChecks(); renderAll();
+    setStatus(n ? ('恢复了 ' + n + ' 条，回到原来的组（组没了就在「未分类」）。记得点保存') : '');
+  }
+  function purgeItems(list){
+    var t = list.filter(function(it){ return it.state === 'trash'; });
+    if (!t.length) return;
+    if (!confirm('彻底删除这 ' + t.length + ' 条？保存以后就再也找不回来了。')) return;
+    t.forEach(function(it){ it.state = 'purging'; });
+    clearChecks(); renderAll();
+    setStatus('标了 ' + t.length + ' 条彻底删除（保存后生效，保存前点恢复能撤回）');
+  }
+  function startRename(it){
+    if (!it || it.locked || !alive(it)) return;
+    renaming = it.key; renderPresets();
+  }
+  function finishRename(commit){
+    var it = byKey(renaming), el = document.getElementById('pcRen');
+    if (it && el && commit) {
+      var t = el.value.replace(/[\u0000-\u001f]/g, ' ').trim();
+      if (t) { it.title = t.slice(0, 120); setStatus('改名为「' + it.title + '」（记得点保存）'); }
+      else setStatus('名字不能空，没改');
+    }
+    // 跟别的动作一样做完就清勾选：改完名还勾着，下一个「复制/删除」会把它也带上（整链测试抓到过）
+    clearChecks(); renderAll();
+  }
+
+  // 保存时送回主窗口的改动清单（store 的 applyPresetEdits 认这个格式）
+  function buildPresetEdits(){
+    var e = { updates:[], copies:[], deletes:[], restores:[], purges:[] };
+    items.forEach(function(it){
+      if (it.state === 'live' && !it.locked) {
+        var u = { id: it.id, expectUpdatedAt: it.updatedAt }, ch = false;
+        var c = effCat(it);
+        if (c !== it.origCategory) { u.category = c; ch = true; }
+        var t = it.title.trim();
+        if (t && t !== it.origTitle) { u.title = t; ch = true; }
+        if (ch) e.updates.push(u);
+      } else if (it.state === 'copy') e.copies.push({ sourceId: it.sourceId, title: it.title, category: effCat(it) });
+      else if (it.state === 'deleting') e.deletes.push({ id: it.id, expectUpdatedAt: it.updatedAt });
+      else if (it.state === 'restoring') e.restores.push({ id: it.id, category: effCat(it), title: it.title });
+      else if (it.state === 'purging') e.purges.push(it.id);
+    });
+    return e;
+  }
+  function pendingPresetCount(){
+    var e = buildPresetEdits();
+    return e.updates.length + e.copies.length + e.deletes.length + e.restores.length + e.purges.length;
+  }
+
+  // 拖到哪个组上：左边素材库的一行，或画布上的一块
+  function dropGroupAt(x, y){
+    var el = document.elementFromPoint(x, y);
+    if (!el || !el.closest) return null;
+    var row = el.closest('.lib-item');
+    if (row && row.dataset.group) {
+      var g = row.dataset.group;
+      return (g === TRASH_VIEW || isTarget(g)) ? { id:g, el:row } : null;
+    }
+    var ast = el.closest('.ast');
+    if (ast && ast.dataset.id && isTarget(ast.dataset.id)) return { id:ast.dataset.id, el:ast };
+    return null;
+  }
+
+  var presetUIBound = false;
+  function bindPresetUI(){
+    if (presetUIBound) return;
+    presetUIBound = true;
+
+    pcSearch.addEventListener('input', function(){ pcFilter = pcSearch.value.trim(); clearChecks(); renderPresets(); });
+
+    // 工具条（每次渲染都换新按钮，所以挂在常驻的 #pcBar 上做委托）
+    pcBar.addEventListener('click', function(e){
+      var b = e.target.closest && e.target.closest('[data-pc]');
+      if (!b || b.disabled) return;
+      var act = b.dataset.pc, on = checkedVisible();
+      if (act === 'all') {
+        var want = b.checked;
+        checked = {};
+        if (want) visibleItems().forEach(function(it){ if (!it.locked) checked[it.key] = true; });
+        renderPresets(); return;
+      }
+      if (act === 'rename') { var one = on.filter(function(it){ return alive(it) && !it.locked; }); if (one.length === 1) startRename(one[0]); return; }
+      if (act === 'copy') return copyItems(on);
+      if (act === 'del') return deleteItems(on);
+      if (act === 'restore') return restoreItems(on);
+      if (act === 'purge') return purgeItems(on);
+    });
+    pcBar.addEventListener('change', function(e){
+      if (!e.target || e.target.dataset.pc !== 'move' || !e.target.value) return;
+      moveTo(checkedVisible(), e.target.value);
+    });
+
+    // 行：点 = 勾/不勾；双击名字 = 改名
+    var suppressClick = false;
+    pcBody.addEventListener('click', function(e){
+      if (suppressClick) { suppressClick = false; return; }
+      if (e.target.closest && e.target.closest('.pc-ren')) return;
+      var row = e.target.closest && e.target.closest('.pc-row'); if (!row) return;
+      var it = byKey(row.dataset.key); if (!it || it.locked) return;
+      if (renaming) finishRename(true);
+      if (checked[it.key]) delete checked[it.key]; else checked[it.key] = true;
+      renderPresets();
+    });
+    pcBody.addEventListener('dblclick', function(e){
+      var t = e.target.closest && e.target.closest('.pc-row .t'); if (!t) return;
+      var it = byKey(t.parentNode.dataset.key);
+      if (it && !it.locked && alive(it)) { checked = {}; checked[it.key] = true; startRename(it); }
+    });
+    pcBody.addEventListener('keydown', function(e){
+      if (!e.target || e.target.id !== 'pcRen') return;
+      if (e.key === 'Enter') { e.preventDefault(); finishRename(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finishRename(false); }
+    });
+    pcBody.addEventListener('focusout', function(e){
+      if (e.target && e.target.id === 'pcRen' && renaming) finishRename(true);
+    });
+
+    // 拖预设到组上（勾了好几条就整批拖；没勾就拖这一条）
+    var pd = null, lastDrop = null;
+    function clearDrop(){ if (lastDrop && lastDrop.el) lastDrop.el.classList.remove('pc-target'); lastDrop = null; }
+    pcBody.addEventListener('pointerdown', function(e){
+      if (e.button !== 0 || renaming) return;
+      if (e.target.closest && e.target.closest('input,button,select')) return;
+      var row = e.target.closest && e.target.closest('.pc-row'); if (!row) return;
+      var it = byKey(row.dataset.key);
+      if (!it || it.locked || !alive(it)) return;
+      pd = { key: it.key, sx: e.clientX, sy: e.clientY, on: false, list: null };
+    });
+    document.addEventListener('pointermove', function(e){
+      if (!pd) return;
+      if (!pd.on) {
+        if (Math.abs(e.clientX - pd.sx) + Math.abs(e.clientY - pd.sy) < 6) return;
+        var it = byKey(pd.key);
+        pd.list = checked[pd.key] ? checkedVisible().filter(function(x){ return alive(x) && !x.locked; }) : [it];
+        pd.on = true;
+        pcGhost.textContent = pd.list.length > 1 ? ('挪 ' + pd.list.length + ' 条预设') : ('挪「' + it.title + '」');
+        pcGhost.style.display = 'block';
+      }
+      pcGhost.style.transform = 'translate(' + (e.clientX + 14) + 'px,' + (e.clientY + 12) + 'px)';
+      var hit = dropGroupAt(e.clientX, e.clientY);
+      if (!hit || !lastDrop || hit.el !== lastDrop.el) { clearDrop(); if (hit) { hit.el.classList.add('pc-target'); lastDrop = hit; } }
+    });
+    function endDrag(e, cancel){
+      if (!pd) return;
+      var d = pd; pd = null;
+      pcGhost.style.display = 'none';
+      var target = lastDrop && lastDrop.id; clearDrop();
+      if (!d.on) return;
+      suppressClick = true; setTimeout(function(){ suppressClick = false; }, 0);
+      if (cancel || !target) return;
+      if (target === TRASH_VIEW) deleteItems(d.list); else moveTo(d.list, target);
+    }
+    document.addEventListener('pointerup', function(e){ endDrag(e, false); });
+    document.addEventListener('pointercancel', function(e){ endDrag(e, true); });
+  }
+
+  // ── 拖动 / 缩放 ──
+  // ⚠⚠ 只在启动时调【一次】。用事件委托挂在 #stage 上，子元素重建也不受影响。
+  //    调多次 = 监听翻倍 = 卡死(见 renderStage 末尾那段注释)。
+  var dragBound = false;
+  function bindDrag(){
+    if (dragBound) return;
+    dragBound = true;
+    var drag = null;
+
+    // 只改被拖的那一个元素的几何，【不重建整个画布】。
+    // ⚠ 重建 = 17 个 <img> 全部重新设 src(而 src 是几 MB 的 dataURL) → 每帧重新解码，
+    //   一样会卡死。拖动时能少动一个 DOM 就少动一个。
+    function paintDragged(){
+      if (!drag || !drag.el) return;
+      drag.el.style.left   = (drag.a.x*100)+'%';
+      drag.el.style.top    = (drag.a.y*100)+'%';
+      drag.el.style.width  = (drag.a.w*100)+'%';
+      drag.el.style.height = (drag.a.h*100)+'%';
+    }
+
+    stage.addEventListener('pointerdown', function(e){
+      var handle = e.target.closest && e.target.closest('.hd');
+      var el = e.target.closest && e.target.closest('.ast');
+      if (!el) { sel = null; renderAll(); return; }
+      var a = byId(el.dataset.id);
+      if (!a) return;
+      if (sel !== a.id){ sel = a.id; groupSel = a.id; clearChecks(); renderAll(); el = stage.querySelector('.ast[data-id="'+a.id+'"]'); }
+      if (!el) return;
+      var r = stage.getBoundingClientRect();
+      drag = {
+        a:a, el:el, mode: handle ? 'size' : 'move',
+        sx:e.clientX, sy:e.clientY,
+        ox:a.x, oy:a.y, ow:a.w, oh:a.h,
+        rw:r.width, rh:r.height
+      };
+      stage.setPointerCapture && stage.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    stage.addEventListener('pointermove', function(e){
+      if (!drag) return;
+      var dx = (e.clientX - drag.sx) / drag.rw;
+      var dy = (e.clientY - drag.sy) / drag.rh;
+      if (drag.mode === 'move'){
+        drag.a.x = drag.ox + dx;
+        drag.a.y = drag.oy + dy;
+      } else {
+        // 按住 Shift = 等比
+        if (e.shiftKey){
+          var k = Math.max((drag.ow + dx)/drag.ow, (drag.oh + dy)/drag.oh);
+          drag.a.w = Math.max(0.02, drag.ow * k);
+          drag.a.h = Math.max(0.02, drag.oh * k);
+        } else {
+          drag.a.w = Math.max(0.02, drag.ow + dx);
+          drag.a.h = Math.max(0.02, drag.oh + dy);
+        }
+      }
+      paintDragged();
+      setStatus(drag.a.name + '  ' + (drag.a.x*100).toFixed(1) + '%, ' + (drag.a.y*100).toFixed(1) + '%  ·  '
+                + (drag.a.w*100).toFixed(1) + '×' + (drag.a.h*100).toFixed(1) + '%');
+    });
+
+    // 松手才做一次完整重绘(层级/缩略图/属性面板都对上)
+    function end(){ if(!drag) return; drag = null; renderStage(); renderLib(); renderProp(); }
+    stage.addEventListener('pointerup', end);
+    stage.addEventListener('pointercancel', end);
+  }
+
+  // ── 工具按钮 ──
+  document.getElementById('btnFit').addEventListener('click', function(){
+    // 把所有素材整体缩放平移, 正好填满画布(留 4% 边)
+    if (!assets.length) return;
+    var minX=1,minY=1,maxX=0,maxY=0;
+    assets.forEach(function(a){ minX=Math.min(minX,a.x); minY=Math.min(minY,a.y);
+      maxX=Math.max(maxX,a.x+a.w); maxY=Math.max(maxY,a.y+a.h); });
+    var bw=maxX-minX, bh=maxY-minY;
+    if (bw<=0||bh<=0) return;
+    var k=Math.min(0.92/bw, 0.92/bh);
+    var offX=(1-bw*k)/2 - minX*k, offY=(1-bh*k)/2 - minY*k;
+    assets.forEach(function(a){ a.x=a.x*k+offX; a.y=a.y*k+offY; a.w*=k; a.h*=k; });
+    renderAll(); setStatus('已回到全景');
+  });
+  document.getElementById('btnTidy').addEventListener('click', function(){
+    // 把跑到画布外面的拽回来, 不动大小
+    var n=0;
+    assets.forEach(function(a){
+      var nx=Math.max(0,Math.min(1-a.w,a.x)), ny=Math.max(0,Math.min(1-a.h,a.y));
+      if (nx!==a.x||ny!==a.y){ a.x=nx; a.y=ny; n++; }
+    });
+    renderAll(); setStatus(n ? ('拉回了 '+n+' 个跑到画布外的素材') : '都在画布里，没动');
+  });
+  document.getElementById('btnFront').addEventListener('click', function(){
+    var a=byId(sel); if(!a) return;
+    a.z = assets.reduce(function(m,v){return Math.max(m,v.z||0);},0)+1;
+    renderAll(); setStatus(a.name+' 已置顶');
+  });
+  document.getElementById('btnBack').addEventListener('click', function(){
+    var a=byId(sel); if(!a) return;
+    a.z = assets.reduce(function(m,v){return Math.min(m,v.z||0);},0)-1;
+    renderAll(); setStatus(a.name+' 已置底');
+  });
+
+  // ── 导入向导 ──
+  var wiz = document.getElementById('wiz');
+  var wizDisp = null, wizMask = null;
+  function openWiz(){
+    wizDisp = wizMask = null;
+    document.getElementById('dropDisp').textContent = '点这里选图';
+    document.getElementById('dropDisp').className = 'drop';
+    document.getElementById('dropMask').textContent = '点这里选图';
+    document.getElementById('dropMask').className = 'drop';
+    document.getElementById('wizName').value = '';
+    document.getElementById('wizIcon').value = '';
+    document.getElementById('wizWarn').style.display = 'none';
+    document.getElementById('wizOk').disabled = true;
+    wiz.classList.add('on');
+  }
+  function closeWiz(){ wiz.classList.remove('on'); }
+  document.getElementById('btnAdd').addEventListener('click', openWiz);
+  document.getElementById('btnHelp').addEventListener('click', openWiz);
+  document.getElementById('wizCancel').addEventListener('click', closeWiz);
+  wiz.addEventListener('click', function(e){ if (e.target===wiz) closeWiz(); });
+
+  function pickImage(cb){
+    var i = document.createElement('input');
+    i.type='file'; i.accept='image/png,image/webp,image/*';
+    i.style.position='fixed'; i.style.left='-9999px';
+    document.body.appendChild(i);
+    i.addEventListener('change', function(){
+      var f = i.files && i.files[0];
+      i.remove();
+      if (!f) return;
+      var fr = new FileReader();
+      fr.onload = function(){
+        var img = new Image();
+        img.onload = function(){ cb({ url: fr.result, w: img.naturalWidth, h: img.naturalHeight, name: f.name }); };
+        img.onerror = function(){ alert('这张图读不了：' + f.name); };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(f);
+    });
+    i.click();
+  }
+  function wizCheck(){
+    var warn = document.getElementById('wizWarn');
+    var msgs = [];
+    if (wizDisp && wizMask){
+      if (wizDisp.w !== wizMask.w || wizDisp.h !== wizMask.h){
+        msgs.push('⚠ 两张图尺寸不一样（显示图 '+wizDisp.w+'×'+wizDisp.h+'，选区图 '+wizMask.w+'×'+wizMask.h+'）。'
+                + '还是可以加进来，但点击范围会跟你画的对不上，建议回 PS 改成一样大。');
+      }
+      if (wizMask.opaque){
+        msgs.push('⚠ 选区图整张都不透明（你可能画在白底/纯色底上了）。'
+                + '程序会自动把出现最多的那个颜色当背景，其余算可点范围 —— 加进来以后【务必在剪影上试着点一下】确认对不对。');
+      }
+    }
+    warn.textContent = msgs.join('\n');
+    warn.style.display = msgs.length ? 'block' : 'none';
+    document.getElementById('wizOk').disabled = !(wizDisp && wizMask && document.getElementById('wizName').value.trim());
+  }
+  // 检查选区图是不是整张不透明(跟主窗口的兜底规则对应)
+  function probeOpaque(url, cb){
+    var img = new Image();
+    img.onload = function(){
+      var k = Math.min(1, 128/Math.max(img.naturalWidth,img.naturalHeight));
+      var w = Math.max(1,Math.round(img.naturalWidth*k)), h = Math.max(1,Math.round(img.naturalHeight*k));
+      var cv = document.createElement('canvas'); cv.width=w; cv.height=h;
+      var cx = cv.getContext('2d'); cx.drawImage(img,0,0,w,h);
+      var d = cx.getImageData(0,0,w,h).data;
+      var anyT = false;
+      for (var i=3;i<d.length;i+=4){ if (d[i] < 128){ anyT = true; break; } }
+      cb(!anyT);
+    };
+    img.onerror = function(){ cb(false); };
+    img.src = url;
+  }
+  document.getElementById('dropDisp').addEventListener('click', function(){
+    var el = this;
+    pickImage(function(r){ wizDisp = r; el.textContent = r.name + '  ('+r.w+'×'+r.h+')'; el.className='drop has'; wizCheck(); });
+  });
+  document.getElementById('dropMask').addEventListener('click', function(){
+    var el = this;
+    pickImage(function(r){
+      wizMask = r; el.textContent = r.name + '  ('+r.w+'×'+r.h+')'; el.className='drop has';
+      probeOpaque(r.url, function(op){ wizMask.opaque = op; wizCheck(); });
+    });
+  });
+  document.getElementById('wizName').addEventListener('input', wizCheck);
+  document.getElementById('wizOk').addEventListener('click', function(){
+    if (!wizDisp || !wizMask) return;
+    // 新素材按原图比例摆在画布中间, 宽度占 30%
+    // ⚠ 画布不是正方形, 所以"高度百分比"要乘 ASPECT 才等于原图比例:
+    //   实际宽 = w×画布宽, 实际高 = h×画布高 → h = 原图高宽比 × w × ASPECT
+    var ratio = wizDisp.h / wizDisp.w;
+    var w = 0.3;
+    var h = w * ratio * ASPECT;
+    if (h > 0.9){ var s = 0.9/h; h *= s; w *= s; }
+    var a = {
+      id: uid(),
+      name: document.getElementById('wizName').value.trim() || '新部位',
+      icon: document.getElementById('wizIcon').value.trim() || '',
+      x: (1-w)/2, y: (1-h)/2, w: w, h: h,
+      z: assets.reduce(function(m,v){return Math.max(m,v.z||0);},0)+1,
+      display: wizDisp.url, mask: wizMask.url,
+      count: 0, _new: true, displayChanged: true, maskChanged: true
+    };
+    assets.push(a);
+    sel = a.id; groupSel = a.id; clearChecks();
+    closeWiz(); renderAll();
+    setStatus('已加入「'+a.name+'」，摆好位置后点保存（可以先把预设挪进来，一起保存）');
+  });
+
+  // ── 整套导出 ──
+  // ⚠ 【不能】在这儿拼导出文件。这个窗口里的图是主窗口缩过的【预览图】(最长边 384)，
+  //   拿它们导出等于把整套素材降质保存。原图只有主窗口手上有 —— 所以发个信号让它导。
+  //   (这也符合"窗口里不放业务逻辑"那条边界，同 L4 / 大图。)
+  document.getElementById('btnExport').addEventListener('click', function(){
+    if (renaming) finishRename(true);
+    if (window.editorwin && window.editorwin.save){
+      setStatus('正在保存并导出（用的是原图，不是这里的预览图），完成后本窗口会关闭，路径显示在主面板上…');
+      saveEditor({ exportAll:true, assets: assetsForSave(), presetEdits: buildPresetEdits() });
+    } else {
+      setStatus('这个壳没接上主窗口，导不了');
+    }
+  });
+
+  // ── 恢复内置人体摆位 ──
+  // ⚠ 这活儿在主窗口做(那边才有原图和切割逻辑), 这里只发个信号。
+  //   窗口里不放业务判断 —— 跟 L4 / 大图同一条边界。
+  document.getElementById('btnReset').addEventListener('click', function(){
+    // ⚠ 恢复内置摆位只做这一件事，本窗口里别的没保存的改动（摆位、预设挪组/改名/删除）都会丢 —— 得说出来
+    var pending = pendingPresetCount();
+    if (!confirm('把内置那 17 块人体重新切一次、摆回出厂位置？\n\n你自己导入的素材不会动，预设一条都不会丢。' +
+      (pending ? '\n\n⚠ 但这次在预设栏里还没保存的 ' + pending + ' 处改动会作废（要留着就先点「保存」，再重新打开编辑器恢复）。' : ''))) return;
+    if (window.editorwin && window.editorwin.save){
+      setStatus('正在恢复…');
+      saveEditor({ resetBuiltin: true });
+    } else {
+      setStatus('这个壳没接上主窗口，恢复不了');
+    }
+  });
+
+  // ── 收数据 / 保存 / 取消 ──
+  function applyData(payload){
+    if (!payload || !Array.isArray(payload.assets)) return;
+    editorMeta = {
+      editorSession: payload.editorSession,
+      accountId: payload.accountId,
+      namespaceId: payload.namespaceId,
+      sessionVersion: payload.sessionVersion,
+      accountEpoch: payload.accountEpoch,
+      storageEpoch: payload.storageEpoch,
+      assetVersion: payload.assetVersion
+    };
+    if (Number(payload.aspect) > 0) ASPECT = Number(payload.aspect);
+    assets = payload.assets.map(function(a){ return Object.assign({}, a); });
+    loadPresets(payload);
+    sel = assets.length ? assets[0].id : null;
+    groupSel = sel;
+    layoutStage(); renderAll();
+    var trashN = items.filter(inTrashView).length;
+    setStatus(assets.length + ' 个素材 · ' + items.filter(alive).length + ' 条预设' + (trashN ? ' · 最近删除 ' + trashN + ' 条' : '') + ' · 画布比例 ' + ASPECT.toFixed(3));
+  }
+  function assetsForSave(){
+    return assets.map(function(a){
+      return { id:a.id, name:a.name, icon:a.icon, x:a.x, y:a.y, w:a.w, h:a.h, z:a.z, hidden:a.hidden === true,
+               display:a.display, mask:a.mask,
+               displayChanged: !!a.displayChanged, maskChanged: !!a.maskChanged };
+    });
+  }
+  document.getElementById('btnSave').addEventListener('click', function(){
+    if (renaming) finishRename(true);
+    if (window.editorwin && window.editorwin.save){
+      saveEditor({ assets: assetsForSave(), presetEdits: buildPresetEdits() });
+    }
+  });
+  var saveBusy = false;
+  async function saveEditor(changes){
+    if (saveBusy) { setStatus('正在保存，请等待完成…'); return; }
+    if (!window.editorwin || !window.editorwin.save) { setStatus('这个壳没接上主窗口，保存不了'); return; }
+    saveBusy = true;
+    ['btnSave','btnExport','btnReset'].forEach(function(id){ var el=document.getElementById(id); if(el) el.disabled=true; });
+    try {
+      var result = await window.editorwin.save(editorEnvelope(changes));
+      if (result && result.ok === true) {
+        setStatus('已保存，正在关闭编辑器…');
+        if (window.editorwin.close) window.editorwin.close(editorMeta.editorSession);
+      } else {
+        setStatus('保存没有完成：' + ((result && result.error) || '未知原因') + '。编辑内容仍保留在本窗口，请修正后重试。');
+      }
+    } catch (error) {
+      setStatus('保存失败：' + (error && error.message || error) + '。编辑内容仍保留在本窗口，请稍后重试。');
+    } finally {
+      saveBusy = false;
+      ['btnSave','btnExport','btnReset'].forEach(function(id){ var el=document.getElementById(id); if(el) el.disabled=false; });
+    }
+  }
+  // 取消 / Esc 都走 forceClose(下面那个保命出口), 不各写一套
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){
+      if (wiz.classList.contains('on')) { closeWiz(); return; }
+      // 搜索框里按 Esc = 清空搜索，不是关窗口（不然手一滑整窗没保存的改动全丢）
+      if (document.activeElement === pcSearch && pcSearch.value) {
+        pcSearch.value = ''; pcFilter = ''; renderPresets(); return;
+      }
+      forceClose();
+    }
+  });
+
+  // 启动: 两条腿走路 —— 事件推送 + 主动拉一次(建窗口时的推送常常早于页面就绪而丢掉)
+  if (window.editorwin){
+    if (window.editorwin.onData) window.editorwin.onData(applyData);
+    if (window.editorwin.ready) window.editorwin.ready(applyData);
+    if (window.editorwin.onCloseRequest) window.editorwin.onCloseRequest(function(){
+      if (confirm('编辑窗口请求关闭。尚未确认保存的修改可能会丢失，确定关闭吗？')) forceClose();
+    });
+  }
+  bindDrag();          // ⚠ 只在这里调这一次
+  bindPresetUI();      // ⚠ 同上：预设栏的监听也只挂这一次
+  layoutStage();
+  renderPresets();
+
+  // ── 保命出口 ──
+  // 这个窗口盖满整块屏幕又置顶, 一旦页面出问题就等于把用户锁在外面(2026-09-11 栽过一次)。
+  // 所以关闭这件事【绝不能只有一条路】: 取消按钮 / Esc / 右上角 ✕ / 直接调 Tauri 命令, 四条。
+  function forceClose(){
+    try { if (window.editorwin && window.editorwin.close) { window.editorwin.close(); return; } } catch(_){}
+    // editorwin 没建起来(适配层挂了)时的兜底: 直接调命令
+    try {
+      if (window.__TAURI__ && window.__TAURI__.core) { window.__TAURI__.core.invoke('editor_close'); return; }
+      if (window.__TAURI__ && window.__TAURI__.window) { window.__TAURI__.window.getCurrentWindow().close(); return; }
+    } catch(_){}
+    setStatus('关不掉 —— 按 Alt+F4 强制关闭这个窗口');
+  }
+  // ⚠ 这个变量【绝对不能】叫 esc —— 上面有个 function esc(s) 是做 HTML 转义的，
+  //   var 赋值会把那个函数覆盖成 DOM 元素，于是 renderLib 里 esc(a.display) 直接抛异常，
+  //   renderAll 第一步就断 → 素材库和画布全空，而且页面上一个字的错都看不到。
+  //   2026-09-11 实测踩到。
+  var btnEscEl = document.getElementById('btnEsc');
+  if (btnEscEl) btnEscEl.addEventListener('click', forceClose);
+  document.getElementById('btnCancel').addEventListener('click', forceClose);
+
+  // 数据一直不来 = 适配层或主窗口那头出问题了。明着说, 别让用户对着空窗口猜。
+  setTimeout(function(){
+    if (!assets.length){
+      var why = (window.editorwin ? (window.editorwin.lastError || '主窗口没把数据送过来') : '这个壳没注入 editorwin 接口');
+      setStatus('⚠ 没收到素材数据：' + why + ' —— 右上角 ✕ 可以关掉');
+    }
+  }, 5000);
+})();
+</script>
+
+
+</body></html>

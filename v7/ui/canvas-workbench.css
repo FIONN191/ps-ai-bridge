@@ -1,0 +1,61 @@
+.canvas-workbench{position:fixed;inset:0;z-index:var(--z-workbench,9000);display:grid;grid-template-rows:auto minmax(0,1fr) 28px;background:hsl(var(--card-h,220 10%) 8%);color:var(--tx);font-size:13px;letter-spacing:0;overflow:hidden;}
+.canvas-workbench[hidden]{display:none;}
+body.canvas-active{opacity:1;}
+.cw-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line-strong);min-height:48px;flex-wrap:wrap;background:var(--bg-solid);}
+.cw-title{font-size:17px;font-weight:600;margin-right:8px;}
+.cw-toolbar select{max-width:180px;min-width:120px;}
+.cw-toolbar>.uisel-trigger{width:180px;max-width:180px;flex:0 0 180px;}
+.cw-name{width:160px;min-width:80px;}
+.cw-spacer{flex:1;}
+.cw-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;padding-top:8px;border-top:1px solid var(--line)}
+.cw-tools>.uisel-trigger{width:144px;max-width:144px;flex:0 0 144px}
+.cw-tools select{width:144px}
+.canvas-workbench button,.canvas-workbench input,.canvas-workbench select,.canvas-workbench textarea{font:inherit;color:var(--tx);border:1px solid var(--line-strong);background:var(--surface-faint);border-radius:8px;box-sizing:border-box;}
+.canvas-workbench input,.canvas-workbench select,.canvas-workbench textarea{padding:8px;min-width:0;}
+.canvas-workbench select option{background:var(--bg-solid);color:var(--tx);}
+.canvas-workbench button{cursor:pointer;min-height:36px;padding:8px 12px;}
+.canvas-workbench button:hover{background:var(--surface-strong);}
+.canvas-workbench button:focus-visible,.canvas-workbench input:focus-visible,.canvas-workbench select:focus-visible,.canvas-workbench textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.canvas-workbench button:disabled{opacity:0.5;cursor:default;}
+.canvas-workbench .cw-icon{width:36px;min-width:36px;padding:8px;display:inline-flex;align-items:center;justify-content:center;}
+.cw-icon svg{width:18px;height:18px;}
+.canvas-workbench .cw-run{background:hsl(var(--accent-hsl)/.25);border-color:var(--accent);}
+.cw-main{display:grid;grid-template-columns:minmax(0,1fr) 280px;min-height:0;min-width:0;}
+.cw-main.browser-open{grid-template-columns:minmax(280px,1fr) 280px minmax(300px,40%);}
+.cw-stage{position:relative;min-width:0;min-height:0;overflow:hidden;background:hsl(var(--card-h,220 10%) 8%);}
+.cw-stage canvas{display:block;position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
+.cw-inspector{border-left:1px solid var(--line-strong);overflow-y:auto;min-width:0;padding:16px;background:var(--bg-solid);}
+.cw-inspector h2{font-size:17px;font-weight:600;margin:0 0 12px;overflow-wrap:anywhere;}
+.cw-field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;min-width:0;}
+.cw-field>span{color:var(--tx2);font-size:11px;}
+.cw-field textarea{resize:vertical;min-height:116px;max-height:240px;width:100%;line-height:1.5;}
+.cw-row{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;}
+.cw-row>*{flex:1;min-width:0;}
+.cw-row button svg{vertical-align:middle;margin-right:4px;}
+.cw-status{font-size:11px;color:var(--tx2);line-height:1.5;overflow-wrap:anywhere;margin:8px 0 12px;}
+.cw-status.error{color:hsl(var(--sem-err));}
+.cw-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0;}
+.canvas-workbench .cw-result{padding:0;overflow:hidden;aspect-ratio:1;border-radius:8px;position:relative;}
+.cw-result img{width:100%;height:100%;object-fit:contain;display:block;}
+.cw-result[aria-pressed=true]{border:2px solid var(--accent);}
+.cw-result span{position:absolute;bottom:4px;right:4px;background:var(--bg-solid);padding:2px 4px;border-radius:4px;font-size:11px;}
+.cw-browser{min-width:0;display:flex;flex-direction:column;border-left:1px solid var(--line-strong);background:var(--bg-solid);}
+.cw-browser[hidden]{display:none;}
+.cw-browser-toolbar{padding:8px;display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line);}
+.cw-browser-toolbar input{flex:1;min-width:160px;}
+.cw-browser-toolbar select{width:100%;}
+.cw-browser-target{flex:1;min-height:160px;position:relative;}
+.cw-browser-status{padding:8px;font-size:11px;color:var(--tx2);overflow-wrap:anywhere;}
+.cw-footer{display:flex;justify-content:space-between;gap:12px;padding:4px 12px;border-top:1px solid var(--line);font-size:11px;color:var(--tx2);overflow:hidden;}
+.cw-footer span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.canvas-workbench .cw-source{width:100%;max-height:192px;object-fit:contain;display:block;}
+body.canvas-active>.stage,body.canvas-active>#stage{pointer-events:none;}
+
+/* 统一工作面契约：幕布接管整层输入，画布与检查器使用实底 token。 */
+.canvas-workbench{z-index:var(--z-workbench,9000);background:var(--workbench-bg,var(--bg-solid));color:var(--tx);isolation:isolate}
+.cw-toolbar,.cw-inspector,.cw-browser{background:var(--workbench-panel,var(--bg-solid))}
+.cw-stage{background:var(--workbench-canvas,var(--bg))}
+.canvas-workbench button,.canvas-workbench input,.canvas-workbench select,.canvas-workbench textarea{background:var(--workbench-input,var(--bg-solid));color:var(--tx);border-color:var(--line);border-radius:var(--radius-control,8px)}
+.canvas-workbench button:hover{background:var(--surface-strong);border-color:var(--accent)}
+@media(max-width:1100px){.cw-main{grid-template-columns:minmax(0,1fr) 248px;}.cw-main.browser-open{grid-template-columns:minmax(240px,1fr) 248px;}.cw-main.browser-open .cw-browser{position:absolute;right:0;top:var(--cw-toolbar-height,104px);bottom:28px;width:42%;z-index:2;box-shadow:var(--shadow-mid);}.cw-name{width:120px;}}
+@media(max-width:700px){.cw-main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(220px,1fr) minmax(160px,40%);}.cw-main.browser-open{grid-template-columns:minmax(0,1fr);}.cw-inspector{border-left:0;border-top:1px solid var(--line-strong);padding:12px;}.cw-toolbar{padding:8px;gap:4px;}.cw-title{font-size:17px;}.cw-name{display:none;}.cw-toolbar select{max-width:140px;}.cw-main.browser-open .cw-browser{inset:var(--cw-toolbar-height,104px) 0 28px auto;width:80%;}.cw-results{grid-template-columns:repeat(4,minmax(0,1fr));}.cw-field textarea{min-height:80px;}.cw-row{margin:4px 0;}}

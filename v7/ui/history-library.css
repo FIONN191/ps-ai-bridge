@@ -1,0 +1,48 @@
+.history-library{font-size:12px;line-height:1.5;letter-spacing:0;min-width:0;container-type:inline-size;}
+.history-library *{box-sizing:border-box;}
+.history-library-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;}
+.history-library-row-text{grid-template-columns:minmax(0,1fr);}
+.history-library-thumb{padding:0;width:64px;height:64px;border:1px solid var(--line);background:var(--surface-faint);border-radius:4px;overflow:hidden;cursor:pointer;}
+.history-library-thumb img{display:block;width:100%;height:100%;object-fit:contain;}
+.history-library .history-item-title,.history-library .history-item-info{overflow-wrap:anywhere;}
+.history-library .settings-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.history-library .settings-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+.history-library input,.history-library select{min-width:0;max-width:100%;}
+.history-library .settings-field,.history-library .history-item{min-width:0;}
+.history-library .settings-field>span,.history-library [role="status"]{overflow-wrap:anywhere;}
+.history-library .settings-btn{max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;}
+.history-library .history-list{min-width:0;}
+.history-library-summary{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:10px 0;}
+.history-library-summary>[data-library-count]{flex:1;min-width:0;}
+.history-library-summary>[data-library-billing]{flex:1 1 100%;}
+.history-library-layout{display:flex;align-items:center;gap:6px;margin:8px 0;color:var(--tx2);}
+.history-library-layout>span{margin-right:auto;}
+.history-library-layout .settings-btn[aria-pressed="true"]{border-color:var(--accent);color:var(--tx);background:hsl(var(--accent-hsl, 211 100% 68%) / .14);}
+.history-timeline-group{position:relative;margin:14px 0 18px;padding-left:14px;border-left:2px solid hsl(var(--accent-hsl,211 100% 68%) / .35);}
+.history-timeline-group>h3{margin:0 0 8px -2px;padding:0 0 4px 10px;border-bottom:1px solid var(--line-faint);font-size:12px;font-weight:650;color:var(--tx);}
+.history-timeline-track{display:flex;flex-direction:column;gap:8px;}
+.history-timeline-track>.history-item,.history-timeline-task>.history-item{position:relative;}
+.history-timeline-track>.history-item::before,.history-timeline-task>.history-item::before{content:"";position:absolute;left:-20px;top:14px;width:7px;height:7px;border:2px solid var(--surface);border-radius:50%;background:hsl(var(--accent-hsl,211 100% 68%));}
+.history-timeline-project{display:flex;flex-direction:column;gap:6px;margin:4px 0 10px;}
+.history-timeline-project-title{padding:3px 0 3px 2px;border-bottom:1px solid var(--line-faint);font-size:11px;font-weight:650;color:var(--tx2);overflow-wrap:anywhere;}
+.history-timeline-task{display:flex;flex-direction:column;gap:8px;}
+.history-item-completed{color:var(--tx2);}
+.history-library-empty{margin:12px 0;color:var(--tx2);overflow-wrap:anywhere;}
+.history-library-context{padding:8px 10px;margin-bottom:10px;border-left:2px solid var(--accent);background:var(--surface-faint);font-size:13px;font-weight:600;overflow-wrap:anywhere;}
+.history-timeline-prompt{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;margin-top:4px;color:var(--tx);font-size:12px;line-height:1.5;overflow-wrap:anywhere;}
+.history-archive .settings-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.history-archive .settings-actions>.settings-btn{min-width:0;white-space:normal;}
+.history-library-pagination{justify-content:center;}
+.history-library-pagination>button{width:32px;height:32px;flex:0 0 32px;padding:6px;}
+.history-cost-fields{margin:8px 0;display:grid;gap:5px;}
+.history-cost-fields>div{display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px;}
+.history-cost-fields dt{color:var(--tx2);}
+.history-cost-fields dd{min-width:0;margin:0;overflow-wrap:anywhere;}
+.history-cost-fields [data-library-cost]{font-weight:600;}
+@container(max-width:340px){
+  .history-library .settings-grid{grid-template-columns:minmax(0,1fr);}
+  .history-library .settings-actions{gap:6px;}
+  .history-library .settings-actions>select{flex:1 1 100%;width:100%;}
+  .history-library .settings-actions>.settings-btn{flex:1 1 auto;}
+  .history-library .history-library-pagination>.settings-btn{flex:0 0 32px;}
+}

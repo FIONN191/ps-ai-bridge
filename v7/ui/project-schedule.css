@@ -1,0 +1,45 @@
+.project-schedule{width:min(780px,94vw);max-height:88vh;border:1px solid var(--line);border-radius:var(--r-3,18px);padding:22px;color:var(--tx);background:var(--surface-solid,#20232c);box-shadow:0 20px 100px #0008;overflow:auto}
+.project-schedule::backdrop{background:#0005}.project-schedule *{box-sizing:border-box}.project-schedule h2{margin:0;font-size:20px}.project-schedule p{font-size:13px;line-height:1.7;color:var(--tx-2,var(--tx));margin:12px 0}.project-schedule header{display:flex;align-items:center;justify-content:space-between;gap:16px}.project-schedule nav,.planner-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.project-schedule button,.project-schedule input,.project-schedule select,.project-schedule textarea{color:var(--tx);background:var(--surface-2,#2b303b);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;max-width:100%}.project-schedule button{cursor:pointer}.project-schedule button[aria-current=true],.project-schedule button.primary{border-color:var(--accent,#84a9ef)}.project-schedule button:disabled{opacity:0.5;cursor:default}.project-schedule label{display:flex;flex-direction:column;gap:6px;font-size:13px}.planner-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.planner-fields label.wide{grid-column:1/-1}.project-schedule textarea{min-height:70px;resize:vertical}.planner-row{border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}.planner-row h3{font-size:13px;margin:0 0 7px;overflow-wrap:anywhere}.planner-row small{display:block;color:var(--tx-2,var(--tx));font-size:12px;line-height:1.6;overflow-wrap:anywhere}.planner-row[data-due=true]{border-color:var(--accent,#84a9ef)}.planner-check{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;padding:7px 0}.planner-check input{width:auto}.planner-status{display:block;min-height:20px;font-size:12px;line-height:1.6}.planner-attention{position:fixed;left:32px;bottom:24px;z-index:calc(var(--z-workbench,9000) + 900);max-width:340px;border:1px solid var(--line);color:var(--tx);background:var(--surface-solid,#252a36);border-radius:12px;padding:12px 16px;box-shadow:0 8px 32px #0006;cursor:pointer}.planner-attention[hidden]{display:none}.planner-empty{padding:22px 0;font-size:13px}.planner-queue{border:1px solid var(--accent,#84a9ef);padding:12px;border-radius:12px;margin:12px 0}.planner-eagle-results{max-height:280px;overflow:auto}.planner-divider{height:1px;background:var(--line);margin:18px 0}
+.planner-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.planner-fields>label,.planner-check>span{min-width:0;overflow-wrap:anywhere}.planner-fields input,.planner-fields select{min-width:0;width:100%}.project-schedule output{display:block;overflow-wrap:anywhere}.project-schedule [data-eagle-plan] p{overflow-wrap:anywhere}@media(max-width:580px){.planner-fields{grid-template-columns:minmax(0,1fr)}.project-schedule{padding:14px}.planner-attention{left:12px;right:12px;max-width:none}}
+.project-schedule{background:var(--workbench-bg,var(--bg-solid));border-radius:var(--radius-card,28px);border-color:var(--line-strong);}
+.project-schedule header{position:sticky;top:-22px;z-index:2;padding-bottom:10px;background:var(--workbench-bg,var(--bg-solid));}
+.project-schedule nav{position:sticky;top:34px;z-index:2;padding:8px 0;background:var(--workbench-bg,var(--bg-solid));}
+.project-schedule button{border-radius:var(--radius-button, 12px);background:var(--surface);transition:border-color var(--m-fast) ease,background var(--m-fast) ease;}
+.project-schedule button:hover,.project-schedule button:focus-visible{border-color:var(--accent);background:var(--surface-hover,var(--surface));outline:none;}
+.project-schedule button.primary{background:var(--accent);color:var(--accent-contrast,#10141c);border-color:var(--accent);}
+.project-schedule button.secondary{background:var(--surface-faint);color:var(--tx2);}
+.project-schedule button.danger{border-color:hsl(var(--sem-err) / .65);color:hsl(var(--sem-err));background:var(--surface-faint);}
+.project-schedule button.danger:hover,.project-schedule button.danger:focus-visible{background:hsl(var(--sem-err) / .16);}
+.planner-danger-note{margin:0 0 12px!important;padding:8px 10px;border-left:3px solid hsl(var(--sem-err) / .75);color:var(--tx2)!important;font-size:12px!important;}
+.planner-row[data-due=true]{box-shadow:inset 3px 0 0 var(--accent);}
+.planner-status{color:var(--tx2);}
+.project-schedule.project-schedule-embedded{width:100%;max-width:100%;max-height:none;min-width:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;overflow:visible;font-size:13px;line-height:1.6;}
+.project-schedule-embedded .planner-fields{grid-template-columns:minmax(0,1fr);gap:12px;}
+.project-schedule-embedded .planner-row{padding:12px;margin:12px 0;border-radius:var(--radius-control);background:var(--surface-faint);}
+.project-schedule-embedded .planner-row h3{font-size:13px;font-weight:600;line-height:1.5;margin:0 0 8px;}
+.project-schedule-embedded .planner-row small,.project-schedule-embedded .planner-status{font-size:11px;line-height:1.6;color:var(--tx2);}
+.project-schedule-embedded .planner-status{margin-top:12px;}
+.project-schedule-embedded label,.project-schedule-embedded input,.project-schedule-embedded select,.project-schedule-embedded textarea{min-width:0;max-width:100%;}
+.project-schedule-embedded label{gap:4px;font-size:11px;line-height:1.6;color:var(--tx2);overflow-wrap:anywhere;}
+.project-schedule-embedded input:not([type=checkbox]),.project-schedule-embedded select,.project-schedule-embedded textarea{width:100%;min-height:32px;padding:8px;background:var(--surface-faint);border-radius:var(--radius-control);font-size:13px;line-height:1.6;}
+.project-schedule-embedded textarea{min-height:80px;}
+.project-schedule-embedded button{min-height:32px;padding:8px 12px;font-size:11px;font-weight:600;line-height:1.6;border-radius:var(--radius-control);transition:background var(--m-fast) var(--ease-soft),border-color var(--m-fast) var(--ease-soft);}
+.project-schedule-embedded button.primary{font-size:13px;border-radius:var(--radius-button);background:var(--surface);color:var(--tx);border-color:var(--accent);}
+.project-schedule-embedded button:hover:not(:disabled){background:var(--surface-strong);}
+.project-schedule-embedded button.danger:hover:not(:disabled){background:hsl(var(--sem-err) / .16);}
+.project-schedule-embedded button:focus-visible,.project-schedule-embedded input:focus-visible,.project-schedule-embedded select:focus-visible,.project-schedule-embedded textarea:focus-visible,.project-schedule-embedded summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.project-schedule-embedded .planner-actions{gap:8px;margin:12px 0;}
+.project-schedule-embedded .planner-actions>select,.project-schedule-embedded .planner-actions>.uisel-trigger{flex:1 1 100%;}
+.project-schedule-embedded .planner-actions>button{min-width:0;flex:1 1 96px;}
+.project-schedule-embedded .planner-check{min-height:32px;padding:8px 0;font-size:13px;}
+.project-schedule-embedded .planner-check input{flex:none;accent-color:var(--accent);}
+.project-schedule-embedded .planner-empty{padding:16px 0;overflow-wrap:anywhere;}
+.project-schedule-embedded .planner-divider{margin:16px 0;}
+.project-schedule-embedded .planner-queue{padding:12px;margin:16px 0;border-radius:var(--radius-control);background:var(--surface-faint);overflow-wrap:anywhere;}
+.project-schedule-embedded .planner-danger-note{padding:8px 12px;font-size:11px!important;line-height:1.6;}
+.project-schedule-embedded [data-planner-body]>p{font-size:11px;line-height:1.6;color:var(--tx2);}
+.project-schedule-embedded .planner-row p{font-size:13px;line-height:1.6;white-space:pre-wrap;}
+.project-schedule-embedded summary{min-height:32px;padding:8px 0;font-size:13px;font-weight:600;line-height:1.5;cursor:pointer;}
+.project-schedule-embedded .uisel-trigger{min-height:32px;max-width:100%;padding:8px;border-radius:var(--radius-control);background:var(--surface-faint);color:var(--tx);font-size:13px;font-weight:400;}
+.project-schedule-embedded .uisel-label{min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.5;}
+.project-schedule-embedded button,.project-schedule-embedded p,.project-schedule-embedded summary{white-space:normal;overflow-wrap:anywhere;}

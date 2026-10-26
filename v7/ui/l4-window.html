@@ -1,0 +1,164 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="utf-8">
+<title>L4 Blocking</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="icons.css">
+<style nonce="__TAURI_STYLE_NONCE__">
+  /* ⚠ 代币全部来自 tokens.css（head 里先于本段引入，2026-09-14 收敛）。
+     这里原来抄了一份 —— 四个页面各抄一份已经飘了，别再加回来。 */
+  *{box-sizing:border-box;}
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;}
+  body{
+    color:var(--tx);
+    font-family:'OPPO Sans',-apple-system,"SF Pro","Segoe UI","Microsoft YaHei",sans-serif;
+    background:transparent;
+    user-select:none;
+  }
+  .freeze-layer{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+    background:rgba(6,8,12,.72);
+    backdrop-filter:blur(16px) saturate(.7);
+    -webkit-backdrop-filter:blur(16px) saturate(.7);
+    opacity:0;
+    transition:opacity .28s var(--ease-soft);
+  }
+  .freeze-layer.ready{opacity:1;}
+  .l4-card{
+    width:340px; max-width:calc(100vw - 48px);
+    padding:28px 24px 24px;
+    border-radius:28px;
+    background:hsl(var(--card-h, 220 28%) 13% / .98);
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    text-align:center;
+    transform:scale(.92) translateY(8px);
+    opacity:0;
+    transition:transform .32s var(--ease-out), opacity .24s var(--ease-soft);
+  }
+  .freeze-layer.ready .l4-card{transform:scale(1) translateY(0); opacity:1;}
+  .l4-icon{font-size:38px; line-height:1; margin-bottom:12px; color:hsl(var(--sem-err));
+    display:flex; align-items:center; justify-content:center;}   /* SVG 居中(2026-09-14) */
+  .l4-icon.warn{color:hsl(var(--sem-warn));}
+  .l4-icon.info{color:hsl(var(--sem-info));}
+  .l4-title{margin:0 0 8px; font-size:17px; line-height:1.4; font-weight:600;}
+  .l4-body{margin:0 0 8px; font-size:13px; line-height:1.6; color:var(--tx2);}
+  .l4-detail{margin:0 0 20px; font-size:11px; line-height:1.6; color:var(--tx2);}
+  .l4-detail:empty{display:none;}
+  .l4-action{
+    width:100%; padding:13px 24px;
+    border:0; border-radius:14px;
+    background:hsl(var(--sem-err)); color:#fff;
+    font-family:inherit; font-size:15px; line-height:1.2; font-weight:600;
+    cursor:pointer;
+    transition:transform .15s var(--ease-out), filter .15s;
+  }
+  .l4-action.warn{background:hsl(var(--sem-warn)); color:#19130a;}
+  .l4-action.info{background:hsl(var(--sem-info));}
+  .l4-action:hover{filter:brightness(1.08); transform:translateY(-1px);}
+  .l4-action:active{transform:translateY(0) scale(.98);}
+  .l4-hint{margin-top:12px; font-size:11px; color:var(--tx2);}
+</style>
+</head>
+<body>
+  <main class="freeze-layer" id="freezeLayer" role="dialog" aria-modal="true" aria-labelledby="l4Title">
+    <section class="l4-card">
+      <!-- 初始图标。真正显示什么由 applyData 按 level 决定，这里只是数据没来之前的占位 -->
+      <div class="l4-icon" id="l4Icon" data-icon-static="close" data-icon-size="38">✕</div>
+      <h1 class="l4-title" id="l4Title">需要处理</h1>
+      <p class="l4-body" id="l4Body"></p>
+      <p class="l4-detail" id="l4Detail"></p>
+      <button class="l4-action" id="l4Action">立即处理</button>
+      <div class="l4-hint">处理完成后界面将恢复</div>
+    </section>
+  </main>
+<!-- Tauri 下补出 window.l4win（Electron 由 l4-preload.js 提供，此文件自动空转） -->
+<script src="reload-guard.js"></script>
+<script src="icons.js"></script>
+<script src="tauri-child-adapter.js"></script>
+<script>
+// 图标：把 HTML 里 [data-icon-static] 的位置渲染成 SVG（2026-09-14）
+try{ if(window.ICON) ICON.mountStatic(); }catch(_){ }
+
+  const layer=document.getElementById('freezeLayer');
+  const icon=document.getElementById('l4Icon');
+  const title=document.getElementById('l4Title');
+  const body=document.getElementById('l4Body');
+  const detail=document.getElementById('l4Detail');
+  const action=document.getElementById('l4Action');
+  const card=document.querySelector('.l4-card');
+
+  // ⚠⚠ 冻结层必须【立刻】可见，绝不能等数据到了才显形。
+  //   L4 是全屏置顶 + 吃掉所有输入 + 连 Alt+F4 都挡住的窗口。
+  //   以前 .ready 只在 applyData 里加，数据一旦没送达就变成"看不见但把整台机器锁死"
+  //   的窗口，只能去任务管理器杀进程 —— 绝不允许再出现这种失败模式。
+  //   现在: 先亮起来, 内容后填。
+  layer.classList.add('ready');
+
+  // 数据迟迟不来: 把原因显示出来, 并且给一个真能用的出口。
+  let gotData=false, emergencyMode=false, displayedId=String(window.__L4_WINDOW_ID__||window.l4win?.windowId||'');
+  setTimeout(function(){
+    if(gotData) return;
+    emergencyMode=true;
+    const why=!window.l4win ? '桥接层未加载(l4win 不存在)'
+            : (window.l4win.lastError || '主窗口没有发送数据');
+    icon.textContent='⚠';
+    title.textContent='冻结窗口没收到数据';
+    body.textContent=why;
+    detail.textContent='这是异常状态，不是正常的报错弹窗。点下面的按钮可以强制关掉它。';
+    action.textContent='强制关闭';
+    // 点击只由下面唯一的 listener 路由；不要再给同一个按钮挂 onclick，
+    // 否则超时状态下会同时发应急关闭和正常业务 action。
+  },1500);
+
+  // 只更新背景（主窗口把 dataURL 异步取回后补发的那一条）。
+  // ⚠ 不能走 applyData：那会把标题/正文/按钮全部重置成默认值。
+  function applyBackgroundOnly(data){
+    if(!data || !data.background) return;
+    card.style.backgroundImage='linear-gradient(180deg, rgba(10,13,20,.52), rgba(10,13,20,.28) 42%, rgba(10,13,20,.5)), url("'+data.background+'")';
+    card.style.backgroundSize='cover';
+    card.style.backgroundPosition='center';
+  }
+  function applyData(data){
+    if(data && data.backgroundOnly){ applyBackgroundOnly(data); return; }
+    if(!data || !data.id) return;
+    // 超时后的按钮始终是应急关闭；迟到内容不能在用户按下时偷换为业务确认。
+    if(emergencyMode) return;
+    gotData=true;
+    displayedId=String(data && data.id || displayedId || '');
+    const level=String(data.level||'err');
+    // 图标（2026-09-14 图标改造）：按语义等级画 SVG，颜色由 .l4-icon.<level> 的 CSS 给。
+    // ⚠ 主窗口传过来的 data.icon 是【字符】(✕/⚠/ℹ/✓)，不是图标名 ——
+    //   L4 是独立窗口，两边不共享图标名表，传名字容易对不上。所以这里按 level 自己映射，
+    //   拿不到图标库时回退显示那个字符（至少不是空白）。
+    const L4_ICON={err:'close',warn:'warning',info:'info',ok:'check'};
+    const svg=window.ICON?window.ICON.render(L4_ICON[level]||'close',38):'';
+    if(svg) icon.innerHTML=svg; else icon.textContent=data.icon||'✕';
+    icon.className='l4-icon '+level;
+    title.textContent=data.title||'需要处理';
+    body.textContent=data.body||'';
+    detail.textContent=data.detail||'';
+    action.textContent=data.action||'立即处理';
+    action.className='l4-action '+level;
+    if(data.background){
+      card.style.backgroundImage='linear-gradient(180deg, rgba(10,13,20,.52), rgba(10,13,20,.28) 42%, rgba(10,13,20,.5)), url("'+data.background+'")';
+      card.style.backgroundSize='cover';
+      card.style.backgroundPosition='center';
+    }else if(data.backgroundFallback){
+      // 没有上传 L4 图片时仍使用 L4 自己的默认主题，不回落到其它等级。
+      card.style.backgroundImage=data.backgroundFallback;
+      card.style.backgroundSize='cover';
+      card.style.backgroundPosition='center';
+    }
+    requestAnimationFrame(()=>layer.classList.add('ready'));
+  }
+  if(window.l4win) window.l4win.onData(applyData);
+  action.addEventListener('click',()=>{ if(emergencyMode){ if(window.l4win && window.l4win.escape) window.l4win.escape(); else if(window.__TAURI__ && displayedId) window.__TAURI__.core.invoke('l4_escape',{id:displayedId}).catch(function(){}); return; } if(gotData && window.l4win) window.l4win.action(); });
+  window.addEventListener('keydown',event=>{
+    // L4 没有 Esc 关闭路径，只允许点击指定操作解除冻结。
+    if(event.key==='Escape') event.preventDefault();
+  });
+</script>
+
+
+</body></html>

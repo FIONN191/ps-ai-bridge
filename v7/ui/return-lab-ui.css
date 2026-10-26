@@ -1,0 +1,18 @@
+.return-lab{min-width:0;display:flex;flex-direction:column;gap:10px;}
+.return-lab h3,.return-lab p{margin:0;}
+.return-lab-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;}
+.return-lab-fields label{display:grid;grid-template-columns:76px minmax(0,1fr);align-items:start;gap:8px;}
+.return-lab-fields select{width:100%;min-width:0;font:inherit;color:var(--tx);background:var(--card-bg,#24262c);border:1px solid var(--line);border-radius:8px;padding:7px;}
+/* ⚠ 2026-10-07：这一格的下拉标签会被截断（探针实测「B · 显隐保护（正式默认）」
+   在 1020 宽窗口下横丢 31px，且没有 title/aria 兜底，用户看不到全称）。
+   根因：ui.html 的全局 .uisel-label 是 nowrap+ellipsis，而给 .settings-field 写的那条
+   放行规则（card-architecture.css:45）**管不到 return-lab 的字段**（它不在 .settings-field 里）。
+   修法沿用同一条约定：只给这一处放行换行，不动全局规则。 */
+.return-lab-fields .uisel-label{white-space:normal;overflow-wrap:anywhere;text-align:left;line-height:1.45;}
+.return-lab-fields .uisel-trigger{align-items:flex-start;height:auto;min-height:0;}
+.return-lab-preview{display:flex;align-items:center;gap:10px;color:var(--tx2);}
+.return-lab-preview img{width:72px;height:72px;flex-shrink:0;background:repeating-conic-gradient(#aaa 0% 25%,#eee 0% 50%) 50%/16px 16px;}
+.return-lab [data-return-status]{line-height:1.6;overflow-wrap:anywhere;}
+.return-lab [data-return-doc]{overflow-wrap:anywhere;}
+.return-lab textarea{width:100%;min-height:160px;max-height:300px;resize:vertical;box-sizing:border-box;background:rgba(0,0,0,.15);color:var(--tx);border:1px solid var(--line);font:11px/1.5 monospace;}
+.return-lab button:disabled{opacity:0.5;cursor:default;}

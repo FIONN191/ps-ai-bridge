@@ -1,0 +1,7 @@
+.pd-field-heading{display:flex;align-items:center;gap:5px;min-width:0;}
+.pd-field-heading .pd-field-label{flex:1;min-width:0;overflow-wrap:anywhere;}
+.pd-field-heading .pd-hb{flex:0 0 26px;width:26px;height:26px;}
+.pd-field-history{display:grid;grid-template-columns:minmax(0,1fr) 26px;gap:5px;align-items:center;}
+.pd-field-history[hidden]{display:none;}
+.pd-field-history select{min-width:0;width:100%;box-sizing:border-box;}
+.pd-field-history .pd-hb{width:26px;height:26px;}

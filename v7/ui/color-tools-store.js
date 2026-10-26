@@ -1,0 +1,13 @@
+(function(root){
+  'use strict';
+  let epoch=0;const live=new Set();root.addEventListener('wheelchair:storage-context',()=>{epoch++;for(const tx of live)try{tx.abort();}catch(_){};});
+  function create(){const token=epoch,name=root.WHEELCHAIR_STORAGE.dbName('color-tools.v1');let connection;
+    function check(){if(token!==epoch)throw root.V7ColorCore.fail('账号已切换，请重新打开调色工作面');}
+    function open(){check();return connection||(connection=new Promise((resolve,reject)=>{const r=indexedDB.open(name,1);r.onupgradeneeded=()=>{r.result.createObjectStore('state');r.result.createObjectStore('assets');};r.onerror=()=>reject(r.error);r.onsuccess=()=>{try{check();resolve(r.result);}catch(error){r.result.close();reject(error);}};}));}
+    async function tx(tables,mode,fn){check();const db=await open();check();return new Promise((resolve,reject)=>{let value;const transaction=db.transaction(tables,mode);live.add(transaction);transaction.oncomplete=()=>{live.delete(transaction);try{check();resolve(value);}catch(error){reject(error);}};transaction.onerror=transaction.onabort=()=>{live.delete(transaction);reject(transaction.error||root.V7ColorCore.fail('本机调色记录保存中断'));};try{fn(transaction,v=>value=v);}catch(error){transaction.abort();reject(error);}});}
+    const get=(table,key)=>tx([table],'readonly',(t,set)=>{t.objectStore(table).get(key).onsuccess=e=>set(e.target.result);});
+    async function put(asset){if(!(asset?.full instanceof Blob)||!(asset?.thumb instanceof Blob))throw root.V7ColorCore.fail('调色素材无效');const id=crypto.randomUUID();let full=false;try{await tx(['assets'],'readwrite',t=>{const store=t.objectStore('assets');store.getAll().onsuccess=e=>{const total=e.target.result.reduce((n,a)=>n+a.full.size+a.thumb.size,asset.full.size+asset.thumb.size);if(total>512*1024*1024){full=true;t.abort();return;}store.put(asset,id);};});}catch(error){if(full)throw root.V7ColorCore.fail('调色素材超过 512 MB，请先清理不需要的结果');throw error;}return {id,width:asset.width,height:asset.height};}
+    return {check,put,asset:id=>get('assets',id),load:()=>get('state','current'),save:state=>tx(['state'],'readwrite',t=>t.objectStore('state').put(structuredClone(state),'current')),async prune(state){const keep=new Set([state.a?.id,state.b?.id,...state.runs.flatMap(r=>[r.a?.id,r.b?.id,...r.outputs.map(o=>o.id)])].filter(Boolean));await tx(['assets'],'readwrite',t=>{const request=t.objectStore('assets').openCursor();request.onsuccess=()=>{const cursor=request.result;if(cursor){if(!keep.has(cursor.key))cursor.delete();cursor.continue();}};});},async close(){if(connection)(await connection).close();}};
+  }
+  root.V7ColorStore={create};
+})(window);

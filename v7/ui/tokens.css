@@ -1,0 +1,303 @@
+/* ═══════════════════════════════════════════════════════════════
+   tokens.css —— 全项目唯一的颜色/尺寸代币表
+   2026-09-14 建立。主窗口和三个子窗口【共用这一份】。
+
+   ⚠⚠ 为什么要抽出来：
+     原来四个页面各自在 :root 里抄了一份，已经开始飘 ——
+     `--line` 在三个页面是三个值（.09 / .10 / .16），
+     而大图窗口干脆没有 `--tx`，只能写死 rgba(255,255,255,.8)。
+     再拖下去每加一个页面就多一份拷贝。
+
+   ⭐ 主题系统的地基（用户 2026-09-14 定的方向）：
+     以后主题有两种 —— 图片主题（背景图自带主题色）和纯色主题（自选背景色+主题色）。
+     两种都必须保证【可读性】，所以文字色不能写死，必须是可覆盖的一层。
+
+     覆盖的办法是【改变量，不是列清单】：
+
+       .on-light{ --tx:...; --tx2:...; }     ← 挂在任意容器上
+
+     CSS 变量会往下继承，所以挂在一张卡上，整张卡里所有用 var(--tx) 的文字
+     自动跟着变 —— **不需要为每个元素单独写一条规则**。
+     ⚠ 这一点很重要：原来 `.task.on-light .t-close{...}` 那种逐元素清单，
+       加一个新元素就得回来登记一次，必漏（docs/14 五点七节）。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ⭐⭐ 2026-10-22（用户：「我记得 v6 带一个 oppo 的啥啥字体，你用上，那个还挺好用的」）：
+   自带 OPPO Sans，不再靠系统字体。
+   为什么：以前字体栈是 -apple-system/SF Pro/Segoe UI/微软雅黑 ——
+     Windows 上英文落 Segoe UI、中文落微软雅黑，两者不是一套设计的，
+     同一个 font-weight 在中英文上粗细对不上（这就是"中英混排看着不匀"的来源）；
+     而且精简版系统缺字体会整体掉到 sans-serif，界面全变样。
+   子集化：只留 ASCII + 中文标点 + GB2312 6763 汉字 + 界面符号（tmp/subset-oppo.py），
+     9.7MB → 1.05MB/字重，三个字重共 3MB。
+   字重对照：R = 400（正文）、M = 500 和 600（标题、按钮、标签）、B = 700（加粗）。
+     ⚠ 以前只带 R/B 时，写 600 的 162 处会被浏览器直接挑成 B（偏粗），写 500 的挑成 R；
+       不是"合成发糊"。10-22 用户在对照台看过对比，拍板加 M。 */
+@font-face{
+  font-family:'OPPO Sans';
+  src:url('assets/fonts/OPPOSans-R.woff2') format('woff2');
+  font-weight:400; font-style:normal; font-display:swap;
+}
+@font-face{
+  font-family:'OPPO Sans';
+  src:url('assets/fonts/OPPOSans-M.woff2') format('woff2');
+  font-weight:500 600; font-style:normal; font-display:swap;
+}
+@font-face{
+  font-family:'OPPO Sans';
+  src:url('assets/fonts/OPPOSans-B.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:swap;
+}
+:root{
+
+  /* ⚠⚠⚠ 2026-10-07 补：这一条以前【全项目都没有】，而它管的是一整类"原生控件"的长相。
+     没有它的时候，浏览器/WebView 按【浅色】画这些系统自己绘制的东西：
+       · <select> 的原生弹层、<input type=checkbox|radio|range|date> 的系统外观、
+         autofill 的底色、以及滚动条的默认色（我们只画了 webkit 那条，别的引擎不受控）。
+     ⇒ 用户看到的就是"下拉框/控件跟界面对不上、像是外来的一块"。
+       他这次专门点出来说是"系统层级的问题" —— 说的就是这一类。
+     ⚠ 我们整套 UI 是深色的，所以这里写 dark。它【只影响系统绘制的那部分】，
+       我们自己的 CSS 一律优先，不会把已有样式改掉。
+     ⚠⚠ 以后做浅色主题时，这个值要跟着主题走（挂到主题类上，别写死在 :root 里就不管了）。 */
+  color-scheme: dark;
+
+  /* ══ 工作面底 ══
+     工作面必须是实底，避免 Photoshop 或下层卡片从文字和控件后面透出。
+     卡片自己的背景图仍由 ui.html 的卡片遮罩负责，不能把工作面再做成玻璃层。 */
+  --bg: rgb(26 29 36);       /* 工作面画布层：完全不透明 */
+  --bg-solid: rgb(30 34 44); /* 工作面面板层：完全不透明 */
+  --workbench-bg: var(--bg-solid);
+  --workbench-panel: var(--bg-solid);
+  --workbench-canvas: var(--bg);
+  --workbench-input: var(--bg-solid);
+  --radius-card: 28px;
+  /* 任务卡和参考图右划面板共用；大图按面板的实际宽度对齐。 */
+  --preview-panel-width: 540px;
+  --radius-zone: 16px;      /* 2026-10-22：原 20px 不在档位表里 → 收到 16（和 fill-border 的 16 一档） */
+  --radius-button: 12px;    /* 2026-10-22：原 14px 不在档位表里 → 收到 12（和"小块"一档） */
+  --radius-control: 8px;
+  /* ⭐ 2026-10-03 补进规范（用户拍板）：这三档以前项目里大量在用，
+     但规范表没写，于是审计脚本把它们一律报成"违规"—— 是规范漏了，不是代码写错。
+     用途定死，新增代码照这个用：
+       10px = 图标底 / 小药丸
+        6px = 开关轨道 / 极小组件
+        2px = 细进度条 / 分隔条这类"几乎方"的元素
+     ⚠ 不要再自己拍 3px/5px/7px 这种不在表里的值。 */
+  --radius-chip: 10px;
+  --radius-toggle: 6px;
+  --radius-slab: 2px;
+  /* ══ 层级（z-index）——2026-10-22（docs/263 第 12 条，用户拍板「实装」）══
+     全局层级以前散着 30 来个裸数字（最大 100100），谁盖谁靠记忆。现在收成 8 个命名层，
+     每个元素写成「层名 + 偏移」。⚠⚠ 迁移时每个元素算出来的数值跟原来【完全相同】——上下顺序一个没变。
+       例：报错堆 = var(--z-stack) + 1 = 831（原来就是 831）。
+     ⚠ 组件【内部】的小层级（0~100，只在自己盒子里比）不用这些，照旧写小数字。
+     ⚠ 层内顺序有讲究的（锁 830 < 报错 831 < 参考图卡 834 < 任务 835），偏移别乱改。
+     新东西先想清楚属于哪一层，再取「层名 + 偏移」；scripts/check-ui-rules.cjs 会拦裸数字。 */
+  --z-stage:      800;   /* 舞台浮层：提示条 800 / 横幅 801 / 自由摆放预览 800、块 828、性能面板 829 */
+  --z-stack:      830;   /* 卡堆：弹窗点击锁 830 / 报错堆 831 / 参考图卡 834 / 任务堆 835 / 窄窗兜底 836 */
+  --z-nav:        840;   /* 导航：顶部导航 840 / 弹窗卡容器 840 / 悬浮条 842 / 拖动中 845 */
+  --z-mask:       850;   /* 遮罩：对话框遮罩 850 / 说明书 860 / 冻结遮罩 950 / 预设悬停标签 2000 */
+  --z-workbench: 9000;   /* 工作面：画布 / 区域 / DLSS 工作台、强锁 9000；阻断式报错 9001；日程提醒 9900 */
+  --z-menu:      9500;   /* 下拉菜单（UISelect）：在工作面之上，所以工作台里的下拉框不会被盖住 */
+  --z-detail:   10000;   /* 详情与预览：任务预览 / 参考图面板 10001、报错详情 10002、预览框 10050 */
+  --z-top:      99998;   /* 最顶：L4 窗口 99998 / 99999 */
+  --z-workbench-backdrop: calc(var(--z-mask) + 10);
+
+  /* ══ 文字（深色底用，默认）══ */
+  --tx:  #eef1f7;   /* 标题、主要内容 */
+  --tx2: #9aa3b8;   /* 描述、副标题 */
+
+  /* ══ 文字（浅色底用）══
+     ⭐ 不是直接生效的，是给 .on-light 覆盖时取用的值。
+     用户放了浅色背景图 / 选了浅色纯色主题时，
+     bg-manager 算出亮度 > .55 就给那张卡挂 .on-light。 */
+  --tx-on-light:  #0f1319;
+  --tx2-on-light: rgba(15,19,25,.72);
+
+  /* ══ 描边三档(2026-08-31 规范化) ══ */
+  --line:        rgba(255,255,255,.09);   /* 标准: 卡片边框 */
+  --line-faint:  rgba(255,255,255,.08);   /* 细: 列表行/虚线/图格边框 */
+  --line-strong: rgba(255,255,255,.18);   /* 强: 按钮/焦点态 */
+  /* 浅色底上的描边（同上，给 .on-light 用） */
+  --line-on-light:        rgba(15,19,25,.18);
+  --line-strong-on-light: rgba(15,19,25,.30);
+
+  /* ══ 表面色 ══ 压在卡片上的那层"薄片"：小按钮底、悬停底、输入框底、标签底…
+     ⚠ 为什么要有这组：它们原来一律写死成 rgba(255,255,255,.xx)（白色半透明），
+       在深色底上没问题，但卡片贴了【浅色背景图】时，白底压白图 = 整块糊掉。
+       抽成变量后 .on-light 一翻，整卡的薄片自动变成深色半透明。
+
+     ⚠⚠⚠ 2026-10-07 用户定案（原话）：
+       「除了状态标识的红色和绿色、黄色之类的，然后进度条之类的，
+        剩下的比如像是高亮、选中、滑块之类的机制，全都联动到主题色上去呗。」
+       ⇒ 这组"薄片"就是【高亮/选中/悬停】在用的东西（全项目 165 处在用 var(--surface…)），
+         所以把它们的【色相】接到主题色 --accent-hsl 上 —— 一改这里，165 处一起跟主题走，
+         不用逐处去改（逐处改约 60 个点，改漏一个就前功尽弃）。
+     ⚠ 写法要点：hsl(var(--accent-hsl) / a) —— 只取【色相+饱和】，亮度由各自的底决定，
+       跟卡片遮罩那套（hsl(var(--card-h) …)）是同一个思路，所以压在深色/浅色底上都成立。
+     ⚠ alpha 比原来的白版【略高一点】：白色是"提亮"，主题色在深底上是"加彩"，
+       同样的 alpha 会显得比原来弱，所以 12%→.16、24%→.30、6%→.09。
+     ⚠ 状态语义色（成功绿/警告橙/错误红）和进度条【不在这里】——用户明说要保留。 */
+  --surface:        hsl(var(--accent-hsl, 211 100% 68%) / .16);   /* 标准: 小按钮底 */
+  --surface-strong: hsl(var(--accent-hsl, 211 100% 68%) / .30);   /* 悬停态 */
+  --surface-faint:  hsl(var(--accent-hsl, 211 100% 68%) / .09);   /* 极淡: 输入框/分组底 */
+  --surface-on-light:        hsl(var(--accent-hsl, 211 100% 68%) / .14);
+  --surface-strong-on-light: hsl(var(--accent-hsl, 211 100% 68%) / .26);
+  --surface-faint-on-light:  hsl(var(--accent-hsl, 211 100% 68%) / .08);
+
+  /* ══ 阴影三档 ══ 轻(小按钮hover) / 中(二级卡/任务卡/浮起) / 重(主卡/三级卡) */
+  --shadow-light: 0 4px 16px rgba(0,0,0,.3);
+  --shadow-mid:   0 12px 36px rgba(0,0,0,.4);
+  --shadow-heavy: 0 20px 60px rgba(0,0,0,.5);
+
+  /* ══ 主题色 ══
+     ⭐ 用户能在设置里改的那个"重点色"：按钮、滑条、进度条、选中态。
+     ⚠ 和下面的【光效色】是两回事，别混：
+        主题色  = 实心控件的颜色，用户直接选
+        光效色  = 卡片边缘那几道光，从背景图反推（--glow-hsl）
+       2026-09-14 之前这两件事都叫 --accent，改主题色会顺带动到光效。 */
+  --accent: #5aa9ff;
+  /* ⭐ 同一个主题色的 HSL 三分量版本。
+     ⚠ 为什么要两份：CSS 里大量地方需要【带透明度】的主题色
+       （选中高亮 .45、按钮悬停 .25、焦点圈 .12…）。
+       hex 没法直接加 alpha，写 rgba 就只能把数字写死 —— 那正是
+       2026-09-14 之前 23 处写死 rgba(90,169,255,...) 的原因，
+       改主题色时它们一个都不跟着变（用户实测："为什么不影响选中高亮色"）。
+     ⚠⚠ 改主题色时【两个都要改】。JS 里 applyThemeColors() 会同时写这两个，
+       手改 CSS 默认值的话别只改一个。 */
+  --accent-hsl: 211 100% 68%;      /* = #5aa9ff */
+  --accent-zone: #4ade80;   /* 二级主题绿(色相带85-165). 二级弹出光用它 */
+
+  /* ══ 语义色 ══ HSL 三分量，用 hsl(var(--sem-ok) / .5) 控透明度 */
+  --sem-ok:   142 69% 58%;   /* 成功 绿 */
+  --sem-info: 212 100% 68%;  /* 信息 蓝 */
+  --sem-warn: 32 100% 75%;   /* 警告 橙 */
+  --sem-err:  0 84% 65%;     /* 错误 红 */
+
+  /* ══ 四层光效色 ══ HSL 三分量(不含 alpha)
+     ⚠ 有背景图时 BG 模块会给该卡设 --glow-hsl(从图反推, 见 bg-manager.pickThemeColor),
+       光效写成 hsl(var(--glow-hsl, 该层默认) / a) → 有图跟图走, 无图/纯灰图回落默认。
+     ⚠ 用户定案: 不加层级色相偏移, 颜色完全跟图走。 */
+  --glow-card:   212 100% 68%;   /* 一级 蓝 (#5aa9ff) */
+  --glow-zone:   142 69% 58%;    /* 二级 绿 (#4ade80) */
+  --glow-detail: 275 100% 76%;   /* 三级 紫玫 (#c484ff) */
+  --glow-task:   32 100% 75%;    /* 任务 橙 (#ffcc80) */
+
+  /* ══ 动画 ══ */
+  --ease-out:  cubic-bezier(.22,.9,.32,1);
+  --ease-soft: cubic-bezier(.3,.75,.3,1);
+  /* 三档时长（docs/263 1.6）：悬停/按下/小位移 fast，展开/弹出 base，整卡位移 slow。
+     CSS 里 .1~.42 秒的过渡都已换成这三个；循环装饰动画（.6s 以上）不归档。
+     「减少动画」开关打开时 html.v7-reduce-motion 把它们压成 1ms（见文件末尾）。 */
+  --m-fast: 120ms;
+  --m-base: 200ms;
+  --m-slow: 340ms;
+  --dur: var(--m-slow);
+  --blur: 24px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   浅色底 —— 挂 .on-light 就整块翻成深色文字
+
+   ⭐ 只改变量，不列元素。挂在哪一层，那一层里的所有文字自动跟着变。
+   ⚠ 判定在 JS 里：bg-manager.luminanceFromDataUrl() 算感知亮度(Rec.601)，
+     > 0.55 就挂这个 class。图片主题和纯色主题走同一条判定。
+   ═══════════════════════════════════════════════════════════════ */
+.on-light{
+  --tx:  var(--tx-on-light);
+  --tx2: var(--tx2-on-light);
+  --line:        var(--line-on-light);
+  --line-strong: var(--line-strong-on-light);
+  --surface:        var(--surface-on-light);
+  --surface-strong: var(--surface-strong-on-light);
+  --surface-faint:  var(--surface-faint-on-light);
+  /* 浅底上主题色要压暗，否则亮蓝配白底看不清。
+     ⚠ hex 和 hsl 两个版本必须一起改（见上面 --accent-hsl 的说明）。 */
+  --accent: #0b4d8f;
+  --accent-hsl: 210 86% 30%;   /* = #0b4d8f */
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   滚动条 —— 全项目统一（2026-09-14 用户要求："为什么还有原生滚动条"）
+
+   ⚠ 原来的做法是【一处一处地藏】：.gc-fields / .dc-scroll / .ed-body …
+     8 个选择器各写一条 `::-webkit-scrollbar{display:none}`。
+     结果就是漏 —— textarea（提示词输入框）和三个子窗口一个都没管，
+     用户在那些地方看到的是系统原生滚动条，跟这套 UI 完全不搭。
+
+   ⭐ 改成【全局默认细滚动条】+【个别地方完全隐藏】两层：
+     · 默认：极细、半透明、不占布局宽度、悬停才明显 —— 有滚动提示但不抢眼
+     · 需要完全无痕的（卡片内容区）：单独加 .no-sb
+
+   ⚠ 不做成"全部隐藏"：输入框里有长文本时，没有任何滚动提示，
+     用户不知道下面还有内容（同 docs/12 坑11：藏在滚动区底部的功能等于不存在）。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ⚠⚠ 2026-10-22（docs/263 三级卡瘦身 · 用户：「滚动条就不能更细、更贴边、变成一条光带吗」）查实：
+     原来这里对 * 写了 scrollbar-width:thin / scrollbar-color —— Chromium 121 起（WebView2 就是它）
+     【只要】出现这两个标准属性，就整套忽略下面的 ::-webkit-scrollbar 样式，直接画系统细滚动条。
+     ⇒ 上面注释说的「视觉 4px、悬停才明显」其实从来没生效过，用户看到的一直是系统滚动条。
+   修法：标准属性只给火狐（它不认 webkit 那套）；Chromium 走下面的光带样式。 */
+@supports (-moz-appearance:none){
+  *{
+    scrollbar-width: thin;                              /* Firefox */
+    scrollbar-color: rgba(255,255,255,.18) transparent;
+  }
+}
+/* 光带：命中区 8px（好抓），看得见的只有贴右边的 3px；平时很淡，悬停 / 拖动变成主题色亮带 */
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-track{ background:transparent; }
+::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.14);
+  border-radius:999px;
+  /* ⚠ 透明边框 + background-clip 是让滑块"变细"的标准手法：
+     直接写 width:3px 会连带把可点击区域缩到 3px，很难抓。
+     左边 4px、右边 1px 透明边：看得见的 3px 贴着右边缘。 */
+  border-style:solid; border-color:transparent; border-width:2px 1px 2px 4px;
+  background-clip:padding-box;
+}
+::-webkit-scrollbar-thumb:hover{ background:hsl(var(--accent-hsl, 211 100% 68%) / .55); background-clip:padding-box; }
+::-webkit-scrollbar-thumb:active{ background:hsl(var(--accent-hsl, 211 100% 68%) / .75); background-clip:padding-box; }
+::-webkit-scrollbar-corner{ background:transparent; }
+
+/* 浅色底上翻深色，否则白滑块压在浅色卡上看不见 */
+.on-light ::-webkit-scrollbar-thumb{ background:rgba(15,19,25,.22); background-clip:padding-box; }
+.on-light ::-webkit-scrollbar-thumb:hover{ background:rgba(15,19,25,.38); background-clip:padding-box; }
+
+/* 完全无痕：卡片内容区用这个（原来那 8 处各写一条的，统一换成这个类） */
+.no-sb{ scrollbar-width:none; -ms-overflow-style:none; }
+.no-sb::-webkit-scrollbar{ width:0; height:0; display:none; }
+
+/* 卡片内容区：完全无痕（原来这 6 处各写一条 ::-webkit-scrollbar{display:none}，
+   2026-09-14 收敛到这里。它们本来就都有 scrollbar-width:none，只是 webkit 侧各写各的）。
+   ⚠ 这些地方藏滚动条是对的：它们是卡片的主内容区，
+     有自己的渐隐提示（docs/12 坑11），不需要再来一条滚动条切掉圆角。
+   ⚠ textarea 和子窗口【不在这个名单里】—— 那些要保留细滚动条，
+     否则用户不知道下面还有内容（用户 2026-09-14 截图里就是这两处露了原生滚动条）。 */
+.dc-scroll::-webkit-scrollbar,
+.ed-body::-webkit-scrollbar,
+.nc-scroll::-webkit-scrollbar,
+.pc-scroll::-webkit-scrollbar,
+.qz-scroll::-webkit-scrollbar,
+.uisel-panel::-webkit-scrollbar,
+.gc-fields::-webkit-scrollbar,
+.bc-fields::-webkit-scrollbar,
+.pz-list::-webkit-scrollbar{ width:0; height:0; display:none; }
+
+/* ═══════════════════════════════════════════════════════════════
+   减少动画（设置 → 外观 → 透明与毛玻璃，2026-10-22 docs/263 1.6 第 4 条）
+   ⚠ 软件自己的开关，挂在 html.v7-reduce-motion 上（motion-tokens.js 管）；
+     不读系统 prefers-reduced-motion —— 用户 Windows 关了显示动画，读了它界面就全僵（09-14、10-20 栽过两次）。
+   三档时长压成 1ms（不是 0：animationend / transitionend 还要照常来，好几处收尾逻辑在等它们）；
+   循环动画只播一遍就停（1ms 的无限循环会疯狂闪）。
+   ═══════════════════════════════════════════════════════════════ */
+html.v7-reduce-motion{ --m-fast:1ms; --m-base:1ms; --m-slow:1ms; }
+html.v7-reduce-motion *,
+html.v7-reduce-motion *::before,
+html.v7-reduce-motion *::after{
+  animation-duration:1ms !important;
+  animation-delay:0s !important;
+  animation-iteration-count:1 !important;
+  transition-duration:1ms !important;
+  transition-delay:0s !important;
+}

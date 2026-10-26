@@ -1,0 +1,118 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="utf-8">
+<title>修图轮椅 · 新手教程</title>
+<!-- ⭐ 2026-10-18 新手教程（方案 docs/243，施工 docs/245；第二版按用户试用意见改，见 tutorial-chapters.js 文件头）。
+     整个窗口 = 一个假 Photoshop（菜单 / 工具栏 / 画布 / 图层面板）+ 嵌进去的【真的修图轮椅界面】（iframe ui.html?tutorial=1）+ 教程层（高亮 / 气泡 / 演示锁）。
+     真界面以为自己连着 PS，其实连的是 tutorial-fake-ps.js；出图用预制结果；不联网（tutorial-host.js 拦死）。 -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="tutorial.css">
+</head>
+<body>
+<div class="ps" id="ps">
+  <!-- 假 PS：菜单栏 -->
+  <div class="ps-menubar">
+    <span class="ps-logo">Ps</span>
+    <span>文件</span><span>编辑</span><span>图像</span><span>图层</span><span>文字</span><span>选择</span><span>滤镜</span><span>3D</span><span>视图</span>
+    <span class="ps-menu-plugins" id="psPluginsMenuBtn" data-ps="plugins-menu" role="button" tabindex="0">增效工具</span><span>窗口</span><span>帮助</span>
+    <span class="ps-menubar-fill"></span>
+    <span class="tut-skip" id="tutSkip" role="button" tabindex="0">跳过教程</span>
+  </div>
+  <!-- 「增效工具」下拉菜单：装好桥接插件之后才有修图轮椅那一项（跟真 PS 一样） -->
+  <div class="ps-dropdown" id="psPluginsMenu" hidden=""></div>
+  <!-- 假 PS：选项栏 -->
+  <div class="ps-optionsbar" id="psOptions">
+    <span class="ps-tool-name" id="psToolName">移动工具</span>
+    <span class="ps-opt" id="psToolOpts">自动选择：图层</span>
+    <span class="ps-opt ps-hint" id="psHint"></span>
+    <span class="ps-menubar-fill"></span>
+    <span class="ps-opt ps-btn" id="psFit" role="button" tabindex="0" title="把画布缩回整张都看得见">适合屏幕</span>
+  </div>
+  <div class="ps-main">
+    <!-- 假 PS：工具栏（只有矩形选框工具能用） -->
+    <div class="ps-toolbar" id="psTools">
+      <div class="ps-tool active" data-ps-tool="move" title="移动工具">✥</div>
+      <div class="ps-tool" data-ps-tool="marquee" title="矩形选框工具（M）">⬚</div>
+      <div class="ps-tool" data-ps-tool="lasso" title="套索工具（教程里用不到）">ʘ</div>
+      <div class="ps-tool" data-ps-tool="brush" title="画笔（教程里用不到）">✎</div>
+      <div class="ps-tool" data-ps-tool="stamp" title="仿制图章（教程里用不到）">⎈</div>
+      <div class="ps-tool" data-ps-tool="eraser" title="橡皮擦（教程里用不到）">⌫</div>
+      <div class="ps-tool" data-ps-tool="text" title="文字（教程里用不到）">T</div>
+      <div class="ps-tool" data-ps-tool="zoom" title="缩放（教程里用不到）">⌕</div>
+    </div>
+    <!-- 假 PS：画布 -->
+    <div class="ps-workspace" id="psWorkspace">
+      <div class="ps-tabs" id="psTabs"></div>
+      <div class="ps-canvas-wrap" id="psCanvasWrap">
+        <canvas id="psCanvas" width="800" height="1000"></canvas>
+        <div class="ps-guide" id="psGuide" hidden=""><span id="psGuideLabel"></span></div>
+        <div class="ps-marquee" id="psMarquee" hidden=""></div>
+      </div>
+    </div>
+    <!-- 假 PS：右侧面板（图层；插件面板停靠在这里） -->
+    <div class="ps-panels" id="psPanels">
+      <div class="ps-panel">
+        <div class="ps-panel-title">图层</div>
+        <div class="ps-layers" id="psLayers"></div>
+      </div>
+      <div class="ps-dock-hint" id="psDockHint" hidden="">松开鼠标，面板就停在这里</div>
+    </div>
+  </div>
+  <!-- 真的修图轮椅界面：浮在 PS 上面（真软件也是一个浮在 PS 上的透明窗口） -->
+  <iframe id="app" class="tut-app" src="ui.html?tutorial=1" title="修图轮椅（教程）"></iframe>
+  <!-- 修图轮椅的桥接插件面板（在增效工具里打开；按住标题栏能拖，拖到右边面板区就停靠） -->
+  <div class="ps-float" id="psPlugin" hidden="">
+    <div class="ps-panel-title ps-float-title" id="psPluginTitle">修图轮椅 V7 连接 PS 插件工具 <span class="ps-float-x">⠿ 按住拖动</span></div>
+    <div class="ps-plugin-body"><span class="ps-plugin-dot" id="psPluginDot"></span> <span id="psPluginStatus">正在连接修图轮椅…</span><div class="ps-plugin-meta">版本：教程</div></div>
+  </div>
+</div>
+
+<!-- 教程层 -->
+<div class="tut-lock" id="tutLock" hidden=""><div class="tut-lock-tag">正在演示 · 先看，不用动手</div></div>
+<div class="tut-dim" id="tutDim" hidden=""></div>
+<div class="tut-ring" id="tutRing" hidden=""></div>
+<div id="tutRings"></div>
+<div class="tut-hand" id="tutHand" hidden=""></div>
+<div class="tut-keycap" id="tutKeycap" hidden=""></div>
+<div class="tut-bubble" id="tutBubble" hidden="">
+  <div class="tut-mode" id="tutMode"></div>
+  <div class="tut-chapter" id="tutChapter"></div>
+  <div class="tut-text" id="tutText"></div>
+  <div class="tut-task" id="tutTask" hidden=""></div>
+  <div class="tut-links"><button type="button" class="tut-link" id="tutHelp" hidden="">做不出来？帮我做一下</button><button type="button" class="tut-link" id="tutReplay" hidden="">再演示一遍</button></div>
+  <div class="tut-actions">
+    <button type="button" id="tutBack">上一步</button>
+    <span class="tut-progress" id="tutProgress"></span>
+    <button type="button" id="tutNext" class="pri">下一步</button>
+  </div>
+</div>
+<!-- 假的「用户账户控制」（真软件装插件要管理员权限，会弹这个） -->
+<div class="tut-uac" id="tutUac" hidden="">
+  <div class="tut-uac-box">
+    <div class="tut-uac-head">用户账户控制</div>
+    <div class="tut-uac-body"><b>你要允许此应用对你的设备进行更改吗？</b><div class="tut-uac-app">修图轮椅 V7 · 安装 Photoshop 桥接插件</div><div class="tut-uac-note">（教程模拟：真装插件时 Windows 也会弹这个，点「是」）</div></div>
+    <div class="tut-uac-btns"><button type="button" id="tutUacYes" class="pri">是</button><button type="button" id="tutUacNo">否</button></div>
+  </div>
+</div>
+<!-- 看大图（真软件是一个全屏窗口） -->
+<div class="tut-viewer" id="tutViewer" hidden="">
+  <img id="tutViewerImg" alt="大图">
+  <div class="tut-viewer-bar"><span id="tutViewerNum"></span><span>点空白处或按 Esc 关掉 · ← → 换上下张</span></div>
+</div>
+<!-- 开头：选从哪一章开始 / 结尾：做完了 -->
+<div class="tut-cover" id="tutCover" hidden=""></div>
+<!-- 跳过确认 -->
+<div class="tut-confirm" id="tutConfirm" hidden="">
+  <div class="tut-confirm-box">
+    <div class="tut-confirm-title">要跳过教程吗？</div>
+    <div class="tut-confirm-text">没看完的章节，下次打开软件还会提醒你（全部看完就不再弹）。也可以随时在「设置 → 关于软件 → 重新看教程」里打开、挑章节看。</div>
+    <div class="tut-actions"><button type="button" id="tutConfirmNo">接着学</button><button type="button" id="tutConfirmYes" class="pri">跳过</button></div>
+  </div>
+</div>
+
+<script src="reload-guard.js"></script>
+<script src="tutorial-fake-ps.js"></script>
+<script src="tutorial-chapters.js"></script>
+<script src="tutorial.js"></script>
+
+
+</body></html>

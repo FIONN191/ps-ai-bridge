@@ -73,7 +73,11 @@ const config = (helperDir, pluginDir) => ({
   copyright: 'Copyright (C) 2026 fionn · GPL-3.0-or-later',
   directories: { output: OUT, buildResources: 'assets' },
   files: ['src/**/*', 'assets/**/*', 'package.json'],
-  extraResources: [{ from: pluginDir, to: 'plugin' }],
+  extraResources: [
+    { from: pluginDir, to: 'plugin' },
+    // 夏三七的修图轮椅 V7（界面、PS 联动插件、主程序）+ 我们补写的 foundation；开发时写在 v7/ 下的运行数据不打进去
+    { from: path.join(REPO, 'v7'), to: 'v7', filter: ['ui/**', 'uxp-bridge/**', 'eagle-bridge/**', 'engine/**', 'foundation/**', 'VERSION.json'] },
+  ],
   afterPack: copyHelper(helperDir),
   mac: {
     icon: 'assets/icon.png',

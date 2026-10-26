@@ -1,0 +1,45 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   provider-balance.css —— 「服务商与连接」里的余额框 + 模型变化提示
+
+   ⚠⚠ 2026-10-07 新增。用户对余额框的原话：
+     ·「那个出现的余额应该是一个框框，然后你再点余额就会刷新余额」
+       ⇒ 它是【可点的】（role=button），所以必须有 hover/光标/焦点的反馈，
+         否则用户不知道这里能点（"看着像个死标签"）。
+     ·「在用户输入完这个URL之后，你那个地方需要有一个表示现在我们还没有检查这个状态」
+       ⇒ 没查过的状态（data-state=unknown）要显眼到能引导人去点按钮，不能只是一行灰字。
+   ⚠ 三个状态必须一眼能分开：unknown（还没查）/ known（有数字）/ none（这家不提供）。
+   ⚠ 颜色全走代币：主题色联动是上一轮刚统一过的，别在这里写死。
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.provider-balance{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-top:10px;padding:10px 12px;
+  border:1px solid var(--line);border-radius:var(--radius-control);
+  background:var(--surface-faint);
+  font-size:13px;line-height:1.5;
+  cursor:pointer;
+  transition:background var(--m-fast) var(--ease-soft),border-color var(--m-fast) var(--ease-soft);
+}
+.provider-balance:hover{background:var(--surface);border-color:var(--line-strong)}
+.provider-balance:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 不提供余额的连接：点了也没用 ⇒ 不给"能点"的样子，避免用户白点 */
+.provider-balance[data-can="0"]{cursor:default}
+.provider-balance[data-can="0"]:hover{background:var(--surface-faint);border-color:var(--line)}
+/* 还没查过：给一条左边框当"待办"的暗示，引导用户去点「检查连接」 */
+.provider-balance[data-state="unknown"]{border-left:3px solid hsl(var(--sem-warn) / .7)}
+.provider-balance[data-state="known"]{border-left:3px solid hsl(var(--sem-ok) / .7)}
+
+.provider-balance .pb-label{flex:none;font-weight:600;color:var(--tx)}
+.provider-balance .pb-value{font-variant-numeric:tabular-nums;font-weight:600;color:var(--tx)}
+.provider-balance .pb-dim{font-weight:400;color:var(--tx2)}
+.provider-balance .pb-extra,.provider-balance .pb-at{font-size:11px;color:var(--tx2)}
+.provider-balance .pb-at{margin-left:auto}
+.provider-balance .pb-hint{font-size:11px;color:var(--tx2);opacity:.75}
+.provider-balance[data-state="known"]:hover .pb-hint{opacity:1}
+
+/* 模型名单"新增/消失"的提示行（不弹窗，只写一行；用户要"提醒但别打断"） */
+.provider-modelnote{border-left:3px solid hsl(var(--sem-info) / .7);padding-left:10px}
+.provider-modelnote[hidden]{display:none!important}
+
+/* 用户自己填的"余额不足提醒线"那一项旁边的小字 */
+.provider-balance-threshold-note{font-size:11px;color:var(--tx2)}

@@ -1,0 +1,11 @@
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory();else root.V7BatchCore=factory();})(typeof self!=='undefined'?self:this,function(){
+  'use strict';
+  const MAX_BATCH=18; // Product limit shared with AI_BATCH_MAX (docs/36).
+  const fail=message=>Object.assign(new Error(message),{code:'BATCH_QUEUE_FAILED'});
+  const fields=['presetTitle','presetId','prompt','protocol','provider','baseUrl','endpoint','authMode','model','size','aspectRatio','batch','antiMode','autoReturn','autoFullCanvas','imageComputeSource','workflowSource','workflowPreset','preActionPreset','workflowParameters','workflowPresetId','fieldHistorySnapshot','comfyUrl','runninghubUrl','layerType'];
+  function clean(value){if(Array.isArray(value))return value.map(clean);if(value&&typeof value==='object'){const out={};for(const [key,child]of Object.entries(value)){if(/api.?key|access.?token|password|authorization|secret|base64|image(data)?url/i.test(key))throw fail('批处理配置含图片正文或密钥字段，请使用连接设置和参考图槽');if(key==='refImages')continue;out[key]=clean(child);}return out;}return value;}
+  function configuration(value){const result={};for(const key of fields)if(value[key]!==undefined&&value[key]!==null)result[key]=clean(value[key]);result.batch=result.batch==null?1:Number(result.batch);if(!Number.isSafeInteger(result.batch)||result.batch<1||result.batch>MAX_BATCH)throw fail('每项张数须为 1 至 '+MAX_BATCH+' 的整数');for(const name of ['baseUrl','endpoint','comfyUrl','runninghubUrl']){const url=result[name];if(url&&/[?&](key|token|api_key|access_token)=/i.test(url))throw fail('服务地址含密钥，请将密钥移到连接设置后再加入批处理');}return result;}
+  function metadata(item){const copy={id:String(item.id),taskId:String(item.taskId||''),status:String(item.status||'queued'),error:String(item.error||''),createdAt:Number(item.createdAt)||Date.now(),attempts:Number(item.attempts)||0,config:configuration(item.config),source:item.source?clean(item.source):null,assets:item.assets?clean(item.assets):null};return copy;}
+  function move(queue,id,direction){const at=queue.findIndex(item=>item.id===id),to=at+direction;if(at<0||to<0||to>=queue.length)return false;[queue[at],queue[to]]=[queue[to],queue[at]];return true;}
+  return {MAX_BATCH,fail,configuration,metadata,move};
+});

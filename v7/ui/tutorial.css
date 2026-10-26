@@ -1,0 +1,130 @@
+/* ⭐ 2026-10-18 新手教程 · 假 Photoshop 的外观 + 教程层（高亮 / 气泡 / 遮罩 / 演示锁）。
+   配色照 PS 2025 深色界面；尺寸跟着窗口走（教程窗口全屏）。 */
+html, body { margin: 0; height: 100%; overflow: hidden; background: #1e1e1e; color: #ddd; font: 12px/1.4 "Microsoft YaHei UI", "Segoe UI", sans-serif; user-select: none; }
+/* ⚠ 封面 / 确认框写了 display:grid，会盖过 hidden 属性 —— 不加这条它们永远显示 */
+[hidden] { display: none !important; }
+.ps { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; flex-direction: column; }
+.ps-menubar { height: 28px; display: flex; align-items: center; gap: 14px; padding: 0 10px; background: #2b2b2b; border-bottom: 1px solid #111; position: relative; z-index: 3; }
+.ps-logo { background: #31a8ff; color: #001e36; font-weight: 700; padding: 1px 4px; border-radius:4px; }
+.ps-menubar-fill { flex: 1; }
+.ps-menu-plugins { padding: 2px 6px; border-radius:4px; cursor: pointer; }
+.ps-menu-plugins:hover, .ps-menu-plugins.open { background: #444; }
+.ps-menu-plugins.hot { background: #2f7cf6; color: #fff; }
+/* 跳过教程永远点得到（演示锁也挡不住它） */
+.tut-skip { padding: 3px 10px; border: 1px solid #555; border-radius: 4px; cursor: pointer; color: #eee; position: relative; z-index: 96; background: #2b2b2b; }
+.tut-skip:hover { background: #444; }
+.ps-dropdown { position: absolute; top: 28px; z-index: 40; min-width: 280px; background: #323232; border: 1px solid #111; box-shadow: 0 8px 24px rgba(0,0,0,.6); padding: 4px 0; }
+.ps-dd-item { padding: 6px 16px; cursor: pointer; color: #ddd; }
+.ps-dd-item:hover { background: #2f7cf6; color: #fff; }
+.ps-dd-item.muted { color: #777; cursor: default; }
+.ps-dd-item.muted:hover { background: none; color: #777; }
+.ps-dd-sep { height: 1px; background: #444; margin: 4px 0; }
+.ps-optionsbar { height: 32px; display: flex; align-items: center; gap: 16px; padding: 0 12px; background: #323232; border-bottom: 1px solid #111; color: #bbb; }
+.ps-tool-name { color: #eee; }
+.ps-hint { color: #8fd0ff; }
+.ps-hint.warn { color: #ffcc33; }
+.ps-btn { padding: 2px 10px; border: 1px solid #555; border-radius:4px; cursor: pointer; color: #ddd; }
+.ps-btn:hover { background: #444; }
+.ps-main { flex: 1; display: flex; min-height: 0; }
+.ps-toolbar { width: 40px; background: #2b2b2b; border-right: 1px solid #111; display: flex; flex-direction: column; align-items: center; padding-top: 6px; gap: 2px; }
+.ps-tool { width: 30px; height: 28px; display: grid; place-items: center; color: #bbb; border-radius:4px; font-size: 15px; cursor: pointer; }
+.ps-tool:hover { background: #3a3a3a; }
+.ps-tool.active { background: #4a4a4a; color: #fff; box-shadow: inset 0 0 0 1px #6a6a6a; }
+.ps-workspace { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #1e1e1e; }
+.ps-tabs { height: 26px; display: flex; background: #262626; border-bottom: 1px solid #111; }
+.ps-tab { padding: 5px 14px; color: #aaa; border-right: 1px solid #111; cursor: pointer; }
+.ps-tab.active { background: #323232; color: #eee; }
+.ps-canvas-wrap { position: relative; flex: 1; display: grid; place-items: center; overflow: hidden; }
+#psCanvas { max-width: 92%; max-height: 92%; box-shadow: 0 0 0 1px #000, 0 6px 30px rgba(0,0,0,.5); cursor: default; background: #fff; transform-origin: 0 0; transition: transform .45s ease; }
+#psCanvas.marquee { cursor: crosshair; }
+.ps-marquee { position: absolute; border: 1px dashed #fff; outline: 1px dashed #000; outline-offset: -1px; pointer-events: none; animation: ants .6s linear infinite; }
+@keyframes ants { to { outline-offset: 2px; } }
+/* 目标范围：照着这个虚线框框选 */
+.ps-guide { position: absolute; border: 2px dashed #ffcc33; background: rgba(255,204,51,.08); pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
+.ps-guide span { position: absolute; left: 0; top: -22px; padding: 1px 6px; background: #ffcc33; color: #222; border-radius:4px; font-size: 12px; white-space: nowrap; }
+.ps-guide.ok { border-color: #4ade80; background: rgba(74,222,128,.1); }
+.ps-guide.ok span { background: #4ade80; }
+.ps-panels { width: 270px; background: #2b2b2b; border-left: 1px solid #111; display: flex; flex-direction: column; position: relative; }
+.ps-panel { border-bottom: 1px solid #111; }
+.ps-panel-title { padding: 6px 10px; background: #323232; color: #eee; border-bottom: 1px solid #111; }
+.ps-layers { max-height: 46vh; overflow: auto; }
+.ps-layer { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-bottom: 1px solid #222; transition: background var(--m-base); }
+.ps-layer.flash { background: #2f4f6f; }
+.ps-layer .eye { width: 16px; text-align: center; color: #ddd; cursor: pointer; }
+.ps-layer.hidden .eye { color: #555; }
+.ps-layer.hidden .name { color: #777; }
+.ps-layer .thumb { width: 34px; height: 26px; background: #fff center/contain no-repeat; border: 1px solid #111; flex: none; }
+.ps-layer .mask { width: 26px; height: 26px; background: #000 center/contain no-repeat; border: 1px solid #666; flex: none; }
+.ps-layer .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-layer.group .name::before { content: "📁 "; }
+.ps-dock-hint { margin: 8px; padding: 18px 8px; border: 2px dashed #2f7cf6; color: #8fd0ff; text-align: center; border-radius:4px; }
+/* 桥接插件面板：浮着 / 停靠 */
+.ps-float { position: fixed; z-index: 30; width: 260px; background: #2b2b2b; border: 1px solid #111; box-shadow: 0 10px 30px rgba(0,0,0,.6); }
+.ps-float.docked { position: static; width: auto; box-shadow: none; border: 0; border-bottom: 1px solid #111; }
+.ps-float-title { cursor: move; display: flex; justify-content: space-between; }
+.ps-float-x { color: #888; font-size: 11px; }
+.ps-float.docked .ps-float-x { display: none; }
+.ps-plugin-body { padding: 10px; }
+.ps-plugin-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #888; }
+.ps-plugin-dot.on { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+.ps-plugin-meta { margin-top: 6px; color: #888; }
+/* 真界面：浮在 PS 上（透明背景，跟真软件一样是一个浮窗）。尺寸照主窗口 1020×1100，窗口矮时等比缩 */
+.tut-app { position: absolute; right: 290px; top: 64px; width: 1020px; height: 1100px; border: 0; background: transparent; transform-origin: right top; z-index: 10; }
+/* 自由模式：真软件是铺满整个屏幕的透明窗口 */
+.tut-app.free { left: 0; top: 0; right: auto; width: 100%; height: 100%; transform: none !important; }
+/* 教程层 */
+.tut-lock { position: fixed; left: 0; top: 0; width: 100%; height: 100%; z-index: 55; cursor: not-allowed; }
+.tut-lock-tag { position: fixed; left: 50%; top: 40px; transform: translateX(-50%); padding: 6px 16px; border-radius:12px; background: rgba(30,60,110,.92); color: #fff; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+.tut-dim { position: fixed; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,.35); pointer-events: none; z-index: 50; }
+.tut-ring { position: fixed; border: 2px solid #ffcc33; border-radius: 8px; box-shadow: 0 0 0 4000px rgba(0,0,0,.35), 0 0 18px #ffcc33; pointer-events: none; z-index: 60; transition: all var(--m-slow); }
+.tut-ring.extra { box-shadow: 0 0 18px #ffcc33; }
+.tut-ring-label { position: absolute; left: -2px; top: -24px; padding: 2px 8px; background: #ffcc33; color: #222; border-radius: 4px 4px 4px 0; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.tut-hand { position: fixed; font-size: 30px; pointer-events: none; z-index: 70; transition: left .6s, top .6s; filter: drop-shadow(0 2px 4px #000); }
+.tut-hand.fast { transition: none; }
+.tut-bubble { position: fixed; width: 360px; background: #fdfaf0; color: #222; border-radius:8px; padding: 12px 16px 12px; box-shadow: 0 10px 40px rgba(0,0,0,.6); z-index: 80; font-size: 13px; line-height: 1.6; border: 3px solid transparent; transition: left var(--m-base), top var(--m-base); }
+.tut-bubble.mode-demo { border-color: hsl(var(--accent-hsl, 211 100% 68%) / .85); }
+.tut-bubble.mode-try { border-color: #f08a24; background: #fff7ec; }
+.tut-mode { display: inline-block; padding: 1px 10px; border-radius:8px; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.mode-demo .tut-mode { background: #dfe8fb; color: #2c4f99; }
+.mode-try .tut-mode { background: #f08a24; color: #fff; }
+.mode-tell .tut-mode { background: #eee; color: #555; }
+.tut-chapter { font-size: 11px; color: #b07d00; margin-bottom: 4px; }
+.tut-text b { color: #a3550a; }
+.tut-task { margin-top: 8px; padding: 8px 10px; background: #fff3c4; border-radius:4px; color: #6b4b00; font-weight: 600; }
+.tut-task.note { background: #ffe1d6; color: #9a3412; }
+.tut-task.done { background: #d9f7d9; color: #1e6b1e; }
+.tut-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.tut-actions button { padding: 5px 12px; border: 1px solid #bbb; border-radius:4px; background: #fff; color: #222; cursor: pointer; font: inherit; }
+.tut-actions button.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tut-actions button:disabled { opacity:0.5; cursor: default; }
+.tut-progress { flex: 1; text-align: center; color: #888; font-size: 11px; }
+.tut-links { display: flex; gap: 12px; margin-top: 6px; }
+.tut-link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: 12px; text-decoration: underline; }
+.tut-link[hidden] { display: none; }
+.tut-keycap { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%); padding: 10px 22px; background: rgba(20,20,20,.9); color: #fff; border: 1px solid #666; border-radius:8px; font-size: 22px; letter-spacing: 1px; z-index: 85; pointer-events: none; }
+.tut-uac { position: fixed; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,.5); z-index: 90; display: grid; place-items: center; }
+.tut-uac-box { width: 440px; background: #fff; color: #222; border-top: 30px solid #2a5bd7; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+.tut-uac-head { margin-top: -26px; padding: 0 14px; color: #fff; font-size: 13px; }
+.tut-uac-body { padding: 18px 20px 10px; font-size:13px; line-height: 1.7; }
+.tut-uac-app { margin-top: 8px; color: #333; }
+.tut-uac-note { margin-top: 6px; color: #888; font-size: 12px; }
+.tut-uac-btns { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 20px 16px; background: #f3f3f3; }
+.tut-uac-btns button { min-width: 90px; padding: 6px 14px; border: 1px solid #aaa; background: #fff; cursor: pointer; font: inherit; }
+.tut-uac-btns button.pri { background: #2a5bd7; color: #fff; border-color: #2a5bd7; }
+.tut-viewer { position: fixed; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,.88); z-index: 45; display: grid; place-items: center; }
+.tut-viewer img { max-width: 86%; max-height: 82%; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+.tut-viewer-bar { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; color: #ccc; font-size: 13px; }
+.tut-cover { position: fixed; left: 0; top: 0; width: 100%; height: 100%; background: rgba(10,12,16,.92); z-index: 90; display: grid; place-items: center; }
+.tut-cover-box { width: 680px; max-width: 92%; background: #fdfaf0; color: #222; border-radius:12px; padding: 26px 28px; }
+.tut-cover-box h1 { margin: 0 0 6px; font-size: 22px; }
+.tut-cover-box p { margin: 6px 0 14px; color: #555; line-height: 1.7; }
+.tut-chapters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 50vh; overflow: auto; }
+.tut-ch { text-align: left; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #222; cursor: pointer; font: inherit; }
+.tut-ch small { display: block; color: #888; margin-top: 2px; }
+.tut-ch.done { border-color: #7cc77c; background: #f2fbf2; }
+.tut-ch.done::after { content: " ✓"; color: #2e8b2e; }
+.tut-ch.new { border-color: #f0b429; }
+.tut-confirm { position: fixed; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,.55); z-index: 100; display: grid; place-items: center; }
+.tut-confirm-box { width: 380px; background: #fdfaf0; color: #222; border-radius: 12px; padding: 18px 20px; }
+.tut-confirm-title { font-size:15px; font-weight: 600; margin-bottom: 6px; }
+.tut-confirm-text { color: #555; line-height: 1.6; }

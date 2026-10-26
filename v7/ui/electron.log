@@ -1,0 +1,19 @@
+
+[38540:0903/125114.789:ERROR:cache_util_win.cc(20)] Unable to move the cache: 拒绝访问。 (0x5)
+[38540:0903/125114.790:ERROR:cache_util_win.cc(20)] Unable to move the cache: 拒绝访问。 (0x5)
+[38540:0903/125114.790:ERROR:cache_util_win.cc(20)] Unable to move the cache: 拒绝访问。 (0x5)
+[38540:0903/125114.793:ERROR:disk_cache.cc(208)] Unable to create cache
+[38540:0903/125114.793:ERROR:gpu_disk_cache.cc(713)] Gpu Cache Creation failed: -2
+[38540:0903/125114.793:ERROR:disk_cache.cc(208)] Unable to create cache
+[38540:0903/125114.793:ERROR:gpu_disk_cache.cc(713)] Gpu Cache Creation failed: -2
+[38540:0903/125114.794:ERROR:disk_cache.cc(208)] Unable to create cache
+[38540:0903/125114.794:ERROR:gpu_disk_cache.cc(713)] Gpu Cache Creation failed: -2
+[38540:0903/125120.933:ERROR:CONSOLE(1)] "Unknown VE context: language-mismatch    at new He (devtools://devtools/bundled/ui/legacy/legacy.js:1:98356)
+    at devtools://devtools/bundled/ui/legacy/legacy.js:1:191793
+    at new oi (devtools://devtools/bundled/ui/legacy/legacy.js:1:192189)
+    at oi.instance (devtools://devtools/bundled/ui/legacy/legacy.js:1:192311)
+    at H.presentUI (devtools://devtools/bundled/entrypoints/main/main.js:1:27708)
+    at #I (devtools://devtools/bundled/entrypoints/main/main.js:1:17314)
+    at #x (devtools://devtools/bundled/entrypoints/main/main.js:1:17109)", source: devtools://devtools/bundled/ui/visual_logging/visual_logging.js (1)
+[38540:0903/125121.077:ERROR:CONSOLE(1)] "Request Autofill.enable failed. {"code":-32601,"message":"'Autofill.enable' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
+[38540:0903/125121.077:ERROR:CONSOLE(1)] "Request Autofill.setAddresses failed. {"code":-32601,"message":"'Autofill.setAddresses' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)

@@ -1,0 +1,66 @@
+.account-center{box-sizing:border-box;width:min(900px,calc(100vw - 24px));height:min(760px,calc(100vh - 24px));max-width:none;max-height:none;padding:0;border:1px solid var(--line-strong,var(--line));border-radius:var(--radius-zone);background:var(--workbench-bg);color:var(--tx);box-shadow:0 24px 80px #0008;font-family:inherit;font-size:13px;line-height:1.6;overflow:hidden}
+.account-center[open]{display:flex;flex-direction:column}.account-center::backdrop{background:#0009}.account-center *{box-sizing:border-box}.account-center header,.account-center footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;flex:none;background:var(--workbench-bg)}.account-center header{border-bottom:1px solid var(--line)}.account-center h2,.account-center h3,.account-center h4,.account-center p{margin:0}.account-center h2{font-size:17px}.account-center header p,.account-note,.account-center time,.account-center small{color:var(--tx2);font-size:11px}.account-center nav{display:flex;gap:8px;flex:none;padding:12px 22px;border-bottom:1px solid var(--line)}.account-center button,.account-center input,.account-center textarea,.account-center select{font:inherit;color:inherit;border:1px solid var(--line);border-radius:8px;background:var(--workbench-bg);min-width:0}.account-center button{cursor:pointer;min-height:36px;padding:6px 13px;white-space:nowrap}.account-center button:hover,.account-center button[aria-selected=true]{border-color:var(--accent);background:var(--surface)}.account-center button:disabled{opacity:0.5;cursor:default}.account-center button:focus-visible,.account-center input:focus-visible,.account-center textarea:focus-visible,.account-center select:focus-visible,.account-center summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.account-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:20px 22px;scrollbar-gutter:stable}.account-center footer{border-top:1px solid var(--line);padding-block:12px}.account-center [data-account-message]{min-width:0;overflow-wrap:anywhere;color:var(--tx2)}.account-center [data-account-message][data-error=true]{color:hsl(var(--sem-err))}.account-summary{display:grid;grid-template-columns:1fr 1fr;gap:12px}.account-summary>div{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:12px;padding:16px}.account-summary strong{font-size:17px}.account-section{margin-top:20px;border-top:1px solid var(--line);padding-top:18px}.account-section h3{font-size:13px;margin-bottom:12px}.account-center label{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;min-width:0}.account-center input,.account-center select{min-height:36px;padding:7px 10px}.account-center textarea{resize:vertical;padding:9px;max-width:100%;min-height:68px}.account-inline{display:flex;align-items:end;gap:12px;margin-bottom:10px}.account-inline label{flex:1;margin:0}.account-inline button{flex:none}.account-note{margin-top:10px!important;line-height:1.65}.account-section-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.account-section-head label{flex-direction:row;align-items:center;white-space:nowrap}.account-ledger article{padding:12px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.account-ledger article>div{display:flex;justify-content:space-between;gap:16px}.account-ledger small{display:block}.account-amount{white-space:nowrap}.account-pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px}.account-empty{padding:22px 0;color:var(--tx2)}.account-warning{border:1px solid hsl(var(--sem-warn));border-radius:8px;padding:10px;margin-top:12px!important;color:hsl(var(--sem-warn))}.account-ticket{border:1px solid var(--line);border-radius:8px;padding:12px;margin:12px 0}.account-ticket summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}.account-ticket summary strong{flex:1;min-width:120px;overflow-wrap:anywhere}.account-ticket summary time{width:100%}.account-ticket[open]>p{margin:14px 0}.account-pre{white-space:pre-wrap;overflow-wrap:anywhere}.account-replies article{border-left:2px solid var(--line);padding:8px 12px;margin-bottom:12px}.account-replies time{display:block}.account-services{padding:0;list-style:none}.account-services li{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:10px 0}.account-announcement{border-top:1px solid var(--line);padding:14px 0}.account-announcement h4{font-size:13px}.account-announcement p{margin-top:8px}
+@media(max-width:600px){.account-center{width:calc(100vw - 12px);height:calc(100vh - 12px);border-radius:12px}.account-center header,.account-center footer,.account-scroll{padding:14px}.account-center nav{padding:10px 14px;gap:6px}.account-center nav button{padding:6px;flex:1;font-size:11px;white-space:normal}.account-inline{flex-wrap:wrap}.account-inline label{flex-basis:42%;min-width:100px}.account-inline button{width:100%}.account-summary{gap:8px}.account-summary>div{padding:12px}.account-center h2{font-size:17px}.account-pagination{gap:6px;font-size:11px}.account-pagination button{padding:6px 8px}.account-ledger article>div{flex-wrap:wrap;gap:2px}.account-section-head{align-items:start;flex-direction:column;gap:0}.account-center footer{align-items:start}.account-center footer button{flex:none}}
+
+
+
+.account-center.account-center-embedded{display:block;width:100%;height:auto;min-width:0;max-width:100%;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;overflow:visible;font-size:13px;line-height:1.6;}
+.account-center-embedded .account-scroll{padding:0;overflow:visible;scrollbar-gutter:auto;}
+.account-center-embedded footer{margin-top:16px;padding:12px 0 0;gap:8px;flex-wrap:wrap;background:transparent;font-size:11px;}
+.account-center-embedded footer>span{flex:1 1 100%;}
+.account-center-embedded input,.account-center-embedded select,.account-center-embedded textarea{width:100%;max-width:100%;min-height:32px;padding:8px;border-radius:var(--radius-control);background:var(--surface-faint);font-size:13px;line-height:1.6;}
+.account-center-embedded textarea{min-height:80px;}
+.account-center-embedded button{min-height:32px;max-width:100%;padding:8px 12px;border-radius:var(--radius-control);background:var(--surface);font-size:11px;font-weight:600;line-height:1.6;white-space:normal;overflow-wrap:anywhere;}
+.account-center-embedded button:hover:not(:disabled){background:var(--surface-strong);}
+.account-center-embedded label{gap:4px;margin-bottom:12px;color:var(--tx2);font-size:11px;line-height:1.6;overflow-wrap:anywhere;}
+.account-center-embedded .account-inline,.account-center-embedded .account-section-head{display:flex;flex-direction:column;align-items:stretch;gap:8px;}
+.account-center-embedded .account-inline{margin-bottom:12px;}
+.account-center-embedded .account-inline label{margin:0;min-width:0;}
+.account-center-embedded .account-section-head label{display:flex;flex-direction:column;align-items:stretch;white-space:normal;}
+.account-center-embedded .account-summary{gap:8px;grid-template-columns:repeat(2,minmax(0,1fr));}
+.account-center-embedded .account-summary>div{padding:12px;min-width:0;border-radius:var(--radius-control);background:var(--surface-faint);}
+.account-center-embedded .account-summary strong{overflow-wrap:anywhere;}
+.account-center-embedded .account-summary span{font-size:11px;color:var(--tx2);overflow-wrap:anywhere;}
+.account-center-embedded .account-section{margin-top:16px;padding-top:16px;}
+.account-center-embedded .account-section:first-child{margin-top:0;padding-top:0;border-top:0;}
+.account-center-embedded .account-section h3,.account-center-embedded .account-announcement h4{font-size:13px;font-weight:600;line-height:1.5;overflow-wrap:anywhere;}
+.account-center-embedded .account-note{margin-top:8px!important;font-size:11px;line-height:1.6;overflow-wrap:anywhere;}
+.account-center-embedded .account-ledger article>div{flex-wrap:wrap;gap:4px 8px;}
+.account-center-embedded .account-amount{white-space:normal;overflow-wrap:anywhere;}
+.account-center-embedded .account-pagination{flex-wrap:wrap;gap:8px;margin-top:12px;font-size:11px;}
+.account-center-embedded .account-pagination>span{min-width:0;overflow-wrap:anywhere;}
+.account-center-embedded .account-empty{padding:16px 0;font-size:13px;overflow-wrap:anywhere;}
+.account-center-embedded .account-warning{padding:12px;border-radius:var(--radius-control);font-size:11px;line-height:1.6;overflow-wrap:anywhere;}
+.account-center-embedded .account-ticket{padding:12px;border-radius:var(--radius-control);background:var(--surface-faint);}
+.account-center-embedded .account-ticket summary{min-height:32px;gap:4px 8px;}
+.account-center-embedded .account-ticket summary strong{min-width:0;flex-basis:100%;font-size:13px;font-weight:600;}
+.account-center-embedded .account-ticket summary>span{font-size:11px;color:var(--tx2);overflow-wrap:anywhere;}
+.account-center-embedded .account-ticket[open]>p{margin:12px 0;}
+.account-center-embedded .account-pre{font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;}
+.account-center-embedded .account-replies article{padding:8px 12px;}
+.account-center-embedded .account-services{margin:12px 0;}
+.account-center-embedded .account-services li{flex-wrap:wrap;gap:4px 8px;padding:12px 0;overflow-wrap:anywhere;}
+.account-center-embedded .account-services li>span{font-size:11px;color:var(--tx2);}
+.account-center-embedded .account-announcement{padding:12px 0;}
+
+/* ══ 2026-10-15 设置卡「积分与充值」重排 ════════════════════════════════════
+ *   · 兑换卡密：默认收起，设置卡标题行的「兑换卡密」按钮把这一节标成 [data-redeem-open] 时往下展开
+ *     （grid 行高 0fr → 1fr 做"下滑"，不量高度、不跳）。独立弹窗那一版一直展开（没有那颗按钮）。
+ *   · 账单 / 余额提醒：<details> 折叠，默认收。
+ *   · 卡密框和按钮【横排一行】（原来竖着叠，太长）。 */
+.account-center-embedded .account-redeem-panel{display:grid;grid-template-rows:0fr;visibility:hidden;
+  transition:grid-template-rows var(--m-base) var(--ease-out,ease),visibility 0s linear .24s}
+.account-center-embedded .account-redeem-panel>.arp-in{min-height:0;overflow:hidden}
+[data-redeem-open] .account-center-embedded .account-redeem-panel{grid-template-rows:1fr;visibility:visible;transition:grid-template-rows var(--m-base) var(--ease-out,ease)}
+.account-center-embedded .account-redeem-panel .account-inline{flex-direction:row;align-items:flex-end;margin-top:4px}
+.account-center-embedded .account-redeem-panel .account-inline>label{flex:1 1 auto;margin-bottom:0}
+.account-center-embedded .account-redeem-panel .account-inline>button{flex:none}
+.account-center-embedded .account-redeem-panel .account-note{margin:6px 0 4px}
+.account-center-embedded .account-fold{margin-top:10px;border-top:1px solid var(--line-faint,rgba(255,255,255,.08));padding-top:8px}
+.account-center-embedded .account-fold>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:600;color:var(--tx);min-height:28px}
+.account-center-embedded .account-fold>summary::-webkit-details-marker{display:none}
+.account-center-embedded .account-fold>summary::before{content:'▸';font-size:10px;color:var(--tx2);transition:transform var(--m-fast)}
+.account-center-embedded .account-fold[open]>summary::before{transform:rotate(90deg)}
+.account-center-embedded .account-fold>summary:hover{color:var(--accent)}
+.account-center-embedded .account-fold[open]>*:not(summary){margin-top:8px}

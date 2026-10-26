@@ -1,0 +1,523 @@
+/* ═══ ui-main/css/02-forms-cards.css —— 主界面主样式第 2 / 8 段 ═══
+   管什么：通用表单组件 · 生成卡卡面 · 生成卡底栏 · 设置卡 / 外挂卡版式
+   2026-10-21 从 ui.html 那一整段 <style> 原样切出来；ui.html 按编号顺序 <link> 进来（顺序 = 原来的先后，别调）。 */
+/* ── 以上是文件说明（拼回 ui.html 时会去掉）── */
+  /* ══ 通用表单组件(2026-09-11) ══════════════════════════════
+     ⚠ 全项目【不许出现原生控件的默认外观】(用户定案):
+       · <input type="number"> 右侧那对上下小箭头(spinner)——丑、难点、还会被滚轮误改
+       · <input type="checkbox"> 的原生方块——只换 accent-color 治标不治本
+     数字一律用 .nsl(点按跳值 + 左右拖拽的条)，布尔一律用 .tgl(滑动开关)。
+     ⚠ 底层仍是 range / checkbox：读值的代码(el.value / el.checked)一个字都不用改，
+       只是把外观整个接管过来。 */
+  .nsl{display:flex; flex-direction:column; gap:3px; min-width:0;}
+  .nsl-head{display:flex; align-items:baseline; justify-content:space-between; gap:6px;}
+  .nsl-name{font-size:10px; color:var(--tx2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  /* ⚠ 字号跟标签拉开太多会把 baseline 拽歪，左右两列的标签就不在一条线上了。
+     11px 够醒目，又不会把"张数"顶得比旁边的"抗截断"低。 */
+  /* ⚠ 字号跟标签拉开太多会把 baseline 拽歪，左右两列的标签就不在一条线上了。 */
+  .nsl-val{
+    font-size:11px; font-weight:600; color:var(--tx);
+    font-variant-numeric:tabular-nums; line-height:1.3;
+    /* 按位滚动: 容器只负责把各位横着排开，【裁切在每一位自己身上】(.rn-d)。
+       ⚠ tabular-nums 不能省 —— 等宽数字才不会在 1↔8 之间左右抖，
+         位宽一变，"只动个位"就会把旁边的位也挤得跟着动。 */
+    display:inline-flex; align-items:baseline; vertical-align:baseline;
+  }
+  .pd-slider-val{display:inline-flex; align-items:baseline; vertical-align:baseline; font-variant-numeric:tabular-nums;}
+  /* 一位数字 = 一个独立滚轮 */
+  .rn-d{display:inline-block; overflow:hidden; height:1.35em; line-height:1.35;}
+  .rn-d i{display:block; font-style:normal; line-height:1.35;}
+  .nsl-range{
+    -webkit-appearance:none; appearance:none; width:100%; height:4px; margin:5px 0 2px;
+    border-radius:4px; outline:none; cursor:pointer;
+    /* --fill 由 JS 实时更新: 左边填充色, 右边槽色 */
+    background:linear-gradient(90deg, var(--accent) 0%, var(--accent) var(--fill,0%),
+               rgba(255,255,255,.14) var(--fill,0%), rgba(255,255,255,.14) 100%);
+  }
+  .nsl-range::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:13px; height:13px; border-radius:50%;
+    background:#fff; border:1px solid rgba(0,0,0,.25); box-shadow:var(--shadow-light); cursor:pointer;
+  }
+  .tgl{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:7px 10px; border-radius:8px; cursor:pointer;
+    border:1px solid var(--line); background:rgba(255,255,255,.05);
+    font-size:11px; color:var(--tx2); min-width:0;
+    /* ⭐⭐ 2026-10-15 修（用户报：点「完成音效」开关，设置二级左边整片变空白、只剩右边导航）：
+       下面那个藏起来的 input 是 position:absolute。.tgl 原来【没有定位】⇒ input 的参照物跑到外层
+       （设置卡的 .sc-page，在滚动区【外面】），于是它被算在几千像素以下。
+       点开关 = input 拿到焦点 ⇒ 浏览器为了"让焦点露出来"去滚它所在的外层框 ——
+       连 overflow:hidden 的 .sc-main 也照滚（实测 scrollTop 被推到 2869）⇒ 整页内容跑出视野。
+       ⇒ 让 .tgl 自己当参照物：input 永远贴着开关本身，焦点滚动只会滚正确的那一层、而且几乎不动。
+       ⚠ 设置页里 14 个这种开关全中招（不只音效）；生成卡大二级、三级面板里的 .tgl 同理。 */
+    position:relative;
+  }
+  /* ⚠ 标签换行时开关不能跟着被压扁 —— 它是固定尺寸的操作目标。
+     没有这条的话，长标签会把右边的滑块挤成一条线，点都点不准。 */
+  .tgl .tgl-track{flex:0 0 auto;}
+  /* ⚠ 别加 white-space:nowrap + ellipsis（2026-09-12 去掉）。
+     那正是用户看到「自动校...」的来源 —— 开关的标签是【这一项唯一的说明】，
+     截断了就等于没有标签，用户根本不知道这个开关管什么。
+     设置页里开关已经改成占整行，横向空间够；真放不下就让它换行。 */
+  .tgl-label{min-width:0; line-height:1.4;}
+  /* ⚠ 原生 checkbox 不用 display:none —— 那样键盘 Tab 和读屏都拿不到它。
+     用 position:absolute + opacity:0 藏起来，语义和可访问性都留着。 */
+  .tgl input{position:absolute; opacity:0; width:0; height:0; pointer-events:none;}
+  .tgl-track{
+    flex:0 0 auto; position:relative; width:32px; height:18px; border-radius:8px;
+    background:rgba(255,255,255,.16); transition:background var(--m-fast) var(--ease-soft);
+  }
+  .tgl-dot{
+    position:absolute; left:2px; top:2px; width:14px; height:14px; border-radius:50%;
+    background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.4);
+    transition:transform var(--m-fast) var(--ease-out);
+  }
+  .tgl input:checked ~ .tgl-track{background:var(--accent);}
+  .tgl input:checked ~ .tgl-track .tgl-dot{transform:translateX(14px);}
+  .tgl input:focus-visible ~ .tgl-track{box-shadow:0 0 0 2px hsl(var(--accent-hsl, 211 100% 68%) / .45);}
+
+  /* ══ 生成卡专属: 卡面直接放常用参数(2026-09-11) ══
+     ⚠ 只作用于 [data-card="generation"]，别的主卡还是大图标大标题的老样子。 */
+  .gc-head{
+    /* 标题"能显示但不占位置": 图标/名字/描述压成一行，从原来约 113px 压到 26px。
+       多出来的高度全给参数。 */
+    display:flex; align-items:baseline; gap:7px;
+    white-space:nowrap; overflow:hidden;
+  }
+  /* ⚠ 三个东西字号差很多(19/17/10)，用 baseline 对齐会把图标吊得很高。
+     改成按中线对齐，再给图标一点下沉补偿，看起来才是一行。 */
+  .gc-head{align-items:center;}
+  .gc-head .gc-ico{font-size:17px; line-height:1; filter:drop-shadow(0 2px 6px rgba(0,0,0,.35));}
+  .gc-head .gc-title{font-size:17px; font-weight:600; letter-spacing:.4px; line-height:1.2;}
+  .gc-head .gc-sub{font-size:10px; color:var(--tx2); overflow:hidden; text-overflow:ellipsis; line-height:1.2; padding-top:2px;}
+
+  /* ⭐⭐ 生成卡底栏（2026-09-13）：标题从顶部搬到这儿。
+     ⚠ 为什么非得在底部：主卡叠压时只露出最下面 STEP=34px，
+       标题在顶部的话一叠压就全被盖住，分不清下面压着哪几张卡。
+     排版按用户定的层级：【左】图标+卡名（大） 【右】张数·分辨率·比例·模型（小）。 */
+  .gc-foot{
+    position:absolute; left:26px; right:26px; bottom:10px; height:26px;
+    /* ⚠ 左对齐 + baseline（2026-09-13 用户要求）：卡名贴左边缘，
+       次级信息推到右边。baseline 让 16px 的卡名和 10px 的信息底线齐平，
+       用 center 的话小字会飘在中间看着没对齐。 */
+    display:flex; align-items:baseline; justify-content:flex-start; gap:8px; z-index:3;
+    white-space:nowrap; overflow:hidden;
+  }
+  /* 2026-09-13 起不显示（用户要求）—— 留着类名免得别处引用炸。
+     ⚠ 2026-09-14 一度把它改成显示 38px 大图标，是错的：
+       底栏只有 height:26px，38px 塞进去会溢出到卡面上（用户截图）。
+       而且用户明确"不要擅自增加图标" —— 这里本来就是藏着的，保持藏着。 */
+  .gc-foot .gc-foot-ico{display:none;}
+  .gc-foot .gc-foot-name{font-size:15px; font-weight:600; letter-spacing:.4px; flex:0 0 auto;}
+  /* 次级信息压小压淡：它是"需要时能查到"，不是"一眼看到" */
+  .gc-foot .gc-foot-info{
+    flex:1; min-width:0; text-align:right;
+    font-size:10px; color:var(--tx2); letter-spacing:.2px;
+    overflow:hidden; text-overflow:ellipsis;
+  }
+
+  /* ⭐ 设置卡 / 外挂能力卡：学生成卡的版式（2026-09-13 用户要求）。
+     卡面放最常用的开关，标题在底栏 —— 叠压时只露出最下面 34px，
+     标题在顶部等于完全看不见。 */
+  /* ⚠⚠ top 从 20 → 30（2026-09-13 用户实测"内容高到顶部的拖拽 bar 上了"）：
+     .dragbar 占的是 y=10~24px（top:10px + height:14px，z-index:3 还压在卡面内容之上），
+     参数区从 20px 起就直接撞上去了 —— 第一行的标签会被那条横条压住一截。
+     30px 是剪影卡 .ps-canvas 用的同一个值（那边注释写明了"必须避开拖动横条"）。 */
+  .bc-inner.bc-compact{padding:30px 26px 48px;}
+  .bc-fields{
+    position:absolute; left:26px; right:26px; top:30px; bottom:48px;
+    display:grid; grid-template-columns:1fr 1fr; gap:9px 8px; align-content:start;
+    overflow:hidden;   /* ⚠ 不许滚：主卡任何地方都要能滚轮切卡 */
+  }
+  /* ⚠ .bc-fields 的控件样式【不在这里】，统一写在下面 .gc-fields 那一段里
+     （那段的选择器同时列了 .gc-fields 和 .bc-fields）。
+     ⚠⚠ 这里原来单独写了两条 .gcf 规则 + 一句"复用生成卡样式"的注释 ——
+       那句注释是错的：只复用了格子，下拉框/开关/滑块的样式全写死在 .gc-fields 上，
+       所以设置卡和外挂卡的控件一直没有边框和交互反馈（2026-09-14 用户实测发现）。
+       已合并，别再在这儿单独写一套。 */
+  .bc-foot{
+    position:absolute; left:26px; right:26px; bottom:10px; height:26px;
+    display:flex; align-items:baseline; justify-content:flex-start; gap:8px; z-index:3;
+    white-space:nowrap; overflow:hidden;
+  }
+  .bc-foot .bc-foot-name{font-size:15px; font-weight:600; letter-spacing:.4px; flex:0 0 auto;}
+  .bc-foot .bc-foot-info{
+    flex:1; min-width:0; text-align:right;
+    font-size:10px; color:var(--tx2); letter-spacing:.2px;
+    overflow:hidden; text-overflow:ellipsis;
+  }
+  .gc-fields{
+    /* ⚠ bottom 必须跟着底部有没有东西走。2026-09-11「打开生成」按钮移除后
+       这里留过 84px 的坑，最后两个开关被裁掉半截(用户截图)。
+       ⚠⚠ 2026-09-13 标题搬到底栏(.gc-foot 高 34px + 8 间距)，所以：
+         top 从 62 → 20（顶部不再有标题，直接从上边开始放参数）
+         bottom 从 26 → 48（给底栏让位）
+       ⚠⚠ 2026-09-13 下半场又把 top 从 20 → 30：20 会撞上拖拽条(.dragbar 占 y=10~24px,
+         而且它 z-index:3 压在卡面内容之上)，用户实测"内容高到顶部的拖拽 bar 上了"。
+         30 和剪影卡 .ps-canvas 取同一个值(那边注释写明了"必须避开拖动横条")。
+       ⚠ 高度账（这张卡是最挤的）：可用 400-30-48=322；
+         内容 = 模型44 + (分辨率|宽高比)44 + (张数|抗截断)44 + (抓取分辨率|传回图层)44
+                + 两个整行开关约 32×2 + 5 道 9px 间距 ≈ 285 → 还剩约 37px 余量。
+         再加控件【必须回来重算这笔账】，因为这里不许滚。
+       ⚠ 主卡任何地方都要能滚轮切卡，所以这里【不能滚】——
+       内容必须一屏放得下，加控件前先算高度。 */
+    position:absolute; left:26px; right:26px; top:30px; bottom:48px;
+    display:grid; grid-template-columns:1fr 1fr; gap:9px 8px; align-content:start;
+    overflow:hidden;
+  }
+  .generation-compute{grid-column:1 / -1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) 26px;grid-template-rows:26px 16px;gap:3px 5px;border-bottom:1px solid var(--line-faint);padding-bottom:5px;}
+  .generation-compute select{width:100%;min-width:0;height:26px;background:var(--surface);border:1px solid var(--line);border-radius:4px;color:var(--tx);padding:0 6px;font:inherit;font-size:11px;}
+  .generation-compute .uisel-trigger{min-height:26px;height:26px;padding:0 6px;border-radius:4px;font-size:11px;}
+  .generation-compute button{border:0;background:transparent;color:var(--tx2);font:inherit;font-size:10px;padding:0;text-align:left;cursor:pointer;min-width:0;}
+  .generation-compute button:hover{color:var(--tx);}
+  .generation-compute button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+  .generation-compute [data-generation-account]{grid-column:1 / -1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:16px;}
+  .generation-compute [data-generation-config]{display:flex;align-items:center;justify-content:center;border-radius:4px;}
+  .gc-fields:has(.generation-compute){gap:7px 8px;}
+  /* ⚠⚠ 下面这一整段【必须同时写 .gc-fields 和 .bc-fields】(2026-09-14 用户实测)。
+     生成卡用 .gc-fields，设置卡/外挂卡用 .bc-fields。
+     435 行那句注释写着"复用生成卡的 .gcf 格子样式"——**只复用了格子，没复用控件样式**，
+     因为这些选择器全写死了 .gc-fields。结果：设置卡和外挂卡的下拉框/开关一直在裸奔
+     （没边框、没底色、没过渡、按下没反馈），而生成卡是好的。
+     用户原话：「设置卡和外挂卡的主卡按钮没动画 生成卡就有」。
+     ⚠ 以后再加这类规则，**两个前缀一起写**，或者干脆提取个公共类。 */
+  .gc-fields .gcf, .bc-fields .gcf{display:flex; flex-direction:column; gap:4px; font-size:10px; color:var(--tx2); min-width:0;}
+  .gc-fields .gcf.full, .bc-fields .gcf.full{grid-column:1 / -1;}
+  /* ⚠⚠ 2026-10-07 生成卡「模型」栏：改成【半宽 + 右边一块"约能生成多少张"】（用户要求）。
+     ⚠⚠⚠ 这里踩了两个坑，都记下来：
+       坑1：第一版把估算块塞进 <label> 里 ⇒ label 变成 grid 容器，跟外层栅格打架，
+            估算块【掉到了下拉框下面】（实拍看出来的）。
+       坑2：第二版改成"文字 | 下拉框 | 估算块"三列 —— 但【grid 项不能是纯文本节点】，
+            浏览器会把"模型"两个字包成一个【匿名 grid 项】，
+            于是列跟我的预期错位 ⇒ 下拉框被压成 【17×1 像素】，
+            用户看到的就是"没有对齐 + 模型名只显示一个字母"。
+       ⇒ 定案：【文字另起一行（跟"分辨率/宽高比"那两格一个长相）】，
+         下一行 = 下拉框(左) + 估算块(右)，用 flex 平分。
+         这样既跟同排的两格对齐，又不用赌 grid 的匿名项规则。 */
+  .gc-fields .modelrow,.bc-fields .modelrow{grid-column:1 / -1;display:flex;flex-direction:column;
+    gap:4px;min-width:0;font-size:10px;color:var(--tx2);}
+  /* ⚠⚠⚠ 别用 select 当"看得见的那个"：ui-select 把原生 select 藏成 1×1 像素
+     （ui.html:2865 `select.uisel-native{position:absolute;width:1px;height:1px}`），
+     它是"值的载体"；用户看到的是它旁边那个 .uisel-trigger。
+     （我第一版就量错了对象 —— 量出"下拉框 17×1 像素"，其实是那个隐身 select。）
+     ⇒ 左右两块都必须约束到【同一档宽度】，否则又会出现"一块宽一块窄"的错位。 */
+  .modelrow-line{display:flex;align-items:center;gap:8px;min-width:0;}
+  .modelrow-line>.uisel-trigger,.modelrow-line>select{flex:1 1 0;width:auto;min-width:0;}
+  .model-quota{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:5px;padding:0 7px;
+    border:1px solid var(--line);border-radius:4px;background:var(--surface-faint);
+    font-size:10px;color:var(--tx2);white-space:nowrap;overflow:hidden;height:26px;box-sizing:border-box;}
+  .model-quota b{font-variant-numeric:tabular-nums;font-size:11px;color:var(--tx);font-weight:600;}
+  /* ⭐ 2026-10-15（用户：「本次花多少钱」被「够多少张」挤出去了）：阿吉那块改成【框里两行小字】——
+     上行「$单价/张 · 本次 $合计」、下行「余额够 N 张」。⚠ 框的外高不变（还是 26px），
+     卡片高度账一点不动（见下面 empty 那条注释：这张卡只剩 ~37px 余量，不许把框撑高）。 */
+  .model-quota[data-lines="2"]{flex-direction:column;align-items:flex-start;justify-content:center;gap:0;line-height:12px;}
+  .model-quota[data-lines="2"]>.mq-l{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .model-quota[data-lines="2"] b{font-size:10px;}
+  .model-quota[data-state="none"]{opacity:.75;}
+  .model-quota[data-state="unknown"]{color:var(--tx2);}
+  /* ⚠⚠ 2026-10-08：没配连接时的空态。用户定："空的那个地方就过去就是没有模型，
+     请到设置里面配置连接API key就OK"。
+     ⚠ 空态【要显眼】——它不是"暂时没有"，而是"你得先去配"，所以用提醒色左标识。
+     ⚠⚠ 但【不许换行】：这张卡的高度账只剩约 37px 余量（见 .gc-fields 注释），
+       换行 = 多 9px 起，两个开关就会被挤出可视区。所以 nowrap + 省略号，
+       全文放 title 悬停看（跟"模型 id 太长"同一个处理办法）。 */
+  .model-quota[data-state="empty"]{color:var(--tx);border-color:hsl(var(--sem-warn) / .55);
+    border-left:3px solid hsl(var(--sem-warn) / .8);}
+  .modelrow-line>select:disabled{opacity:0.5;cursor:default;}
+  .modelrow-line>select:disabled+.uisel-trigger,.modelrow-line>.uisel-trigger:disabled{opacity:0.5;cursor:default;}
+  /* ⚠ 必须排除 [type=range]：拖拽条底层也是 <input>，被这条规则命中就会套上
+     30px 的框+边框+底色，变成"一个大盒子里飘着个白点"，还跟旁边的下拉框错位
+     (2026-09-11 用户截图)。条的样式由 .nsl-range 全权负责。 */
+  .gc-fields .gcf select,.gc-fields .gcf input:not([type=range]),
+  .bc-fields .gcf select,.bc-fields .gcf input:not([type=range]){
+    width:100%; height:30px; padding:0 8px; border-radius:8px;
+    border:1px solid var(--line); background:rgba(255,255,255,.07); color:var(--tx);
+    font-size:12px; font-family:inherit; outline:none;
+    transition:border-color var(--m-fast), background var(--m-fast), transform var(--m-fast) var(--ease-out);
+  }
+  .gc-fields .gcf select:focus,.gc-fields .gcf input:not([type=range]):focus,
+  .bc-fields .gcf select:focus,.bc-fields .gcf input:not([type=range]):focus{border-color:var(--line-strong);}
+  /* 悬停提亮 + 按下回缩（2026-09-14 补：原来这两张卡上的控件完全没有反馈） */
+  .gc-fields .gcf select:hover,.bc-fields .gcf select:hover{background:rgba(255,255,255,.12);}
+  .gc-fields .gcf select:active,.bc-fields .gcf select:active{transform:scale(.98);}
+  /* 两列要在同一条基线上: 下拉框那列是 10px 标签 + 4 gap + 30 控件 = 44,
+     条这列也撑到 44，并让条落在跟下拉框同样的垂直位置。 */
+  .gc-fields .nsl, .bc-fields .nsl{min-height:44px;}
+  .gc-fields .nsl-range, .bc-fields .nsl-range{margin-top:auto; margin-bottom:12px;}
+  .gc-fields .nsl-head, .bc-fields .nsl-head{min-height:14px;}
+  .gc-fields .gcf-switch, .bc-fields .gcf-switch{
+    grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between;
+    gap:8px; font-size:11px; color:var(--tx2);
+    padding:7px 10px; border-radius:8px;
+    border:1px solid var(--line); background:rgba(255,255,255,.05);
+    cursor:pointer;
+    transition:background var(--m-fast), border-color var(--m-fast), transform var(--m-fast) var(--ease-out);
+  }
+  .gc-fields .gcf-switch:hover, .bc-fields .gcf-switch:hover{
+    background:rgba(255,255,255,.10); border-color:var(--line-strong);
+  }
+  .gc-fields .gcf-switch:active, .bc-fields .gcf-switch:active{transform:scale(.98);}
+  .gc-fields .gcf-switch input, .bc-fields .gcf-switch input{width:15px; height:15px; accent-color:var(--accent); cursor:pointer;}
+  /* 生成卡的主按钮沉到底部(别的卡还是垂直居中) */
+  .block-card[data-card="generation"] .bc-corebtn{top:auto; bottom:26px; transform:none;}
+  .block-card[data-card="generation"] .bc-corebtn:hover{transform:scale(1.02);}
+  .block-card[data-card="generation"] .bc-corebtn:active{transform:scale(.98);}
+  .block-card .bc-thumb{
+    position:absolute;left:26px;right:26px;bottom:26px;height:150px;border-radius:12px;
+    background:hsl(var(--accent-hsl, 211 100% 68%) / .1);
+    display:flex;align-items:center;justify-content:center;font-size:44px;color:var(--tx2);
+     border:1px solid var(--line-faint); transition:opacity var(--m-fast) var(--ease-soft);
+  }
+
+  /* 二级: 分区(卡片右侧) */
+  .zones{
+    position:absolute; top:0; left:340px;
+    display:flex; flex-direction:column; gap:16px;
+    opacity:0; pointer-events:none;
+    transform:translateX(-40px);
+    transition:opacity var(--dur) var(--ease-soft), transform var(--dur) var(--ease-out);
+  }
+  /* 每张二级卡【弹出光】: 贴 .zone 左缘, 卡滑入时亮一次随自身出场动画灭。
+     ⚠ 不靠 ::before/::after(试过都看不到 —— 伪元素在 .z-body(有 will-change) 层叠里被盖)。
+       改用真实元素 .zone-glow, 由 JS 注入(同 .z-selglow 机制), z-index 最高在前。
+       显示的亮/灭由 JS 直接控制(设 opacity/width + transition), 不依赖 CSS animation。 */
+  .zone-glow{
+    position:absolute; left:0; top:0; bottom:0; width:0;
+    pointer-events:none; z-index:1;       /* ⚠ 统一层级(2026-09-11): 遮罩 < 光(z1) < 内容(z2)。光永远压在文字/按钮之下 */
+    /* 颜色: 有背景图跟图走(--glow-hsl), 无图回落二级默认绿 */
+    background:linear-gradient(90deg,
+      hsl(var(--glow-hsl, var(--glow-zone)) / 1) 0%,
+      hsl(var(--glow-hsl, var(--glow-zone)) / .6) 55%,
+      hsl(var(--glow-hsl, var(--glow-zone)) / 0) 100%);
+    opacity:0;                       /* 默认隐藏, 由 JS 弹二级时点亮 */
+    width:0;
+  }
+  /* ⚠ 亮边线(一级有, 二级之前漏了): 独立元素 .zone-bright, 贴左缘 3px 亮线.
+     不继承 .zone-glow 的 opacity(否则跟光绑一起, 没分开). 默认隐藏, 弹二级时亮. */
+  .zone-bright{
+    position:absolute; left:0; top:0; bottom:0; width:3px;
+    pointer-events:none; z-index:1;       /* 与光带同层, DOM 顺序在后自然盖光带; 仍在内容(z2)之下 */
+    /* ⚠ 样式跟一级 .edgehint::after 一致: 纯色渐变, 不加 brightness/box-shadow(那样过亮).
+       峰值亮度由动画控制(.9, 同一级)。颜色同光带: 有图跟图走。 */
+    background:linear-gradient(180deg, transparent, hsl(var(--glow-hsl, var(--glow-zone)) / 1), transparent);
+    opacity:0;                          /* 默认隐藏, 由 JS 弹二级时点亮 */
+  }
+  /* 亮线动画: 只动 opacity(width 固定 3px), 时序跟光带 zoneGlowSweep 对齐(亮→保持→非线性渐灭)
+     ⚠ 峰值 .9 对齐一级 .edgehint::after 的 opacity:0.95 (不用 1, 那样偏亮) */
+  @keyframes zoneBrightSweep{
+    0%   { opacity:0; }
+    16%  { opacity:0.95; }
+    40%  { opacity:0.95; }
+    55%  { opacity:0.3; }                /* 先快衰减(跟光带同步), 后慢趋零 */
+    100% { opacity:0; }
+  }
+  .zone-bright.glow{ animation:zoneBrightSweep var(--dur, .6s) var(--ease-out) forwards; }
+  /* 弹出光: Apple 标准 + 有呼吸的消失.
+     ⚠ 宽度按【卡片宽度比例】与一级对齐: 一级 300px→光44px(≈14.7%), 二级 200px→光29px.
+       之前写死 56px 反而比一级宽(反了, 二级卡更窄). */
+  @keyframes zoneGlowSweep{
+    0%   { opacity:0; width:0px; }
+    16%  { opacity:1; width:29px; }      /* 快而干脆地亮到满(按二级卡宽比例) */
+    40%  { opacity:1; width:29px; }      /* 短暂保持 */
+    55%  { opacity:0.5; width:12px; }     /* 快速衰减大半(先快) */
+    100% { opacity:0; width:0px; }       /* 收尾缓慢趋零(后慢) */
+  }
+  .zone-glow.glow{ animation:zoneGlowSweep .6s var(--ease-out) forwards; }
+  .zones.show{opacity:1; pointer-events:auto; transform:translateX(0);}
+  /* 收起: 沿来的路径反向退(从右往左滑回) */
+  .zones.closing{opacity:0; transform:translateX(-40px); pointer-events:none;}
+  .zone{
+    position:relative;
+    width:200px; height:88px; border-radius:12px; background-color:var(--bg-solid);
+    background-clip:padding-box;    /* 同主卡: 背景不铺到边框下, 防圆角外亮边 */
+    isolation:isolate;
+    backdrop-filter:blur(var(--blur)) saturate(1.5); -webkit-backdrop-filter:blur(var(--blur)) saturate(1.5);
+    border:1px solid var(--line); box-shadow:var(--shadow-mid);
+    cursor:pointer;
+    transform:translateX(-18px); opacity:0;
+    transition:transform var(--dur) var(--ease-out), opacity var(--m-base) var(--ease-soft), border-color var(--m-fast);
+    overflow:hidden;                /* 裁切滑动的 .z-body, 防止背景/颜色出框 */
+  }
+  /* 选中: 左右向内光带(不用 border 变色, 避免边缘锯齿) */
+  .zone .z-selglow{
+    position:absolute; inset:0; border-radius:12px; pointer-events:none; opacity:0; z-index:1;   /* 统一层级: 光 z1, 内容 z2 */
+    background:
+      linear-gradient(90deg, hsl(var(--accent-hsl, 211 100% 68%) / .45), transparent 34%),
+      linear-gradient(270deg, hsl(var(--accent-hsl, 211 100% 68%) / .45), transparent 34%);
+    transition:opacity var(--m-base) var(--ease-soft);
+  }
+  .zone.sel .z-selglow{opacity:1;}
+  .zones.show .zone{transform:translateX(0); opacity:1;}
+  /* 内容层: 背景+内容一起, 在框内上下滑动换新(与主卡平移同一语言)。
+     圆角/裁切交给 .zone(overflow:hidden), 这里不再自己裁, 否则双重裁切且滑动会出框 */
+  .z-body{
+    position:absolute; inset:0;             /* 撑满 .zone, 承载背景 */
+    display:flex; align-items:center; gap:12px; padding:14px 16px;
+    background-size:cover; background-position:center;
+    background-image:none !important;
+    /* ⚠ 自己也要圆角: will-change 会把这层提成合成层, 父级圆角对合成层是硬边裁(无抗锯齿)
+       → 圆角处出锯齿毛边。自带圆角后这层边缘自己就是抗锯齿的。 */
+    border-radius:12px; background-clip:padding-box;
+    will-change:transform, opacity;
+  }
+  /* ⚠ 二级遮罩(一级有 .block-card::before, 二级之前漏了): 压暗背景图保证文字可读。
+     必须挂在 .z-body 上而不是 .zone —— 背景图就在 .z-body, 而且 .zone::before 会被
+     .z-body(有 will-change 的合成层)盖住(之前踩过)。
+     ⚠ .z-body 是 flex 容器, ::before 会作为 flex 项参与布局并盖住后面的内容
+       → absolute 脱离布局。层级用"内容提层"而不是给遮罩 z-index:-1
+       (负值在有层叠上下文时会跑到背景之下就看不见了)。 */
+  .z-body::before{
+    content:''; position:absolute; inset:0; border-radius:12px;
+    /* 2026-10-22（docs/263 第 20 条）：没设背景图时平铺；has-bg 照旧渐变压字 */
+    background:linear-gradient(hsl(var(--card-h, 220 28%) 8% / .6), hsl(var(--card-h, 220 28%) 8% / .6)),
+      var(--card-bg-image, none);
+    background-size:cover; background-position:center;
+    opacity:var(--ui-bg-opacity,1); z-index:1;
+    pointer-events:none;
+  }
+  /* 内容(图标/文字)提到遮罩之上 */
+  .z-body > *{ position:relative; z-index:2; }   /* ⚠ 内容 z2 —— 所有光(z1)都压在它下面 */
+  /* 有自定义背景图时遮罩略减淡, 让图更透出(同一级的 has-bg 逻辑) */
+  .zone.has-bg .z-body::before{
+    background:linear-gradient(180deg, hsl(var(--card-h, 220 28%) 8% / .5), hsl(var(--card-h, 220 28%) 8% / .28) 40%, hsl(var(--card-h, 220 28%) 8% / .42)),
+      var(--card-bg-image, none);
+    background-size:cover; background-position:center;
+  }
+  /* 去 delay: 高亮/选中立即跟手, 不排队等动画 */
+  /* ⚠ z-ic 给固定宽 + flex-shrink:0 —— emoji 宽度不一(🎨/✂/🧹/🎚), 不锁宽会让文字
+     左侧起点随图标宽度漂移, 4 个分区文字不齐。锁 30px 图标, 文字从固定位置起。 */
+  .zone .z-ic{font-size:24px;width:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+  .zone .z-name{font-size:17px;font-weight:600;}
+  .zone .z-sub{font-size:11px;color:var(--tx2);margin-top:3px;}
+  /* 悬停/选中: 只用光带(z-selglow)表达, 不硬变背景/border(否则边缘锯齿) */
+  .zone:hover .z-selglow{opacity:.5;}
+  .zone.sel .z-selglow{opacity:1;}
+  /* ⚠ 预设卡那张单卡【不要】整卡悬停光 —— 它是个列表, 光该在行上(.pz-row), 不在卡上。
+     用户 2026-09-11: 鼠标一上卡整张就亮, 像是被选中了。只关 .pzone, 别的主卡二级照旧。 */
+  .zone.pzone:hover .z-selglow, .zone.pzone.sel .z-selglow{opacity:0;}
+
+  /* 三级: 详情卡 */
+  .detail-card{
+    position:absolute; top:0; left:580px;
+    width:300px; height:400px; border-radius:28px;
+    background-color:transparent; background-size:cover; background-position:center;
+    background-image:none !important;
+    /* ⚠ 上次给主卡/二级加了 padding-box 却漏了这里 → 渐变从半透明边框底下透出,
+       圆角外沿一圈粉边(颜色溢出)。 */
+    background-clip:padding-box;
+    isolation:isolate;
+    backdrop-filter:blur(30px) saturate(1.6); -webkit-backdrop-filter:blur(30px) saturate(1.6);
+    border:1px solid var(--line); box-shadow:var(--shadow-heavy);
+    opacity:0; pointer-events:none; padding:24px; overflow:hidden;
+    transform:translateX(-24px);
+    /* ⚠ opacity 与 transform 同频(都用 --dur) —— 之前 opacity .25s 比 transform .34s 快,
+       收起脱节。同频后一起走完。 */
+    transition:transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-soft);
+  }
+  /* ⚠ 三级遮罩(一级有, 三级之前漏了): 压暗背景图保证文字可读。
+     z-index 要 >0 才能盖住背景, 但 .dc-scroll(内容层)也要在它之上 → 给 dc-scroll z-index:2。 */
+  .detail-card::before{
+    content:''; position:absolute; inset:0; border-radius:28px;
+    /* 2026-10-22（docs/263 第 20 条）：没设背景图时平铺（同 01-base.css .block-card::before 的理由）；has-bg 照旧渐变压字 */
+    background:linear-gradient(hsl(var(--card-h, 220 28%) 8% / .6), hsl(var(--card-h, 220 28%) 8% / .6)),
+      var(--card-bg-image, none);
+    background-size:cover; background-position:center;
+    opacity:var(--ui-bg-opacity,1);
+    pointer-events:none; z-index:1;
+  }
+  .detail-card.has-bg::before{
+    background:linear-gradient(180deg, hsl(var(--card-h, 220 28%) 8% / .5), hsl(var(--card-h, 220 28%) 8% / .28) 40%, hsl(var(--card-h, 220 28%) 8%  / .42)),
+      var(--card-bg-image, none);
+    background-size:cover; background-position:center;
+  }
+  /* 详情卡内容: 可滚动(三级内容滚轮上下滑动浏览), 高度撑满去掉 padding 占位 */
+  .detail-card .dc-scroll{
+    position:absolute; inset:0; padding:24px; overflow-y:auto;
+    scrollbar-width:none;
+    overscroll-behavior:contain;
+    z-index:2;                    /* ⚠ 要在遮罩(::before z1)之上, 否则内容被压暗 */
+    /* 滚动容器会被提成合成层, 父级圆角对它是硬边裁(无抗锯齿) → 自带圆角 */
+    border-radius:28px;
+  }
+  /* ⚠ 路线 A(用户 2026-09-11 定案): 从剪影卡【右滑】→ 提示词框直接当二级，出现在二级的位置。
+     它仍是同一张 #detail 卡(尺寸 300×400 不变)，只是 left 从 580 挪到 340。
+     这样滑块/填空/参数记忆全部复用，不用第二套提示词框。
+     点部位进来的路线 B 不带这个 class，三级照旧在 580。 */
+  /* (as-zone 已废弃 2026-09-11 第三版: 路线 A 改用真正的二级卡 #promptZone, 见下面 .qzone) */
+  /* ⚠ 整体滑动层: 跟二级卡 .z-body 同一套语言 —— 切换分区时【整卡内容作为整体】上下滑,
+     不是逐行错落(那跟一级/二级的动作语言割裂)。will-change 常驻合成层防掉帧。 */
+  .detail-card .dc-slide{
+    will-change:transform, opacity;
+    transition:transform var(--m-base) var(--ease-out), opacity var(--m-fast) var(--ease-soft);
+  }
+  /* ⚠ 三级弹出光(参考二级): 真实元素, 放 .detail-card 里 .dc-scroll 之后, z-index 最高防被盖.
+     三级卡300宽(同一级), 光带宽度按比例=44px(一级同款), 从左缘向右渗入.
+     用三级主题色(紫玫, keyToGrad detail 色相带275-355). */
+  .detail-glow{
+    position:absolute; left:0; top:0; bottom:0; width:0;
+    pointer-events:none; z-index:1;
+   /* 统一层级(2026-09-11): 光 z1 < 内容 z2, 光永远压在文字/按钮之下 */
+    /* 颜色: 有背景图跟图走(--glow-hsl), 无图回落三级默认紫玫 */
+    background:linear-gradient(90deg,
+      hsl(var(--glow-hsl, var(--glow-detail)) / 1) 0%,
+      hsl(var(--glow-hsl, var(--glow-detail)) / .6) 55%,
+      hsl(var(--glow-hsl, var(--glow-detail)) / 0) 100%);
+    opacity:0;
+  }
+  /* 三级亮边线: 贴左缘, z 更高(防被光带盖, 同二级坑)
+     ⚠ 样式跟一级 .edgehint::after 一致: 纯色渐变, 不加 brightness/box-shadow */
+  .detail-bright{
+    position:absolute; left:0; top:0; bottom:0; width:3px;
+    pointer-events:none; z-index:1;
+   /* 同层, DOM 在后自然盖光带 */
+    background:linear-gradient(180deg, transparent, hsl(var(--glow-hsl, var(--glow-detail)) / 1), transparent);
+    opacity:0;
+  }
+  /* 三级光动画: 跟二级同款"亮→保持→非线性渐灭" */
+  @keyframes detailGlowSweep{
+    0%   { opacity:0; width:0px; }
+    16%  { opacity:1; width:44px; }      /* 按三级卡宽比例(300px→44px, 同一级) */
+    40%  { opacity:1; width:44px; }
+    55%  { opacity:0.5; width:18px; }
+    100% { opacity:0; width:0px; }
+  }
+  .detail-glow.glow{ animation:detailGlowSweep var(--dur, .6s) var(--ease-out) forwards; }
+  @keyframes detailBrightSweep{
+    0%   { opacity:0; }
+    16%  { opacity:0.95; }
+    40%  { opacity:0.95; }
+    55%  { opacity:0.3; }
+    100% { opacity:0; }
+  }
+  .detail-bright.glow{ animation:detailBrightSweep var(--dur, .6s) var(--ease-out) forwards; }
+  .detail-card.show{opacity:1; pointer-events:auto; transform:translateX(0);}
+  /* 收起: 【与二级同向, 一起向左回收】(向左 = 负方向)。回到来时的起点。 */
+  .detail-card.closing{opacity:0; transform:translateX(-24px); pointer-events:none;}
+  .detail-card .dc-name{font-size:17px;font-weight:600;margin-bottom:14px;}
+  .detail-card .dc-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line-faint);font-size:13px;}
+  .detail-card .dc-row span:first-child{color:var(--tx2);}
+  .detail-card .dc-btn{margin-top:18px;width:100%;padding:13px;border-radius:12px;border:none;cursor:pointer;
+    background:var(--accent);color:#fff;font-size:15px;font-weight:600;
+    box-shadow:0 6px 20px hsl(var(--accent-hsl, 211 100% 68%) / .35);transition:transform var(--m-fast) var(--ease-out), filter var(--m-fast);}
+  .detail-card .dc-btn:hover{transform:translateY(-1px);filter:brightness(1.08);}
+  .detail-card .dc-btn:active{transform:translateY(0) scale(.98);}
+  /* 三级里的背景管理区 */
+  .detail-card .dc-section{margin-top:18px;border-top:1px solid var(--line-faint);padding-top:12px;}
+  /* 放在顶部时: 上边不要分割线, 改用下边线与参数行隔开 */
+  .detail-card .dc-section-top{margin-top:10px;border-top:none;padding-top:0;
+    border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:10px;margin-bottom:6px;}
+  .detail-card .dc-secret-title{font-size:13px;font-weight:600;margin-bottom:10px;color:var(--tx);}
+  /* 下面还有内容的提示: 底部渐隐(不吃鼠标)
+     ⚠ 自己必须带下方圆角, 否则方角顶到卡片圆角外 → 底部两角溢出。 */
+  .detail-card::after{
+    content:''; position:absolute; left:0; right:0; bottom:0; height:34px;
+    background:linear-gradient(180deg, transparent, hsl(var(--card-h, 220 28%) 8% / .55));
+    border-bottom-left-radius:27px; border-bottom-right-radius:27px;
+    pointer-events:none; z-index:3;
+  }
+
+  /* 任务(常驻下方, 与主卡同款叠卡, 对齐主卡堆下沿) */
+  .tasks{
+    position:absolute; top:0; left:60px;       /* ⚠ absolute(铁律6.5): fixed 在拖拽时会漂移, top 由 JS 动态设置(updateStackPositions) */
+    z-index:calc(var(--z-stack,830) + 5); pointer-events:none;          /* ⚠ 必须高于 .errors(831) 和 popupLock(830), 任务卡始终在最上层 */
+  }

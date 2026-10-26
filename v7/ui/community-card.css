@@ -1,0 +1,60 @@
+/* 社区卡（community-card.js）· 2026-10-20
+ * ⚠ 卡面规则收在 .cc-face 里；大二级规则收在 #communityZone 里 —— 不漏到别的卡。
+ *   大二级外壳（右边导航、节标题）跟生成卡 / 问题反馈卡共用 settings-card.css / card-architecture.css。
+ * ⚠ 颜色一律用 tokens.css 的代币，不写死色值。
+ */
+
+/* ═══ 卡面 ═══ */
+/* .bc-fields 默认是 2 列网格（ui.html），卡面只有一个子元素 ⇒ 压成 1 列（同问题反馈卡） */
+.bc-fields[data-community-face]{grid-template-columns:minmax(0,1fr)}
+.cc-face{display:flex;flex-direction:column;gap:8px;min-width:0;padding:2px 0;color:var(--tx)}
+.cc-live{display:flex;align-items:baseline;gap:8px;min-width:0}
+.cc-live-n{font-size:40px;line-height:1;font-weight:700;letter-spacing:-.5px;color:var(--accent);font-variant-numeric:tabular-nums}
+.cc-live-t{font-size:13px;color:var(--tx)}
+.cc-face-sub{font-size:11px;color:var(--tx2);margin-top:4px}
+.cc-face-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+.cc-face-btns .ai-btn{flex:1 1 auto}
+.cc-face-btns .ai-btn[hidden]{display:none}
+.cc-empty{margin:0;font-size:11px;line-height:1.6;color:var(--tx2)}
+.cc-status{margin:0;font-size:11px;line-height:1.6;color:var(--tx2);white-space:pre-wrap;overflow-wrap:anywhere}
+.cc-status:empty{display:none}
+.cc-status[data-kind="ok"]{color:hsl(var(--sem-ok))}
+.cc-status[data-kind="warn"]{color:hsl(var(--sem-warn))}
+.cc-status[data-kind="err"]{color:hsl(var(--sem-err))}
+
+/* 排行（卡面前三 + 大二级前十共用） */
+.cc-rank{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.cc-rank-row{display:flex;align-items:center;gap:8px;min-width:0;padding:5px 8px;border-radius:var(--radius-control);background:var(--surface-faint);font-size:12px}
+.cc-rank-row.me{background:hsl(var(--glow-zone)/.18);outline:1px solid var(--accent)}
+.cc-rk{flex:none;width:20px;height:20px;border-radius:50%;text-align:center;line-height:20px;font-size:11px;font-weight:700;background:var(--line);color:var(--tx)}
+.cc-rank-row:nth-child(1) .cc-rk{background:hsl(45 90% 55%);color:#222}
+.cc-rank-row:nth-child(2) .cc-rk{background:hsl(210 15% 75%);color:#222}
+.cc-rank-row:nth-child(3) .cc-rk{background:hsl(28 60% 55%);color:#222}
+.cc-nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cc-ct{flex:none;color:var(--tx2);font-variant-numeric:tabular-nums}
+
+/* ═══ 大二级 ═══ */
+#communityZone .cc-periods{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+#communityZone .cc-period{all:unset;box-sizing:border-box;cursor:pointer;height:26px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface-faint);color:var(--tx2);font-size:11px;line-height:24px}
+#communityZone .cc-period:hover{color:var(--tx)}
+#communityZone .cc-period.sel{border-color:var(--accent);color:var(--tx);background:hsl(var(--glow-zone)/.16)}
+#communityZone .cc-period:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#communityZone .cc-hot{display:flex;flex-direction:column;gap:8px}
+#communityZone .cc-post{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface-faint);min-width:0}
+#communityZone .cc-post-head{display:flex;align-items:center;gap:6px;min-width:0}
+#communityZone .cc-kind{flex:none;font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid var(--line);color:var(--tx2)}
+#communityZone .cc-kind-preset{border-color:var(--accent);color:var(--tx)}
+#communityZone .cc-post-title{flex:1 1 auto;min-width:0;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#communityZone .cc-post-meta{font-size:10px;color:var(--tx2)}
+#communityZone .cc-post-text{font-size:11px;line-height:1.55;color:var(--tx2);white-space:pre-wrap;overflow-wrap:anywhere}
+#communityZone .cc-post-acts{display:flex;gap:6px;justify-content:flex-end}
+#communityZone .cc-post-acts .ai-btn{height:26px;padding:0 10px;font-size:11px}
+#communityZone .cc-more{all:unset;cursor:pointer;align-self:center;padding:4px 12px;border-radius:8px;border:1px solid var(--line);font-size:11px;color:var(--tx2)}
+#communityZone .cc-more:hover{color:var(--tx)}
+#communityZone .cc-note{margin:6px 0 0;font-size:11px;line-height:1.6;color:var(--tx2)}
+#communityZone .cc-page > .cc-status{margin-bottom:6px}
+
+/* 隐私开关（排行榜那一节下面） */
+#communityZone .cc-privacy{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+#communityZone .cc-privacy[hidden]{display:none}
+#communityZone .cc-switch{font-size:11px}

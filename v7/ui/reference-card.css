@@ -1,0 +1,324 @@
+/* ══════════════════════════════════════════════════════════════════════════
+ * 参考图卡（ui-pure/reference-card.css）
+ * ══════════════════════════════════════════════════════════════════════════
+ * 2026-10-13 新建。用户定案：参考图从"弹窗"改成"报错栏那一片的常驻卡"。
+ *
+ * ⚠⚠ 这套样式是【照抄报错卡】的（.error-card / errorGlowSweep / errorBrightSweep）。
+ *   尺寸、圆角、毛玻璃、阴影、光带动画全部对齐 —— 两个堆摆在一起必须像一套东西。
+ *   报错卡的定义在 ui-pure/ui.html（搜 .error-card）。
+ *
+ * 层级（unit: 报错栏一片）：
+ *   参考图卡默认在报错卡【下面】（.refs 的 z-index 低于 .errors）。
+ *   ⚠ 用户定："它不用最上，而是我们添加参考图、调整参考图的时候，它应该被提到最上。"
+ *     ⇒ 交互中由 JS 加 .refs-front 临时抬到报错卡之上（见 reference-card.js raiseFront()）。
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 容器：它是 #errors 的【子元素】，用堆内坐标（跟 .error-card 同一套） ──
+   ⚠⚠ 2026-10-14 改：原来按"屏幕绝对定位"写（left:60px + z-index:829），挂在 .anchor 里
+     ⇒ ① 坐标系错了（.anchor 自己 left/top 各 60，叠加成 120）② 被 .anchor 的 z-index:5
+     层叠上下文锁死，抬到报错卡之上的机制根本没生效。
+   ⭐ 现在它是 #errors 的子元素 —— #errors 负责屏幕定位，这里只管【堆内往下让多少】
+     （由 reference-card.js 的 reposition() 写 transform，跟报错卡的叠压方式一致）。 */
+.refs{
+  position:absolute; top:0; left:0;
+  /* ⚠ 堆内层级：报错卡在 #errors 里用的是 baseZ(8) 递减，所以这里【低于它们】——
+     报错来了参考图让位（用户 2026-10-13 定）。 */
+  z-index:1;
+  pointer-events:none;      /* 容器不接收事件，由子卡接收（同 .errors） */
+}
+.refs[hidden]{ display:none; }   /* ⚠ 必须写死：没图时整张卡不挂（用户定） */
+/* 正在加图/管图 → 抬到报错卡之上（堆内抬，报错卡最高 8） */
+.refs.refs-front{ z-index:20; }
+
+/* ── 卡本体：照抄 .error-card（300×100 / r28 / p15 / 毛玻璃 / 同款阴影） ── */
+.ref-card{
+  position:absolute; top:0; left:0;
+  width:300px; height:100px;
+  border-radius:28px; padding:15px;
+  background:transparent;
+  isolation:isolate;
+  border:1px solid var(--line);
+  transform-origin:top left; pointer-events:auto;
+  transition:transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-soft);
+  will-change:transform, opacity;
+  box-shadow:var(--shadow-mid);
+  overflow:visible;         /* ⚠ 不能 hidden —— 右滑推出来的管理区在卡【外面】 */
+}
+/* 与主卡 ::before 同样分层：全局只淡化背景，缩略图和文字保持清晰。
+   毛玻璃也在这一层，不能留在本体上，否则调低后背景仍被强烈遮住。 */
+.ref-card::before,
+.ref-panel::before{
+  content:''; position:absolute; inset:0; border-radius:inherit;
+  z-index:0; pointer-events:none;
+  /* 实心底色由全局背景不透明度统一淡化，100% 时不再残留固定 22% 透底。 */
+  background:hsl(var(--card-h, 220 28%) 11%);
+  backdrop-filter:blur(var(--blur)) saturate(1.5);
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(1.5);
+  opacity:var(--ui-bg-opacity,1);
+  transition:opacity var(--m-fast) var(--ease-soft);
+}
+
+/* ── 卡头：图标 + 标题 + 张数 ──
+   ⚠⚠ 2026-10-14 改（用户："前面加了个很丑的这个 URL…再微调一下"）：
+     原来是 图标13px / 文字11px，而【报错卡的头是 图标20 / 标题14】——
+     两张卡就摆在上下隔壁，尺寸差一圈看着就是"不是一套东西"。
+     ⭐ 根因不是"图标选错了"：icons.js 里 G.image 的注释就写着
+       「参考图片 — GPT 80→24」，它本来就是给这张卡做的。
+     病是【23 个矢量部件塞进 13px】—— 那个字形有叠层卡+山+箭头+扫描线四组部件，
+     13px 下糊成一团墨点。报错卡的 ico-close 只有两笔，所以 20px 才清爽。
+     ⚠ 描边宽度不用管：icons.css 按 [width] 属性自动分档（13px→2.2 / 20px→1.9），
+       SVG 自己那个 stroke-width="2" 会被 CSS 覆盖掉。
+     ⚠ 卡片总高 100px 是固定的（跟报错卡同款）：头 18→22 之后
+       下面 .rc-strip 的 margin-top 从 8 收到 4，把 4px 还回去，不然槽行会被挤扁。 */
+.ref-card .rc-head{
+  position:relative; z-index:3;
+  display:flex; align-items:center; gap:7px;
+  height:22px; color:var(--tx2); font-size:13px; letter-spacing:0;
+}
+.ref-card .rc-head-ico{ display:inline-flex; width:20px; height:20px; color:hsl(var(--sem-info)); }
+.ref-card .rc-head-ico svg{ width:20px; height:20px; }
+.ref-card .rc-title{ font-size:13px; color:var(--tx2); }
+.ref-card .rc-count{ font-size:12px; font-variant-numeric:tabular-nums; }
+
+/* ── 图槽行：1:1 缩略图。5 张 50px 正好塞满 270 可用宽 ── */
+.ref-card .rc-strip{
+  position:relative; z-index:3;
+  display:flex; align-items:center; gap:4px;
+  height:50px; margin-top:4px;   /* ⚠ 8 → 4：头部高了 4px，这里还回去（总高 100 不能变） */
+}
+/* ⭐⭐ 2026-10-14 新增（用户要求拖拽排序 + 缩略图上直接删）──
+   .rc-thumb-wrap 是缩略图的定位外壳：拖拽时跟着鼠标走的就是它，
+   右上角那个小叉也挂在它上面（用绝对定位）。
+   ⚠ 为什么要有这一层：小叉要压在缩略图右上角、还要露出一半到框外，
+     直接挂在 .rc-thumb（button）里面会被 button 的 overflow:hidden 裁掉。
+   ⚠ 拖动中的 transform 由 JS 逐帧写行内值（照抄预设列表那套），这里只给默认态。 */
+.ref-card .rc-thumb-wrap{
+  position:relative; flex:0 0 auto; display:inline-flex;
+  overflow:visible;                       /* ⚠ 不 hidden —— 小叉有一半在框外 */
+}
+.ref-card .rc-thumb{
+  flex:0 0 auto; width:50px; height:50px; padding:0; margin:0;
+  border:0; border-radius:8px; overflow:hidden;
+  /* ⚠⚠ 2026-10-14 改（用户："为什么参考图的界面的不透明度没有跟随全局的设置"）：
+     原来这里写的是写死的 rgba(255,255,255,.06)。
+     我当时的理由抄的是原生那句"内容层（文字/控件/缩略图/预览）故意不跟元素级 opacity"——
+     但那条说的是【文字/图片本身】不该被整体透明化（否则图会跟着变淡、看不清）。
+     而这个 .06 白是【缩略图还没加载出图时的底色层】，跟 .block-card::before 是同一类东西，
+     它【该】跟全局不透明度一起淡下去。
+     ⚠ 图本身用 background-image 画（在 background 简写里），它不受这行 alpha 影响 ——
+       所以"图不变淡、底跟着淡"这个意图没被破坏。 */
+  background:rgba(255,255,255,calc(.06 * var(--ui-bg-opacity,1))) center/cover no-repeat;
+  box-shadow:inset 0 0 0 1px var(--line);
+  /* ⚠ 照抄 .pz-row 的 transition（background .12s, transform .12s）——
+     拖动时 JS 会设自己的 transform，:active 在拖动中一直成立，
+     所以按下反馈的幅度要很小（原生只缩 .99，肉眼几乎看不出打架）。 */
+  transition:transform var(--m-fast) var(--ease-out), box-shadow var(--m-fast) linear, background var(--m-fast) linear;
+  /* ⚠ 光标用 grab 不用 pointer：这个元素现在【能拖】。只留这一条，别在别处再写 pointer。 */
+  cursor:grab;
+}
+.ref-card .rc-thumb:hover{ transform:scale(1.06); }
+.ref-card .rc-thumb:active{ transform:scale(.97); cursor:grabbing; }
+.ref-card .rc-thumb:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+/* 拖动中：⭐ 照抄预设列表 .pz-row.dragging 的高亮语言
+   （原生：background rgba(255,255,255,.16) + box-shadow var(--shadow-light) + z-index:5）
+   ⚠ z-index 必须抬起来 —— 拖起来那张要盖在左右邻居上面，不然钻到别人底下很难看。 */
+.ref-card .rc-thumb-wrap.dragging{ z-index:5; }
+.ref-card .rc-thumb-wrap.dragging .rc-thumb{
+  background:rgba(255,255,255,.16);
+  box-shadow:var(--shadow-light);
+  transform:scale(1.06);
+}
+
+/* 缩略图右上角的小叉：删这一张。
+   ⚠ 尺寸 18×18 不能再小 —— 再小就点不准（缩略图本身才 50×50）。
+   ⚠ 平时半透明、悬停才实心：一排小叉全亮着会很闹，而且会盖住缩略图右上角的内容。 */
+.ref-card .rc-del{
+  position:absolute; top:-6px; right:-6px; z-index:5;
+  width:18px; height:18px; padding:0; margin:0; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--line);
+  background:hsl(var(--card-h, 220 28%) 11% / calc(.78 * var(--ui-bg-opacity,1)));   /* ⚠ 跟卡片同一档 0.78：小元素用 .92 会比卡片还实、很扎眼 */
+  color:var(--tx2); font-size:10px; line-height:1; cursor:pointer;
+  opacity:0; transition:opacity var(--m-fast) linear, background var(--m-fast) linear, color var(--m-fast) linear;
+}
+/* 悬停缩略图、或键盘聚焦到小叉时，才让它显形 */
+.ref-card .rc-thumb-wrap:hover .rc-del,
+.ref-card .rc-del:focus-visible{ opacity:1; }
+.ref-card .rc-del:hover{ background:hsl(var(--sem-err) / .9); color:#fff; border-color:transparent; }
+.ref-card .rc-del:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; opacity:1; }
+
+/* 空槽位：还没放图的占位（虚线框），让"还能加几张"一眼可见 */
+.ref-card .rc-slot{
+  flex:0 0 auto; width:50px; height:50px; border-radius:8px;
+  border:1px dashed var(--line-strong, var(--line));
+  background:transparent; cursor:pointer; padding:0;
+  color:var(--tx2); font-size:15px; line-height:1;
+  transition:border-color var(--m-fast) linear, color var(--m-fast) linear;
+}
+.ref-card .rc-slot:hover{ border-color:var(--accent); color:var(--accent); }
+.ref-card .rc-slot:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+/* 超出一行放不下的（理论上不会发生，上限 5；留着兜底） */
+.ref-card .rc-more{
+  flex:0 0 auto; height:50px; padding:0 8px; border-radius:8px;
+  border:1px solid var(--line); background:rgba(255,255,255,.06);
+  color:var(--tx2); font-size:11px; cursor:pointer;
+}
+
+/* 右划管理区：与任务卡面板同宽、同列；背景按主卡的分层办法淡化。 */
+.ref-panel{
+  position:absolute; top:0; left:340px;      /* ⚠ 同 .task-preview / .error-detail：卡宽 300 + 间隔 40 */
+  height:100px;                              /* ⚠ 同 .error-detail：跟卡片等高 */
+  width:var(--preview-panel-width);
+  z-index:calc(var(--z-detail,10000) + 1);
+  display:flex; flex-direction:column; justify-content:center; gap:6px;
+  opacity:0; pointer-events:none;
+  transform:translateX(-24px);
+  transition:opacity var(--m-base) var(--ease-soft), transform var(--dur) var(--ease-out);
+  background:transparent;
+  isolation:isolate;
+  border:1px solid var(--line); border-radius:12px;
+  box-shadow:var(--shadow-mid);
+}
+.ref-panel.show{ opacity:1; pointer-events:auto; transform:translateX(0); }
+/* ⚠ .rp-body 保留但【不再画背景】：JS 那边按这个容器布局，删了要动结构；
+     留着当纯布局壳，样式归零，免得跟面板自己的底叠成两层。 */
+.ref-panel .rp-body{
+  position:relative; z-index:1;
+  display:flex; flex-direction:column; gap:6px;
+  background:none; border:0; border-radius:0; padding:8px; box-shadow:none;
+}
+.ref-panel .rp-row{ display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+.ref-panel .rp-btn{
+  border:1px solid var(--line); border-radius:8px;
+  background:rgba(255,255,255,.06); color:var(--tx);
+  font-size:11px; line-height:1; padding:7px 10px; cursor:pointer;
+  transition:background var(--m-fast) linear, border-color var(--m-fast) linear;
+}
+.ref-panel .rp-btn:hover{ background:rgba(255,255,255,.12); border-color:var(--line-strong, var(--line)); }
+.ref-panel .rp-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.ref-panel .rp-btn.pri{ background:hsl(var(--accent-h, 220) 70% 46% / .28); border-color:hsl(var(--accent-h, 220) 70% 60% / .45); }
+.ref-panel .rp-btn.danger{ color:hsl(var(--sem-err)); border-color:hsl(var(--sem-err) / .4); }
+.ref-panel .rp-hint{ font-size:10px; color:var(--tx2); }
+
+/* ── 右缘预告光：鼠标在卡上越靠右、右缘越亮（照抄任务的 .task-edgehint） ──
+   ⚠⚠⚠ 2026-10-14 改（用户："包括鼠标相关的位置也会决定我们的光效"）——
+   原来那条 `.ref-card.edge-hint .rc-edgehint{ width:34px; opacity:1 }` 是个【死开关】：
+   一亮就亮到固定亮度，鼠标从卡片中线移到右缘，光一点变化都没有。
+   原生的做法（ui.html:8287-8307 任务卡那条，注释写着"跟一/二级同款"）是：
+     · 中线 → 右缘 算进度 tt（0→1）
+     · pp = tt^1.3；opacity = 0.15 + pp*0.75；width = pp*40px
+     · 进右缘触发带 → 封顶 opacity:1 / width:44px
+   所以【宽度和透明度都是 JS 逐帧写的行内值】—— 这条规则只负责"默认态"和外观底子，
+   不再用 class 去定死亮度（那条已经删了）。
+   ⚠ transition 只留 opacity：宽度由 JS 连续改，再加 transition 会拖尾、跟不上鼠标。 */
+.ref-card .rc-edgehint{
+  position:absolute; top:0; bottom:0; right:0; width:0;
+  pointer-events:none; z-index:1;
+  /* ⚠ 渐变峰值用 .35 不是 1 —— 这是【预告】光，不是弹出光。
+     弹出光（.rc-glow）才用 1。两处别再抄混（第一版就是在这里和弹出光之间串了）。 */
+  background:linear-gradient(270deg,
+    hsl(var(--glow-hsl, var(--glow-task)) / .35) 0%,
+    hsl(var(--glow-hsl, var(--glow-task)) / 0) 100%);
+  opacity:0;
+  transition:opacity var(--m-fast) linear;
+  border-top-right-radius:28px; border-bottom-right-radius:28px;
+}
+
+/* ══ 光的圆角裁切壳 ══════════════════════════════════════════════════
+   ⚠⚠⚠ 2026-10-14 补（用户："你的光效是用一个方形的界面来去限制它的，
+   但是我们的界面是有圆角的，所以说你的方形光线出在我们画面框外了"）——
+   用户说得完全对，而且这条我上一轮"改完光效"时以为自己已经处理了（给光写了 border-*-right-radius），
+   其实没处理对：
+     · 光带是【矩形】，强度从右缘往左递减到 0 —— 递减到 0 之前那几个 px 已经越过圆角了，
+       所以角上会露出一小块方形的光；
+     · 宽度涨到 44px 之后，光的【左边缘也是方的】，右侧圆角根本管不到它。
+   原生的做法（ui.html:1040，报错卡和任务卡共用）是把光包在一层壳里让壳去裁：
+     .error-light-clip, .task-light-clip{
+       position:absolute; inset:0; overflow:hidden; border-radius:28px;
+       pointer-events:none; z-index:2; isolation:isolate;
+     }
+   ⚠ border-radius 必须跟卡片一致（28px，同 .ref-card）—— 写小了角上还会露。
+   ⚠ inset:0 = 铺满卡片；overflow:hidden 才是真正裁的那一句。
+   ⚠ z-index:2 + isolation:isolate：让壳自己成一个层叠上下文，
+     里面的光 z1 就只跟壳内部比，不会跑去跟卡片的内容抢层（原生同款）。 */
+.ref-card .rc-light-clip{
+  position:absolute; inset:0; overflow:hidden; border-radius:28px;
+  pointer-events:none; z-index:2; isolation:isolate;
+}
+
+/* ══ 弹出光 ══════════════════════════════════════════════════════════
+   ⚠⚠⚠ 2026-10-14 重写（用户："我感觉现在你做的光效和我们原生的光效不太一样"）——
+   用户说得对，第一版我抄错了三处，方向是反的：
+     ① 位置：原生 right:0（光从【右缘】射进来）；我写了 left:0（从左缘）
+     ② 角度：原生 linear-gradient(270deg …)；我写了 90deg
+        ⚠ 270deg 和 90deg 在渐变里是【左右相反】的 —— 这是最要命的一处，
+          "光进来"的方向整个反了，看着就是两套东西。
+     ③ 亮度：原生光带峰值是 hsl(--glow-hsl / 1)（满），我写了 .5（半）——
+        所以我的光"发灰、不亮"。
+   还有亮条那一条：原生是 linear-gradient(180deg, transparent, hsl(--glow-hsl / 1), transparent)
+   （竖着的一道、用【主题光色】），我写成 90deg + 白色 —— 又反又白。
+   ⇒ 现在四处一字不差照抄 .error-glow / .error-bright（ui.html 1169-1204 行）。
+   ⚠⚠ 圆角改由外面那层 .rc-light-clip 负责裁（见上）——
+     这里【不再自己写 border-radius】：光带贴着右缘、左缘是方的，
+     自己写圆角既裁不掉左边缘，还会跟外壳的裁切打架。 */
+.ref-card .rc-glow,
+.ref-card .rc-bright{
+  position:absolute; right:0; top:0; bottom:0; width:0;
+  pointer-events:none; z-index:1;          /* ⚠ 只跟裁切壳内部比（壳自己是一个层叠上下文） */
+  opacity:0;
+}
+.ref-card .rc-glow{
+  background:linear-gradient(270deg,
+    hsl(var(--glow-hsl, var(--glow-task)) / 1) 0%,
+    hsl(var(--glow-hsl, var(--glow-task)) / .6) 55%,
+    hsl(var(--glow-hsl, var(--glow-task)) / 0) 100%);
+}
+.ref-card .rc-bright{
+  width:3px;                               /* ⚠ 初始 3px：原生就是 3px，靠动画的 opacity 进出场 */
+  background:linear-gradient(180deg, transparent, hsl(var(--glow-hsl, var(--glow-task)) / 1), transparent);
+}
+/* ⚠ 动画宽度从 0 长到 44px —— 但 .rc-bright 的初始 width 是 3px，
+   动画第 0% 帧是 width:0（原生也这样，由动画接管宽度，初始值只在动画前后生效）。 */
+@keyframes refGlowSweep{
+  0%   { opacity:0; width:0px; }
+  16%  { opacity:1; width:44px; }
+  40%  { opacity:1; width:44px; }
+  55%  { opacity:0.5; width:18px; }
+  100% { opacity:0; width:0px; }
+}
+@keyframes refBrightSweep{
+  0%   { opacity:0; }
+  16%  { opacity:0.95; }
+  40%  { opacity:0.95; }
+  55%  { opacity:0.3; }
+  100% { opacity:0; }
+}
+.ref-card .rc-glow.glow{ animation:refGlowSweep var(--dur, .6s) var(--ease-out) forwards; }
+.ref-card .rc-bright.glow{ animation:refBrightSweep var(--dur, .6s) var(--ease-out) forwards; }
+
+/* 2026-10-14 用户更新：右划面板与任务卡共用宽度和右侧列。
+   不再单独改成 static；面板是卡的兄弟节点，static 会从容器顶部盖住缩略图。 */
+
+/* ── ⚠⚠⚠ 2026-10-14 删掉了一条 @media (prefers-reduced-motion: reduce) ──
+   我原来在这里写了：
+     @media (prefers-reduced-motion: reduce){
+       .ref-card .rc-glow.glow, .ref-card .rc-bright.glow{ animation-duration:1ms; }
+       .ref-card .rc-thumb:hover{ transform:none; }
+     }
+   看着很"讲无障碍"，实际是个坑，而且【用户就是这么发现光效不对的】：
+     他 Windows 里关了"显示动画" → Chromium 判定 prefers-reduced-motion: reduce
+     → 这条命中 → 光的动画被砍到 1ms，等于根本不播。
+     用户看到的是"参考图卡没有光效"，于是连着报了两轮"光效不一样"。
+   ⚠⚠ 这个坑项目里【早就有血泪教训】，icons.css 开头写得很清楚：
+     "2026-09-14 血的教训：第一版在这里写了三条'通用规则'，结果把项目里本来就有的
+      动画全杀了 …… @media (prefers-reduced-motion) 那条把【整个界面】的动画关光了
+      （用户 Windows 里关了'显示动画'→ Chromium 判定 reduce → 全局命中）
+      规矩：这个文件里的选择器必须以 .ico / .ico-btn 开头…想给某类元素加反馈，
+      去那类元素自己的样式段里加，不要在这儿一网打尽。"
+   ⇒ 我等于把它请回来了，只是范围小了一点（只管参考图卡）。
+   ⭐ 判断依据：整个界面【没有任何一处】尊重这个偏好（原生卡片一条都没有，我搜过），
+     所以单独给参考图卡加这一条，结果不是"更友好"，而是【它跟别的卡不一样】——
+     用户看到的就是"这张卡的光效是坏的"。要做无障碍就得整套一起做，
+     那是另一件事（而且得先问用户，因为他的机器正好命中这个偏好）。
+   ⇒ 删掉，跟原生行为一致。将来真要做"减少动效"，统一做、统一开关，别单卡开小灶。 */

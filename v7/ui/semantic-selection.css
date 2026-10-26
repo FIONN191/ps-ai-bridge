@@ -1,0 +1,12 @@
+.semantic-selection-dialog{width:min(800px,94vw);max-height:92vh;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--bg-solid);color:var(--tx);box-shadow:var(--shadow-heavy);backdrop-filter:blur(var(--blur));overflow:auto}
+.semantic-selection-dialog::backdrop{background:var(--bg);backdrop-filter:blur(5px)}
+.semantic-selection-dialog h2{font-size:17px;margin:0 0 8px}
+.semantic-help,.semantic-rect{font-size:12px;line-height:1.7;color:var(--tx2)}
+.semantic-image{width:100%;max-height:48vh;display:block;margin:10px 0;background:var(--surface-faint);border-radius:8px}
+.semantic-box{fill:none;stroke:var(--accent);stroke-width:3}
+.semantic-target,.semantic-margin{display:block;margin:8px 0;font-size:13px}
+.semantic-target select{display:block;width:100%;margin-top:5px;padding:5px;background:var(--bg-solid);color:var(--tx);border:1px solid var(--line-strong);border-radius:4px}
+.semantic-margin input{display:block;width:100%;accent-color:var(--accent)}
+.semantic-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.semantic-actions button{cursor:pointer;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-faint);color:var(--tx);padding:8px 12px}
+.semantic-actions button:disabled{opacity:0.5;cursor:default}

@@ -28,6 +28,7 @@ import { CC_MODES } from './lib/post.mjs';
 import { assist } from './lib/assist.mjs';
 import { registerChannels, channelRoutes, channelAssist } from './providers/channels.mjs';
 import { engineRoutes } from './lib/engines.mjs';
+import { compatModels, compatGenerate } from './lib/compat.mjs';
 import { createWorkbench } from './lib/workbench.mjs';
 import { createRuns } from './lib/runs.mjs';
 import { showChrome } from './lib/chrome.mjs';
@@ -39,7 +40,7 @@ import { runninghub, runninghubRoutes } from './providers/runninghub.mjs';
 import { comfyui, comfyRoutes } from './providers/comfyui.mjs';
 import { chatgpt, CHATGPT_ASPECTS } from './providers/chatgpt.mjs';
 
-const VERSION = '0.7.0';
+const VERSION = '0.8.0';
 // 和 helper 一起分发的插件版本（桌面端里在 resources/plugin，源码版是仓库里的 plugin/）。PS 面板拿它和自己的版本比，旧了就提示更新
 const BUNDLED_PLUGIN = (() => {
   try { return JSON.parse(fs.readFileSync(path.join(ROOT, '..', 'plugin', 'manifest.json'), 'utf8')).version; } catch { return null; }
@@ -92,6 +93,23 @@ const server = http.createServer(async (req, res) => {
     if (process.env.DEBUG) console.log(req.method, req.url, JSON.stringify(req.headers));
     // 防 DNS rebinding / 网页跨站调用：只认本机 Host；写操作必须带自定义头（浏览器跨站发不出来）
     if (!ALLOWED_HOSTS.has(req.headers.host || '')) return send(res, 403, { error: 'bad host' });
+    // 修图轮椅 V7 的「Others」连接走 /compat（Gemini 兼容）。它从主进程发请求，带不了自定义头；
+    // 改为拦住所有带 Origin 的请求（网页发的都有）并要求 JSON，浏览器跨站发 JSON 必须先预检，这里不应答预检
+    if (req.url.startsWith('/compat/')) {
+      if (req.headers.origin) return send(res, 403, { error: { message: 'compat 接口只给本机程序用' } });
+      const m = /^\/compat\/v1beta\/models(?:\/([^/?]+):generateContent)?(?:\?.*)?$/.exec(req.url);
+      if (!m) return send(res, 404, { error: { message: '没有这个接口' } });
+      if (!m[1]) return send(res, 200, compatModels(providers, capabilities));
+      if (req.method !== 'POST' || !/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: { message: '请用 POST + application/json' } });
+      const abort = new AbortController();
+      res.on('close', () => { if (!res.writableFinished) abort.abort(); });
+      try {
+        const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
+        return send(res, 200, await compatGenerate(m[1], body, { providers, capabilities, signal: abort.signal }));
+      } catch (e) {
+        return send(res, e.status || 500, { error: { code: e.status || 500, message: e.message || String(e) } });
+      }
+    }
     if (req.method !== 'GET' && req.headers['x-ps-ai-bridge'] !== '1') return send(res, 403, { error: 'missing x-ps-ai-bridge header' });
 
     const url = new URL(req.url, `http://${req.headers.host}`);

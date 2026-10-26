@@ -9,3 +9,11 @@ PS AI Bridge（AI 生图贴回）
   - 预设格式、"@param" 参数滑杆、【填空】字段与 MODULE 块清理规则（plugin/index.js 的 sanitizePrompt）
   - 人体剪影分区与 plugin/icons/body/body.png
   - 贴回时按选区短边百分比收缩 + 模糊蒙版的羽化做法
+
+整合了以下项目的代码：
+  夏三七的修图轮椅 V7（xiasanqi Wheelchair V7）
+  Copyright (C) 2026 xiasanqi（夏三七）
+  - v7/ui、v7/uxp-bridge、v7/eagle-bridge、v7/engine 由 scripts/import-v7.mjs 从官方 Windows 安装包原样导入
+    （界面、Photoshop 联动插件、Electron 主程序、本机图像引擎），v7/patches.mjs 列出了为 macOS 和整合做的少量改动
+  - 作者本人同意修改、整合，条件是「不能拿去盈利」；本项目及其分发版本均不收费
+  - v7/foundation 是本项目补写的 V7 主程序依赖模块

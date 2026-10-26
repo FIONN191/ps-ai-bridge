@@ -1,0 +1,458 @@
+/* 记录与恢复卡 · 大二级（照 桌面\记录与恢复_占位验证.html 定稿样机搬）
+ *
+ * ⚠ 全部规则都收在 #recordsZone 里 —— 这是宿主里的一个 .zone.pzone，
+ *   不这么收会漏到别的卡上去（预设二级那套 .tcard 尤其容易撞）。
+ * ⚠ 颜色一律用 tokens.css 的代币，不要写死色值：主题一换就花了。
+ *   样机里那个紫是 --glow-detail（检查点专用色，全项目就它一个用）。
+ */
+
+/* ═══ 二级主体：540×400 = 左 416（2 列×4 行任务卡）+ 右 108（检查点时间轴）+ 间隙 ═══ */
+/* ⚠⚠ 边框改成 box-shadow 内描边（2026-09-30，跟一级卡 .block-card 同一个坑）：
+   下面那层 ::before 是 position:absolute; inset:0，参照的是【父级 padding box】——
+   它永远盖不到 border 那一圈。以前这圈是黑边、下面又压着 opaque 的 --bg-solid 底，
+   看不出来；现在这层改为"底色跟设置淡出"，框里就会透出背后的东西变成一条亮边。
+   用 inset box-shadow 画：它就在元素自己的边框盒内绘制，padding box == border box，
+   ::before 正好能把这一圈一起盖住，且元素尺寸/内边距一点都不变。 */
+#recordsZone{
+  width:540px;height:400px;
+  border:0; box-shadow:var(--shadow-mid), inset 0 0 0 1px var(--line);
+}
+/* ⭐⭐ 二级整体底（2026-09-30 补）：让这块二级【透明跟随设置、颜色跟随设置】。
+ *
+ * 为什么非要有这一层：bg-manager.applyToCard() 会把这张卡的 background-color 置成
+ * transparent、并把 --card-bg-image 设在【#recordsZone 自己】身上 —— 而标准二级卡
+ * （.zone）是靠内层 .z-body::before 去消费那个变量的。记录卡的 mount() 重建了
+ * innerHTML、里面没有 .z-body，于是那个变量【没有任何人读】，整块二级就成了纯透明
+ * （实测 100% 和 70% 两档 backgroundColor 都是 rgba(0,0,0,0)，用户看到的就是"背景是透明的"）。
+ *
+ * ⚠ 组成的三个部分（跟 .block-card::before / .z-body::before 同一套规矩，别自己发明）：
+ *   · background-color:var(--bg-solid) → 标准深色底；--bg-solid 由「卡片底色」设置写入，
+ *                                       所以【颜色跟设置走】
+ *   · hsl(var(--card-h, 220 28%) …)    → 掩色相跟「卡片底色」走（亮度 8% 是二级这一档）
+ *   · opacity:var(--ui-bg-opacity,1)   → 整层跟「界面不透明度」一起淡出，所以【透明跟设置走】
+ *   三者缺一，用户就会看到"这张卡不跟设置"。
+ * ⚠ z-index:0：靠 DOM 顺序压在 .rc-main / .rc-rail 之下（它们绝对定位、z-index:auto，
+ *   按树序排在 ::before 之后绘制），所以这层必须是 0，不能往上抬。 */
+#recordsZone::before{
+  content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; z-index:0;
+  background-color:var(--bg-solid);
+  /* 2026-10-22（docs/263 第 20 条）：平铺同一深浅（原来上中下三档的中间值），不再竖向渐变 */
+  background-image:linear-gradient(hsl(var(--card-h, 220 28%) 8% / .6), hsl(var(--card-h, 220 28%) 8% / .6)),
+    var(--card-bg-image, none);
+  background-size:cover; background-position:center;
+  opacity:var(--ui-bg-opacity,1);
+}
+
+#recordsZone .rc-main{position:absolute;left:0;top:0;width:416px;height:400px;overflow-x:clip;overflow-y:visible}
+#recordsZone .rc-left{position:absolute;left:0;top:0;width:416px;height:400px}
+/* 固定检查点时，缩小的任务整片会往左溢出一点，用 clip-path 把左边裁掉、右边留住 40px 间隙 */
+#recordsZone .rc-main.pinned .rc-left{clip-path:inset(0 -40px 0 -40px)}
+#recordsZone .rc-pages{position:absolute;left:0;top:0;width:416px;height:400px;transform-origin:0 0;transition:transform var(--dur) var(--ease-out);will-change:transform}
+#recordsZone .rc-extra{position:absolute;left:0;width:416px;height:400px;animation:rcExtraIn var(--m-slow) var(--ease-soft) .1s both}
+@keyframes rcExtraIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+#recordsZone .rc-extra.leaving{opacity:0;transition:opacity var(--m-fast) linear}
+#recordsZone .rc-slide{position:absolute;inset:0}
+
+/* 2 列 × 4 行；列优先 —— 左列 1–4、右列 5–8（grid-auto-flow:column） */
+#recordsZone .rc-grid{position:absolute;inset:0;display:grid;grid-template-columns:200px 200px;grid-template-rows:repeat(4,88px);grid-auto-flow:column;gap:16px}
+
+/* ═══ 卡的地基（照样机 .zcard 原样搬）═══
+ * ⚠⚠ 这条【必须最先有】：.tc-img / .tc-scrim 都是 position:absolute; inset:0，
+ *   靠它当定位父级。少了它，图片会以整块 .rc-pages（416×400）为父级铺满，
+ *   于是"一张图盖住整个二级"、圆角也没有 —— 实装第一版就漏了这条，
+ *   截图上一眼可见（任务卡变成一张大糊图）。
+ *   同时它提供圆角/描边/阴影/裁切，缺一样都不像样机。 */
+#recordsZone .zcard{
+  position:relative; border-radius:12px; background-color:transparent;
+  /* ⚠⚠ 边框改成 box-shadow 内描边（2026-09-30，跟 .block-card 同一个坑）：
+     底色已经移到下面 ::before 那层、会跟「界面不透明度」一起淡出；
+     而 ::before 是 inset:0，永远盖不到 border 这一圈 ——
+     低不透明度时框里透出桌面，就是一条横贯卡片的亮边。
+     inset box-shadow 在元素自己的边框盒内绘制，::before 正好能连这一圈一起盖住，
+     且元素尺寸/内边距一点都不变。 */
+  border:0; box-shadow:var(--shadow-mid), inset 0 0 0 1px var(--line);
+  overflow:hidden; isolation:isolate;
+}
+#recordsZone .zcard::before{
+  content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none; z-index:0;
+  /* ⚠⚠ 底色【必须放在这一层、跟着 --ui-bg-opacity 一起淡】(2026-09-30 用户实测指出)：
+     原来底色是写死在元素自己的 background-color:var(--bg-solid) 上的 —— 那是【不透明】的，
+     用户把「界面不透明度」调低时它纹丝不动（实测 .rc-rail 的 railBg 在 100%/70% 两档
+     都是 rgb(30,34,44)，像素几乎不变）。滚条/时间轴看着就是"一块没跟设置的实心板"。
+     移到这一层之后：颜色跟 --bg-solid（由「卡片底色」写入）、透明跟 --ui-bg-opacity，
+     两个设置都跟得住。 */
+  background-color:var(--bg-solid);
+  /* ⚠⚠ 色相【必须用 --card-h 代币】(2026-09-30 修)：原来写死 220 28%，
+     用户在设置里改「卡片底色」时，主卡和标准二级都跟着变、只有这张卡的二级不跟。
+     亮度(12%/8%/6%)保留原样 —— 这层是"卡内小卡"的更深一档，跟一级(8%)不是同一个层次。 */
+  background-image:linear-gradient(180deg,
+    hsl(var(--card-h, 220 28%) 12%/.5),
+    hsl(var(--card-h, 220 28%) 8%/.1) 45%,
+    hsl(var(--card-h, 220 28%) 6%/.35));
+  opacity:var(--ui-bg-opacity,1);
+}
+/* 卡片自身的两道扫光（二级弹出时用；平时 opacity:0 不占视觉） */
+#recordsZone .z-glow{position:absolute;left:0;top:0;bottom:0;width:0;pointer-events:none;z-index:1;opacity:0;background:linear-gradient(90deg,hsl(var(--glow-zone)/1) 0%,hsl(var(--glow-zone)/.6) 55%,hsl(var(--glow-zone)/0) 100%)}
+#recordsZone .z-bright{position:absolute;left:0;top:0;bottom:0;width:3px;pointer-events:none;z-index:1;opacity:0;background:linear-gradient(180deg,transparent,hsl(var(--glow-zone)/1),transparent)}
+#recordsZone .z-glow.glow{animation:rcZoneGlowSweep .6s var(--ease-out) forwards}
+#recordsZone .z-bright.glow{animation:rcZoneBrightSweep .6s var(--ease-out) forwards}
+@keyframes rcZoneGlowSweep{from{width:0;opacity:0}30%{opacity:0.95}to{width:100%;opacity:0}}
+@keyframes rcZoneBrightSweep{from{left:0;opacity:0}20%{opacity:1}to{left:100%;opacity:0}}
+
+/* ═══ 状态小标（照样机 .st）═══ */
+#recordsZone .st{
+  font-size:10px; line-height:15px; padding:0 5px; border-radius:4px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
+}
+#recordsZone .st.ok{color:hsl(var(--sem-ok));background:hsl(var(--sem-ok)/.12)}
+#recordsZone .st.run{color:hsl(var(--sem-warn));background:hsl(var(--sem-warn)/.13)}
+#recordsZone .st.info{color:hsl(var(--sem-info));background:hsl(var(--sem-info)/.12)}
+#recordsZone .st.err{color:hsl(var(--sem-err));background:hsl(var(--sem-err)/.13)}
+#recordsZone .st.mute{color:var(--tx2);background:var(--surface-faint)}
+
+/* ═══ 一次计算 = 一张 200×88 横条卡 ═══ */
+#recordsZone .tcard{width:200px;height:88px;cursor:pointer;transition:filter var(--m-base) var(--ease-soft),opacity var(--m-base) var(--ease-soft),box-shadow var(--m-base) var(--ease-soft)}
+#recordsZone .tcard:hover .z-selglow{opacity:.5}
+#recordsZone .tc-img{position:absolute;inset:0;z-index:0;border-radius:inherit;background:#2a2f3b center 28%/cover no-repeat;transition:filter var(--m-base) var(--ease-soft)}
+#recordsZone .tcard.gray .tc-img{filter:grayscale(1) brightness(.6)}
+#recordsZone .tc-scrim{position:absolute;inset:0;z-index:1;border-radius:inherit;pointer-events:none;background:linear-gradient(180deg,rgba(8,10,16,.62) 0%,rgba(8,10,16,.08) 34%,rgba(8,10,16,.12) 50%,rgba(8,10,16,.88) 100%)}
+#recordsZone .tcard.tall .tc-scrim{background:linear-gradient(180deg,rgba(8,10,16,.62) 0%,rgba(8,10,16,.25) 28%,rgba(8,10,16,.9) 60%)}
+#recordsZone .tc-top{position:absolute;left:8px;right:8px;top:8px;z-index:3;display:flex;align-items:center;gap:4px}
+#recordsZone .tc-top .st{background:rgba(8,10,16,.68)}
+#recordsZone .tc-bottom{position:absolute;left:10px;right:10px;bottom:7px;z-index:3;display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
+#recordsZone .tc-top,#recordsZone .tc-bottom,#recordsZone .tc-hg,#recordsZone .tc-x{transition:opacity var(--m-base) var(--ease-soft)}
+#recordsZone .tcard.tall .tc-hg,#recordsZone .tcard.tall .tc-x{display:none}
+#recordsZone .tc-hg{position:absolute;left:0;right:0;top:25px;height:22px;z-index:2;display:flex;align-items:center;justify-content:center;color:hsl(var(--sem-warn));animation:rcSand 1.4s ease-in-out infinite;filter:drop-shadow(0 1px 3px rgba(0,0,0,.7))}
+@keyframes rcSand{0%,100%{transform:rotate(0)}50%{transform:rotate(180deg)}}
+#recordsZone .tc-x{position:absolute;left:0;right:0;top:24px;height:24px;z-index:2;display:flex;align-items:center;justify-content:center;color:hsl(var(--sem-err));filter:drop-shadow(0 1px 3px rgba(0,0,0,.8))}
+/* 底边 3px 进度条：绿=成功 红=失败
+   ⚠⚠⚠ 2026-10-07 体检（用户："看看哪些东西应该关联到主题色，但是没关联"）：
+     这四条原来全是写死的：
+       · 底槽 rgba(126,200,255,.22) —— 一个偏蓝的槽色（就是默认主题蓝的调子，写死了）
+       · 成功 rgba(74,222,128,…)    —— 就是 --sem-ok 的默认值
+       · 失败 rgba(255,107,107,…)   —— 就是 --sem-err 的调子
+     ⇒ 全部改走代币：槽 = 主题色、成功 = --sem-ok、失败 = --sem-err。
+     ⚠ 别改回写死的色值 —— 那样换主题色时进度条自己不跟。 */
+#recordsZone .tc-bar{position:absolute;left:0;right:0;bottom:0;height:3px;z-index:4;display:flex;background:hsl(var(--accent-hsl, 211 100% 68%) / .22);overflow:hidden}
+#recordsZone .tc-bar i{display:block;height:100%;transition:width .52s var(--ease-soft)}
+/* 2026-10-22（docs/263 第 20 条）：进度段实色；扫光（.sweep::after）是「光」，保留渐变 */
+#recordsZone .tc-bar i.ok{background:hsl(var(--sem-ok) / .9)}
+#recordsZone .tc-bar i.err{background:hsl(var(--sem-err) / .8)}
+#recordsZone .tc-bar.sweep::after{content:"";position:absolute;top:0;bottom:0;left:-40%;width:40%;background:linear-gradient(90deg,transparent,hsl(var(--accent-hsl, 211 100% 68%) / .95),transparent);animation:rcSweep 1.1s var(--ease-soft) infinite}
+@keyframes rcSweep{to{left:100%}}
+#recordsZone .tc-shield{flex:none;width:18px;height:18px;border-radius:4px;background:hsl(var(--glow-detail)/.95);color:#1b0d26;display:none;align-items:center;justify-content:center}
+#recordsZone .tcard.cp-covered .tc-shield{display:flex}
+#recordsZone .tc-reuse{margin-left:auto;flex:none;height:22px;padding:0 8px 0 6px;border-radius:999px;border:1px solid hsl(var(--accent-hsl, 211 100% 68%) / .26);background:rgba(10,13,19,.7);color:var(--tx);font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;transition:background var(--m-fast),border-color var(--m-fast),transform var(--m-fast) var(--ease-out)}
+#recordsZone .tc-reuse:hover{background:hsl(var(--accent-hsl)/.55);border-color:hsl(var(--accent-hsl)/.9)}
+#recordsZone .tc-reuse:active{transform:scale(.94)}
+#recordsZone .tc-reuse.done{background:hsl(var(--sem-ok)/.9);border-color:transparent;color:#0d1b12}
+#recordsZone .tc-text{flex:1;min-width:0}
+#recordsZone .tc-title{font-size:12px;font-weight:600;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 3px rgba(0,0,0,.75)}
+#recordsZone .tc-title.custom{font-weight:500;color:var(--tx)}
+#recordsZone .tc-snip{font-size:10px;line-height:1.4;color:#cfd6e4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+#recordsZone .tc-meta{margin-top:1px;font-size:10px;color:rgba(230,236,246,.76);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+#recordsZone mark{background:hsl(var(--accent-hsl)/.34);color:var(--tx);border-radius:4px;padding:0 1px}
+#recordsZone .tc-cost{flex:none;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.85)}
+#recordsZone .tc-cost.pend{color:hsl(var(--sem-warn));font-size:11px;font-weight:600}
+#recordsZone .tc-cost.free{color:var(--tx2);font-size:11px;font-weight:500}
+/* 缩小后卡上改为显示大号时间 */
+#recordsZone .tc-big{position:absolute;left:14px;bottom:9px;z-index:3;font-size:30px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 6px rgba(0,0,0,.85);opacity:0;transition:opacity var(--m-base) var(--ease-soft)}
+#recordsZone .tc-bigshield{position:absolute;right:12px;top:12px;z-index:3;width:40px;height:40px;border-radius:12px;background:hsl(var(--glow-detail)/.95);color:#1b0d26;display:none;align-items:center;justify-content:center}
+#recordsZone .rc-pages.shrunk .tc-top,#recordsZone .rc-pages.shrunk .tc-bottom,#recordsZone .rc-pages.shrunk .tc-hg,#recordsZone .rc-pages.shrunk .tc-x{opacity:0}
+#recordsZone .rc-pages.shrunk .tc-big{opacity:1}
+#recordsZone .rc-pages.shrunk .tcard.cp-covered .tc-bigshield{display:flex}
+/* 检查点之前算完的 = 已备份（紫框 + 盾牌）；之后的 = 变灰；交界那一张顶上画紫线 */
+#recordsZone .tcard.cp-covered{box-shadow:var(--shadow-mid),0 0 0 3px hsl(var(--glow-detail)/.75)}
+#recordsZone .tcard.cp-after{filter:grayscale(1) brightness(.5);opacity:.5}
+#recordsZone .rc-pages.shrunk .tcard.cp-first::after{content:"";position:absolute;left:0;right:0;top:0;height:7px;z-index:5;background:hsl(var(--glow-detail));box-shadow:0 0 16px 2px hsl(var(--glow-detail)/.8)}
+#recordsZone .tcard.enter{animation:rcCardEnter var(--m-slow) var(--ease-out) both}
+@keyframes rcCardEnter{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+#recordsZone .rc-grid .tcard:not(.row-top) .gate-edge.top,#recordsZone .rc-grid .tcard:not(.row-bottom) .gate-edge.bottom{display:none}
+#recordsZone .rc-slide.bump-down{animation:rcBumpDown var(--m-slow) var(--ease-out)}
+#recordsZone .rc-slide.bump-up{animation:rcBumpUp var(--m-slow) var(--ease-out)}
+@keyframes rcBumpDown{0%{transform:none}40%{transform:translateY(6px)}100%{transform:none}}
+@keyframes rcBumpUp{0%{transform:none}40%{transform:translateY(-6px)}100%{transform:none}}
+
+/* ═══ 点开一次计算：全部图平铺（卡原地飞成第一张大图）═══ */
+#recordsZone .gal{position:absolute;inset:0}
+/* ⚠⚠ 底部要给胶囊条让出位置（2026-09-30 截图抓到）：
+   胶囊条 .gal-bar 高 38、贴底 10 → 占掉底部 48px；原来格子 inset:0 铺满到底，
+   底排格子的操作按钮（.acts 贴格子底 8px）正好被胶囊条整条压住 —— 看得见一半、点不到。
+   让出 56px（48 + 8 呼吸），底排按钮就完整露在胶囊条上方。 */
+#recordsZone .gal-grid{position:absolute;left:0;right:0;top:0;bottom:56px;display:grid;gap:16px}
+#recordsZone .gtile{position:relative;border-radius:12px;overflow:hidden;background:hsl(var(--card-h, 220 28%) 8%);border:1px solid var(--line);box-shadow:var(--shadow-mid);cursor:zoom-in}
+#recordsZone .gtile .bgblur{position:absolute;inset:-18px;background:center/cover no-repeat;filter:blur(16px) brightness(.5)}
+#recordsZone .gtile .fg{position:absolute;inset:0;background:center/contain no-repeat;transition:transform var(--m-base) var(--ease-out)}
+#recordsZone .gtile:hover .fg{transform:scale(1.03)}
+#recordsZone .gtile .idx{position:absolute;left:8px;top:8px;font-size:10px;line-height:16px;padding:0 6px;border-radius:4px;background:rgba(0,0,0,.55);font-variant-numeric:tabular-nums}
+#recordsZone .gtile.fail,#recordsZone .gtile.wait{cursor:default}
+#recordsZone .gtile.fail .fg,#recordsZone .gtile.wait .fg{filter:grayscale(1) brightness(.42)}
+#recordsZone .gtile .tag{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px}
+#recordsZone .gtile.fail .tag{color:hsl(var(--sem-err))}
+#recordsZone .gtile.wait .tag{color:hsl(var(--sem-warn))}
+#recordsZone .gtile .acts{position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:.3;transition:opacity var(--m-fast),transform var(--m-fast) var(--ease-out)}
+/* ⭐ 2026-10-22（docs/263 第 8 条，用户拍板）：操作按钮不再藏起来 —— 平时 .3 压淡，移到格子上全亮 */
+#recordsZone .gtile:hover .acts{opacity:1;transform:none}
+/* ⚠⚠ 按钮【只放图标、不放文字】(2026-09-30)：
+   9 张图时格子只有 92px、按钮 34px，文字会被折成 3 行、纵向溢出 +26px 冒出框外。
+   所以这里强制 nowrap + 不换行，并且让 svg 居中；宽度自适应（格子窄也不会爆）。 */
+#recordsZone .gtile .acts button{flex:1;min-width:0;height:24px;padding:0;display:flex;align-items:center;justify-content:center;
+  border-radius:8px;border:1px solid hsl(var(--accent-hsl, 211 100% 68%) / .22);background:rgba(10,14,20,.84);color:#e8edf5;
+  font-size:11px;cursor:pointer;white-space:nowrap;overflow:hidden}
+#recordsZone .gtile .acts button svg{flex:none}
+#recordsZone .gtile .acts button:hover{background:hsl(var(--accent-hsl)/.5)}
+#recordsZone .gtile .acts button:active{transform:scale(.94)}
+
+/* ⭐ 右上角多选框：勾了就能一起传回（用户 2026-09-30 定）。
+   ⚠ 平时半透明常驻（不能只在 hover 时出现 —— 那样用户根本发现不了有这个功能），
+     鼠标移到格子上变实；勾上之后一直实心并带强调色。 */
+#recordsZone .gtile .pick{
+  position:absolute;right:8px;top:8px;z-index:3;width:18px;height:18px;padding:0;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  border:1.5px solid hsl(var(--accent-hsl, 211 100% 68%) / .55);
+  background:rgba(8,10,16,.55);
+  color:transparent;                                    /* 没勾时不显示那个勾 */
+  transition:background var(--m-fast),border-color var(--m-fast),color var(--m-fast),transform var(--m-fast) var(--ease-out);
+}
+#recordsZone .gtile .pick svg{width:11px;height:11px}
+#recordsZone .gtile:hover .pick{border-color:hsl(var(--accent-hsl, 211 100% 68%) / .85);background:rgba(8,10,16,.72)}
+#recordsZone .gtile .pick:hover{transform:scale(1.1)}
+#recordsZone .gtile .pick[aria-pressed="true"]{
+  background:hsl(var(--accent-hsl)/.95);border-color:transparent;color:#0b0f16;
+}
+/* 勾中的格子：描边亮起来，一眼看得出哪几张会被传回 */
+#recordsZone .gtile.picked{border-color:hsl(var(--accent-hsl)/.9);box-shadow:0 0 0 1px hsl(var(--accent-hsl)/.7),var(--shadow-mid)}
+#recordsZone .gtile.picked .fg{filter:brightness(1.06)}
+
+/* 胶囊条上的「传回选中 N 张」——比图标按钮宽，带文字 */
+#recordsZone .gal-bar .send-picked{flex:none;width:auto;height:26px;padding:0 10px 0 8px;border-radius:999px;gap:5px;
+  background:hsl(var(--accent-hsl)/.9);color:#0b0f16;font-size:11px;font-weight:600;
+  display:flex;align-items:center;white-space:nowrap}
+#recordsZone .gal-bar .send-picked:hover{background:hsl(var(--accent-hsl))}
+#recordsZone .gal-bar .send-picked:active{transform:scale(.96)}
+/* 底部胶囊条：返回 / 标题 / 张数·金额 / 恢复到任务栏 / 只用提示词 */
+/* ⭐ 2026-10-06：多了「打开缓存文件夹」一颗按钮 → 底框（保持胶囊圆弧）加宽到 460px；
+ *   标题位同步收窄一点，保证窄窗口下不溢出。 */
+#recordsZone .gal-bar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:5;height:38px;max-width:460px;display:flex;align-items:center;gap:6px;padding:0 5px;border-radius:999px;background:hsl(var(--card-h, 220 28%) 9% / .88);backdrop-filter:blur(var(--blur)) saturate(1.5);border:1px solid var(--line-strong);box-shadow:var(--shadow-mid);white-space:nowrap}
+#recordsZone .gal-bar button{flex:none;width:28px;height:28px;border-radius:50%;border:0;background:var(--surface);color:var(--tx);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+#recordsZone .gal-bar button:hover{background:var(--surface-strong)}
+#recordsZone .gal-bar .t{min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;padding-left:2px}
+#recordsZone .gal-bar .m{font-size:11px;color:var(--tx2);font-variant-numeric:tabular-nums;padding-right:2px}
+#recordsZone .flyer{position:absolute;z-index:30;border-radius:12px;overflow:hidden;background:hsl(var(--card-h, 220 28%) 8%);box-shadow:var(--shadow-mid);pointer-events:none}
+/* 飞行图两层：fl-fit 跟 .gtile 的补底【参数必须一模一样】(bgblur 的 inset/blur/brightness、fg 的 contain)，
+   否则落地那一下还是会跳；fl-cover 跟任务卡 .tc-img 一样裁满、取 center 28%。 */
+#recordsZone .flyer .fl-fit,#recordsZone .flyer .fl-cover{position:absolute;inset:0}
+#recordsZone .flyer .fl-fit{overflow:hidden}
+#recordsZone .flyer .fl-fit .bgblur{position:absolute;inset:-18px;background:center/cover no-repeat;filter:blur(16px) brightness(.5)}
+#recordsZone .flyer .fl-fit .fg{position:absolute;inset:0;background:center/contain no-repeat}
+#recordsZone .flyer .fl-cover{background:center 28%/cover no-repeat}
+
+/* ═══ 检查点卡：从右边挤进来（左边任务同时整体缩小）═══ */
+#recordsZone .rc-detail{position:absolute;left:216px;top:0;width:200px;height:400px;opacity:0;pointer-events:none;transform:translateX(56px);transition:opacity var(--dur) var(--ease-soft),transform var(--dur) var(--ease-out)}
+#recordsZone .rc-main.cp .rc-detail{opacity:1;pointer-events:auto;transform:none}
+#recordsZone .cpd{position:absolute;inset:0}
+#recordsZone .cpd-slide{position:absolute;inset:0;z-index:2}
+#recordsZone .cpd-in{position:absolute;inset:0;padding:12px;display:flex;flex-direction:column;gap:6px}
+#recordsZone .cpd-img{position:relative;flex:none;height:124px;border-radius:12px;overflow:hidden;background:#111;border:1px solid var(--line-faint)}
+#recordsZone .cpd-img .bgblur{position:absolute;inset:-14px;background:center/cover no-repeat;filter:blur(14px) brightness(.5)}
+#recordsZone .cpd-img .fg{position:absolute;inset:0;background:center/contain no-repeat}
+#recordsZone .cpd-time{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+#recordsZone .cpd-doc{font-size:11px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-6px}
+#recordsZone .cpd-rows{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:10px;color:var(--tx2)}
+#recordsZone .cpd-rows b{font-weight:500;color:var(--tx);text-align:right;font-variant-numeric:tabular-nums}
+#recordsZone .cpd-stats{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--tx2);padding:4px 8px;border-radius:8px;background:var(--surface-faint)}
+#recordsZone .cpd-stats b{color:var(--tx);font-size:13px;font-variant-numeric:tabular-nums}
+#recordsZone .cpd-stats i{display:inline-block;width:8px;height:8px;border-radius:4px;margin-right:4px}
+#recordsZone .cpd-stats .in i{background:hsl(var(--glow-detail))}
+#recordsZone .cpd-stats .out i{background:var(--tx2);opacity:.5}
+#recordsZone .cpd-hint{margin-top:auto;font-size:10px;color:hsl(var(--glow-detail));text-align:center}
+#recordsZone .cpd-acts{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+#recordsZone .cpd-btn{height:32px;border-radius:var(--radius-button);border:1px solid var(--line);background:var(--surface);color:var(--tx);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+#recordsZone .cpd-btn:hover{background:var(--surface-strong)}
+#recordsZone .cpd-btn.primary{background:hsl(var(--glow-detail)/.85);border-color:transparent;color:#1b0d26;font-weight:600}
+#recordsZone .cpd-btn.primary:hover{background:hsl(var(--glow-detail))}
+#recordsZone .cpd-btn.ghost{height:26px;background:transparent;border-color:transparent;color:var(--tx2);font-size:11px}
+#recordsZone .cpd-btn.ghost:hover{background:var(--surface-faint);color:var(--tx)}
+
+/* ═══ 右侧检查点时间轴（108 宽，小方点，新的在上，按天分组）═══
+ * ⭐⭐ 它是【大卡里的一块内嵌区】，不是独立的一张卡（2026-09-30 用户实测指出：
+ *   "时间轴目前看来像是单独的卡片，我希望它融合进大的二级卡片内"）。
+ * 之前它带 .zcard，于是自带圆角 20 + 外阴影 + 自己的底色 —— 跟左边任务区还隔着 16px，
+ * 看着就是"卡外又挂了一张卡"。
+ * 现在的做法（用户选的"浅色内嵌区"）：
+ *   · 去掉外阴影、去掉四角圆角（只保留右边两个外角，跟大卡的圆角对齐）
+ *   · 底色换成一层【比大卡略深】的内嵌感（--surface-faint 那档），不再用实心 --bg-solid
+ *   · 左缘一条淡分隔线，交代"这里换区了"，但整体仍是一张卡
+ *   · 不再吃掉那 16px 间隙：内嵌区从 416 贴到 432 起（跟主区等宽相连）
+ * ⚠ .zcard 给的圆角/阴影/边框要在这里覆盖掉，否则两套样式打架。
+ * ⚠ 底色仍然跟 --ui-bg-opacity 一起淡出（不能写死，否则又变成"不跟设置"）。 */
+#recordsZone .rc-rail{
+  position:absolute;left:432px;top:0;width:108px;height:400px;
+  border-radius:0 20px 20px 0;
+  box-shadow:none;                       /* 去掉 .zcard 的外阴影 —— 内嵌区不该有投影 */
+  background-color:transparent;
+  background-image:none;
+  overflow:hidden;
+  border-left:1px solid var(--line-faint);   /* 只留左缘一条分隔线 */
+}
+/* 内嵌区的底：比大卡底色【略浅一档】，做出"这一块是嵌进去的"分区感。
+ * ⚠ 用提亮而不是压暗：这张卡本来就压着一层深色渐变，再压暗会跟左边任务卡糊成一片，
+ *   看不出分区；提亮一档才既有分区感、又不像"另一张卡"。
+ * ⚠ 跟着 --ui-bg-opacity 走，不写死。 */
+#recordsZone .rc-rail::before{
+  content:''; position:absolute; inset:0; pointer-events:none; z-index:0;
+  background:rgba(255,255,255,calc(.05 * var(--ui-bg-opacity,1)));
+}
+/* 时间轴里的 z-glow/z-bright 是弹出光，仍要能显示 → 保持在底之上 */
+#recordsZone .rc-rail .z-glow,#recordsZone .rc-rail .z-bright{z-index:1}
+#recordsZone .rail-in{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;padding:10px 8px 8px}
+#recordsZone .rail-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 4px 6px;font-size:11px;font-weight:600;border-bottom:1px solid var(--line-faint)}
+#recordsZone .rail-head small{font-size:10px;color:var(--tx2);font-weight:400;font-variant-numeric:tabular-nums}
+#recordsZone .rail-list{position:relative;flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding:6px 0;overscroll-behavior:contain}
+#recordsZone .rail-list::-webkit-scrollbar{display:none}
+#recordsZone .rail-nodes{position:relative;display:flex;flex-direction:column;gap:3px}
+#recordsZone .rail-nodes::before{content:"";position:absolute;left:13px;top:10px;bottom:10px;width:2px;border-radius:0px;background:hsl(var(--glow-detail)/.26)}
+#recordsZone .rail-day{position:relative;font-size:10px;color:var(--tx2);opacity:0.75;padding:5px 0 1px 26px;height:18px}
+#recordsZone .cpn{position:relative;height:24px;border-radius:8px;display:flex;align-items:center;gap:8px;padding:0 6px 0 9px;cursor:pointer;color:var(--tx2);font-size:11px;font-variant-numeric:tabular-nums;transition:background var(--m-fast),color var(--m-fast)}
+/* ⚠⚠ 节点行/方点的三层底【必须跟软件统一规则】(2026-09-30 用户实测指出：
+   "节点滚条不按照设置逻辑内的统一深色底按钮走，我需要变成标准状态
+    透明跟随设置、颜色跟随设置"）。
+   原来三层全写死 hsl(var(--glow-detail)/…) 的紫色，与设置里的「卡片底色」「界面不透明度」都不相干。
+   ⚠ 第一版我改成了 --surface(.12)/--surface-strong(.24) —— **那是照错对象了**：
+     那是「小按钮底」的档位，比列表行亮三倍，看着就是"这块比别处亮一截"。
+     软件里【列表行】的权威写法在 ui.html:2375 .pz-row 那一段：
+       · 默认  background 不写（透明，露出卡片自己的底）
+       · 悬停  hsl(var(--accent-hsl, 211 100% 68%) / .04)
+       · 选中  hsl(var(--accent-hsl, 211 100% 68%) / .04) + 两侧光带
+     现在按这个来，跟预设列表行、任务卡行是同一档亮度。
+   ⚠ 方点描边保留 --glow-detail（检查点专用紫，全项目就它一个用，docs/94 写明是刻意的
+     设计意图），但透明度要跟「界面不透明度」一起走，不能写死。 */
+#recordsZone .cpn i{flex:none;width:10px;height:10px;border-radius:4px;background:var(--bg-solid);border:2px solid hsl(var(--glow-detail)/calc(.75 * var(--ui-bg-opacity,1)));transition:transform var(--m-fast) var(--ease-out),background var(--m-fast),box-shadow var(--m-fast),border-color var(--m-fast)}
+#recordsZone .cpn:hover,#recordsZone .cpn.hover{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)));color:var(--tx)}
+#recordsZone .cpn:hover i,#recordsZone .cpn.hover i{transform:scale(1.2);background:hsl(var(--glow-detail)/calc(.6 * var(--ui-bg-opacity,1)))}
+#recordsZone .cpn.sel{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)));color:var(--tx)}
+#recordsZone .cpn.sel i{background:hsl(var(--glow-detail));box-shadow:0 0 8px 2px hsl(var(--glow-detail)/calc(.7 * var(--ui-bg-opacity,1)))}
+/* 2026-10-22（docs/263 第三批「装饰循环砍一半」）：联动到的检查点只「叮」两下告诉你是哪个，不再一直闪 */
+#recordsZone .cpn.linked i{animation:rcNodePing 1s var(--ease-out) 2}
+@keyframes rcNodePing{0%{box-shadow:0 0 0 0 hsl(var(--glow-detail)/.85)}100%{box-shadow:0 0 0 8px hsl(var(--glow-detail)/0)}}
+#recordsZone .rail-foot{padding:6px 4px 0;border-top:1px solid var(--line-faint);display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:10px;color:var(--tx2);font-variant-numeric:tabular-nums}
+#recordsZone .pg-dots{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end}
+#recordsZone .pg-dots i{width:5px;height:5px;border-radius:50%;background:var(--surface-strong)}
+#recordsZone .pg-dots i.on{background:hsl(var(--glow-zone))}
+/* 没有检查点：虚线上一个小方点 + 「去开启」
+   2026-10-22（docs/263 第三批）：原来小方点沿虚线来回巡逻、z z 一直往上飘 —— 一直动但不告诉你任何事，砍成静止 */
+#recordsZone .rail-empty{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:8px 2px 4px;overflow:hidden}
+#recordsZone .re-track{position:absolute;left:50%;top:14px;height:170px;border-left:2px dashed hsl(var(--glow-detail)/.24);transform:translateX(-1px)}
+#recordsZone .re-fly{position:absolute;left:50%;top:14px;width:10px;height:10px;margin-left:-5px;border-radius:4px;background:hsl(var(--glow-detail));box-shadow:0 0 10px 3px hsl(var(--glow-detail)/.55)}
+#recordsZone .re-zz{position:absolute;right:12px;top:6px;font-size:10px;font-weight:600;color:var(--tx2);opacity:.5}
+#recordsZone .re-text{position:relative;margin-top:auto;font-size:11px;line-height:1.55;color:var(--tx)}
+#recordsZone .re-text small{display:block;font-size:10px;color:var(--tx2)}
+#recordsZone .re-btn{position:relative;width:100%;height:30px;border-radius:8px;border:0;background:hsl(var(--glow-detail)/.85);color:#1b0d26;font-weight:600;font-size:12px;cursor:pointer}
+#recordsZone .re-btn:hover{background:hsl(var(--glow-detail))}
+#recordsZone .rail-search{flex:1;display:flex;flex-direction:column;gap:12px;padding:12px 4px;font-size:11px;color:var(--tx2);line-height:1.5}
+#recordsZone .rail-search b{display:block;font-size:22px;color:var(--tx);font-variant-numeric:tabular-nums}
+#recordsZone .rail-note{font-size:10px;color:var(--tx2);line-height:1.6}
+#recordsZone .rc-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--tx2);font-size:12px;line-height:1.8;text-align:center}
+#recordsZone .rc-empty small{font-size:11px;opacity:0.75}
+#recordsZone .pg-pill{position:absolute;left:50%;bottom:14px;transform:translateX(-50%) translateY(6px);z-index:6;height:26px;padding:0 12px;border-radius:999px;background:hsl(var(--card-h, 220 28%) 9% / .9);border:1px solid var(--line-strong);font-size:11px;display:flex;align-items:center;opacity:0;pointer-events:none;transition:opacity var(--m-fast),transform var(--m-fast) var(--ease-out);white-space:nowrap}
+#recordsZone .pg-pill.show{opacity:1;transform:translateX(-50%)}
+
+/* ═══ 一级卡面：搜索框（拖拽条下面）+ 项目横条列表 ═══ */
+/* ⚠ 这里的选择器挂在 .block-card[data-card="history"] 上 —— 一级卡不在 #recordsZone 里。 */
+/* ⭐ 左上角放大镜（2026-09-30 用户定）：跟右上角折叠按钮 .collapse-toggle【镜像对称】——
+   同尺寸 16px 圆、同 top:9px、左边距 = 折叠按钮的右边距 18px、同样的底色/描边/阴影/悬停。
+   ⚠ 规格改了要两边一起改（折叠按钮在 ui.html 的 .collapse-toggle）。
+   ⚠ z-index 6：高过卡面内容，但低于压暗层 .bc-dim(20) —— 被压住时要跟着变暗。 */
+.block-card[data-card="history"] .rs-toggle{
+  position:absolute;top:9px;left:18px;z-index:6;
+  display:none;align-items:center;justify-content:center;
+  width:16px;height:16px;padding:0;
+  border:1px solid hsl(var(--accent-hsl, 211 100% 68%) / .28);border-radius:50%;
+  color:var(--tx2);background:hsl(var(--accent-hsl, 211 100% 68%) / .13);
+  box-shadow:0 2px 8px rgba(0,0,0,.22);cursor:pointer;
+  transition:background var(--m-fast),border-color var(--m-fast),color var(--m-fast),transform var(--m-fast) var(--ease-out);
+}
+.block-card[data-card="history"] .rs-toggle svg{width:9px;height:9px;flex:none}
+.block-card[data-card="history"].is-current .rs-toggle{display:flex}
+.block-card[data-card="history"] .rs-toggle:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .24);border-color:hsl(var(--accent-hsl, 211 100% 68%) / .46);transform:scale(1.08)}
+.block-card[data-card="history"] .rs-toggle:active{transform:scale(.94)}
+/* 展开时按钮点亮，表示"搜索正开着" */
+.block-card[data-card="history"].rs-open .rs-toggle{background:hsl(var(--accent-hsl)/.85);border-color:transparent;color:#0b0f16}
+
+/* 搜索框：平时收起，点放大镜后从拖拽条下方【往下挤出来】，列表同步被推下去。
+   ⚠ 收起态不用 display:none —— display 一切换，过渡在同一帧里不会触发（项目里踩过的"同帧过渡"坑）。
+     用 opacity + transform + visibility（visibility 延迟到淡出结束再隐藏，收起时也有动画）。 */
+.block-card[data-card="history"] .rec-search{position:absolute;left:14px;right:14px;top:34px;height:32px;z-index:5;display:none;align-items:center;gap:6px;padding:0 6px 0 10px;border-radius:8px;border:1px solid var(--line);background:rgba(10,13,19,.5);
+  opacity:0;visibility:hidden;pointer-events:none;transform:translateY(-10px) scaleY(.55);transform-origin:50% 0;
+  transition:opacity var(--m-base) var(--ease-soft),transform var(--m-slow) var(--ease-out),visibility 0s linear .28s,border-color var(--m-fast),background var(--m-fast),box-shadow var(--m-fast)}
+.block-card[data-card="history"].is-current .rec-search{display:flex}
+.block-card[data-card="history"].rs-open .rec-search{opacity:1;visibility:visible;pointer-events:auto;transform:none;
+  transition:opacity var(--m-base) var(--ease-soft) .04s,transform var(--m-slow) var(--ease-out),visibility 0s,border-color var(--m-fast),background var(--m-fast),box-shadow var(--m-fast)}
+.block-card[data-card="history"] .rec-search:focus-within{border-color:hsl(var(--accent-hsl)/.8);background:rgba(10,13,19,.62);box-shadow:0 0 0 3px hsl(var(--accent-hsl)/.14)}
+.block-card[data-card="history"] .rec-search>svg{flex:none;color:var(--tx2)}
+.block-card[data-card="history"] .rec-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--tx);font:inherit;font-size:12px}
+.block-card[data-card="history"] .rec-search input::placeholder{color:rgba(154,163,184,.72)}
+.block-card[data-card="history"] .rec-search .rs-count{flex:none;font-size:10px;line-height:16px;padding:0 6px;border-radius:8px;background:var(--surface-strong);color:var(--tx2);font-variant-numeric:tabular-nums}
+.block-card[data-card="history"] .rec-search .rs-count.hit{background:hsl(var(--accent-hsl)/.85);color:#0b0f16}
+.block-card[data-card="history"] .rec-search .rs-clear{flex:none;display:none;width:18px;height:18px;align-items:center;justify-content:center;border:0;border-radius:50%;background:transparent;color:var(--tx2);cursor:pointer;padding:0}
+.block-card[data-card="history"] .rec-search .rs-clear:hover{background:var(--surface-strong);color:var(--tx)}
+.block-card[data-card="history"] .rec-search.has-q .rs-clear{display:flex}
+/* 列表：搜索收起时从 34px 开始（紧贴拖拽条下方），展开时被挤到 76px。
+   ⚠ top 的过渡时长要跟搜索框的 transform 一致（.28/.3s），两者同步才像"挤下去"，而不是各动各的。 */
+/* ⭐⭐⭐ 2026-10-09（docs/192，用户报"下沿的攒光跑到某个项目底部了"）：
+   原来这里【只有 .rec-list 一层】，而它自己是 overflow-y:auto 的滚动容器 ——
+   挂在它里面的 .pz-edge 会跟着内容一起滚（绝对定位的 bottom:0 对齐的是
+   【内容盒底边】而不是【可视框底边】），于是滚到底时光带跑到列表中间、
+   正好压在最后一个项目下面。
+   ⇒ 加一层【不滚动的定位壳】.rec-listwrap 承担"定位"和"让位"两件事，
+     .rec-list 退化成纯内容层（inset:0 填满壳）。
+   ⚠ 判据放壳上（top/bottom），.rec-list 不再自己算让位 —— 一处尺寸定义，
+     不然"搜索展开挤下去"要改两个地方（改漏一个就是错位）。
+   ⚠⚠⚠ 但【攒光带不挂这个壳】：壳只覆盖列表区（94~416），而卡片本体是 60~460
+     ⇒ 光带贴壳底的话，**卡底还空出 44px**（页脚那一条）。
+     用户 2026-10-09 报的就是这个：「我要求的是你在圆弧的最底和最底…下面还空一块」。
+     ⇒ 光带改挂【卡片本体】，贴它的 top/bottom:1px（= 圆弧最底），见 mountRecordsEdges。
+     这一层壳仍然要留 —— 它解决的是"让位"和"滚动容器里绝对定位跟着滚"两个问题。 */
+.block-card[data-card="history"] .rec-listwrap{position:absolute;left:0;right:0;top:34px;bottom:44px;z-index:4;transition:top var(--m-slow) var(--ease-out)}
+.block-card[data-card="history"].rs-open .rec-listwrap{top:76px;transition:top var(--m-slow) var(--ease-out)}
+.block-card[data-card="history"] .rec-list{position:absolute;inset:0;overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain}
+.block-card[data-card="history"] .rec-list::-webkit-scrollbar{display:none}
+.block-card[data-card="history"] .rec-list-inner{padding:6px 16px 10px;display:flex;flex-direction:column;gap:10px}
+/* ⚠⚠ 预览图【只能铺到边框以内】(2026-09-30 用户第二次报"下边缘亮边")：
+   背景图默认铺到 border-box，而压暗遮罩 ::before 是 inset:0（只到 padding box）——
+   于是 1px 边框那一圈露的是【没压暗的原图】。图下沿一亮（天空、白墙、白底），
+   就是一条横贯的亮线；上一轮只修了一级卡本体的边框，漏了这里。
+   padding-box + origin 对齐：图和遮罩占同一块区域，边框圈里只剩卡片自己的深色底。 */
+.block-card[data-card="history"] .ptile{position:relative;flex:none;height:96px;border-radius:12px;overflow:hidden;cursor:pointer;background:#222 center 28%/cover no-repeat;background-clip:padding-box;background-origin:padding-box;border:1px solid var(--line);transition:border-color var(--m-fast),box-shadow var(--m-fast),transform var(--m-fast) var(--ease-out)}
+.block-card[data-card="history"] .ptile::before{content:'';position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(8,10,16,.1) 15%,rgba(8,10,16,.8) 100%)}
+.block-card[data-card="history"] .ptile:hover{border-color:var(--line-strong)}
+.block-card[data-card="history"] .ptile.sel{border-color:hsl(var(--accent-hsl)/.95);box-shadow:0 0 0 1px hsl(var(--accent-hsl)/.9),0 0 18px hsl(var(--accent-hsl)/.35)}
+.block-card[data-card="history"] .ptile.enter{animation:rcTileEnter var(--m-slow) var(--ease-out) both}
+@keyframes rcTileEnter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.block-card[data-card="history"] .ptile.flash::after{content:'';position:absolute;inset:0;z-index:3;border-radius:inherit;background:hsl(var(--accent-hsl)/.35);animation:rcTileFlash .7s var(--ease-soft) forwards;pointer-events:none}
+@keyframes rcTileFlash{to{opacity:0}}
+.block-card[data-card="history"] .pt-badges{position:absolute;left:8px;top:8px;z-index:2;display:flex;gap:4px;flex-wrap:wrap}
+.block-card[data-card="history"] .pt-chip{display:flex;align-items:center;gap:4px;height:18px;padding:0 7px;border-radius:999px;background:rgba(8,10,16,.72);font-size:10px;color:var(--tx)}
+.block-card[data-card="history"] .pt-chip .dot{width:6px;height:6px;border-radius:50%;background:hsl(var(--sem-warn));animation:rcDot 1.3s ease-in-out infinite}
+.block-card[data-card="history"] .pt-chip.live .dot{background:hsl(var(--sem-ok));animation:none}
+@keyframes rcDot{0%,100%{opacity:1}50%{opacity:0.3}}
+.block-card[data-card="history"] .pt-chip.match{background:hsl(var(--accent-hsl)/.85);color:#0b0f16;font-weight:600}
+.block-card[data-card="history"] .pt-body{position:absolute;left:12px;right:12px;bottom:10px;z-index:2}
+.block-card[data-card="history"] .pt-row{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+.block-card[data-card="history"] .pt-name{font-size:13px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.block-card[data-card="history"] .pt-meta{font-size:10px;color:rgba(230,236,246,.76);font-variant-numeric:tabular-nums;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.block-card[data-card="history"] .pt-cost{flex:none;text-align:right;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;text-shadow:0 1px 3px rgba(0,0,0,.85)}
+.block-card[data-card="history"] .pt-cost small{display:block;font-size:10px;font-weight:500;color:hsl(var(--sem-warn))}
+.block-card[data-card="history"] .rec-empty{padding:34px 10px;text-align:center;color:var(--tx2);font-size:12px;line-height:1.8}
+.block-card[data-card="history"] .rec-empty small{font-size:11px;opacity:0.75}
+/* ⚠ 2026-10-07 补：二级（#recordsZone）里的空状态。
+   为什么要补：二级的 .rc-pages 是 416×400 的绝对定位块，而上面那两条 .rec-empty 规则
+   只对一级卡面生效（选择器是 .block-card[data-card="history"]）⇒
+   不补的话字会贴在面板最顶上（实测截图就是这样）。
+   ⚠ 结构：.rc-pages > .rc-slide > .rec-empty（中间还有一层 .rc-slide，position:absolute;inset:0）
+     —— 所以这里【不能】写成 .rc-pages > .rec-empty（够不着，我第一版就写错了）。
+   ⚠ 只认 #recordsZone 下的，别碰一级卡面那处（那边有自己的 padding 节奏）。 */
+#recordsZone .rc-slide > .rec-empty{position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:0 24px;text-align:center;color:var(--tx2);font-size:12px;line-height:1.9}
+#recordsZone .rc-slide > .rec-empty small{font-size:11px;opacity:0.75}

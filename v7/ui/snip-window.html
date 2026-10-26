@@ -1,0 +1,120 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="utf-8">
+<title>截图当参考图</title>
+<link rel="stylesheet" href="tokens.css">
+<!-- 2026-10-24（用户定）：参考图快捷键按下时 PS 不在前台 ⇒ 每块屏一个这个窗口：全屏变暗，拉一个框，松手后「确认 / 重截」。
+     外壳 snip.rs：确认时先关掉这些窗口，再只抓框住的那一块（这里不拿整屏截图）。 -->
+<style nonce="__TAURI_STYLE_NONCE__">
+  *{box-sizing:border-box;}
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:transparent;cursor:crosshair;user-select:none;
+    font-family:'OPPO Sans',-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;}
+  /* 变暗：框外暗、框里亮（box-shadow 一大圈）。⚠ 背景不能全透明 —— Windows 上全透明的像素点击会穿过去 */
+  .dim{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(6,8,12,.42);}
+  .dim.has-box{background:rgba(6,8,12,.01);}
+  .box{position:fixed;display:none;outline:1.5px solid #fff;box-shadow:0 0 0 100vmax rgba(6,8,12,.42);}
+  .box.show{display:block;}
+  .size{position:absolute;left:0;top:-26px;padding:3px 8px;border-radius:6px;background:rgba(6,8,12,.82);color:#fff;font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .bar{position:absolute;right:0;bottom:-44px;display:none;gap:8px;}
+  .bar.show{display:flex;}
+  .bar button{height:32px;padding:0 12px;border-radius:8px;border:1px solid rgba(255,255,255,.28);background:rgba(20,22,28,.92);color:#fff;font:inherit;font-size:13px;cursor:pointer;}
+  .bar button.primary{background:hsl(211 100% 58%);border-color:transparent;font-weight:600;}
+  .tip{position:fixed;left:50%;top:24px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:6px 6px 6px 14px;border-radius:10px;background:rgba(6,8,12,.82);color:#fff;font-size:13px;}
+  /* ⭐ 10-25 学员反馈：参考图的比例会影响出图分辨率，有参考图时图 1 用正方形最稳、偏移最小 ⇒ 加「1:1」锁正方形 */
+  .ratio{height:28px;padding:0 10px;border-radius:7px;border:1px solid rgba(255,255,255,.28);background:rgba(20,22,28,.92);color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums;}
+  .ratio.on{background:hsl(211 100% 58%);border-color:transparent;}
+  .bar .ratio{height:32px;}
+</style>
+</head>
+<body>
+<div class="dim" id="dim"></div>
+<div class="box" id="box"><span class="size" id="size"></span><div class="bar" id="bar"><button type="button" class="ratio" data-ratio="" title="锁成正方形（按住 Shift 拖也是正方形）">1:1</button><button type="button" id="again">重截</button><button type="button" id="cancel">取消</button><button type="button" class="primary" id="ok">确认</button></div></div>
+<div class="tip" id="tip"><span>拖一个框，框里的就是参考图 · Esc 取消</span><button type="button" class="ratio" data-ratio="" title="锁成正方形（按住 Shift 拖也是正方形）">1:1</button></div>
+<script>
+(function () {
+  'use strict';
+  var invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+  var box = document.getElementById('box'), size = document.getElementById('size'), bar = document.getElementById('bar'), dim = document.getElementById('dim'), tip = document.getElementById('tip');
+  var start = null, rect = null, done = false;
+  // 1:1 开没开：按电脑记住（每块屏一个窗口，都读同一份）
+  var RATIO_KEY = 'v7.snip.square';
+  var square = false;
+  try { square = localStorage.getItem(RATIO_KEY) === '1'; } catch (_) {}
+  var ratioBtns = document.querySelectorAll('[data-ratio]');
+  function paintRatio() { for (var i = 0; i < ratioBtns.length; i++) ratioBtns[i].classList.toggle('on', square); }
+  // 从起点拖到 (x, y) 的框；正方形时边长取两边里长的那条，往拖的方向长，碰到屏幕边就停
+  function rectFrom(x, y, sq) {
+    if (!sq) return { x: Math.min(start.x, x), y: Math.min(start.y, y), w: Math.abs(x - start.x), h: Math.abs(y - start.y) };
+    var dx = x - start.x, dy = y - start.y;
+    var room = Math.min(dx < 0 ? start.x : innerWidth - start.x, dy < 0 ? start.y : innerHeight - start.y);
+    var s = Math.min(Math.max(Math.abs(dx), Math.abs(dy)), room);
+    return { x: dx < 0 ? start.x - s : start.x, y: dy < 0 ? start.y - s : start.y, w: s, h: s };
+  }
+  // 框好之后再点 1:1：围着原来的中心变成正方形（边长取长的那条，超出屏幕就缩到放得下）
+  function squareUp(r) {
+    var s = Math.min(Math.max(r.w, r.h), innerWidth, innerHeight);
+    var cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+    return { x: Math.max(0, Math.min(innerWidth - s, cx - s / 2)), y: Math.max(0, Math.min(innerHeight - s, cy - s / 2)), w: s, h: s };
+  }
+  function draw(r) {
+    box.style.left = r.x + 'px'; box.style.top = r.y + 'px'; box.style.width = r.w + 'px'; box.style.height = r.h + 'px';
+    size.textContent = Math.round(r.w * devicePixelRatio) + ' × ' + Math.round(r.h * devicePixelRatio);
+    // 工具条放不下（框贴着屏幕底）就放到框里面
+    bar.style.bottom = (r.y + r.h + 48 > innerHeight) ? '8px' : '-44px';
+    bar.style.right = (r.y + r.h + 48 > innerHeight) ? '8px' : '0';
+    size.style.top = r.y < 30 ? '6px' : '-26px';
+    size.style.left = r.y < 30 ? '6px' : '0';
+  }
+  function reset() {
+    start = null; rect = null;
+    box.classList.remove('show'); bar.classList.remove('show'); dim.classList.remove('has-box'); tip.style.display = '';
+  }
+  function cancel() { if (done) return; done = true; if (invoke) invoke('snip_cancel').catch(function () {}); }
+  function confirm() {
+    if (done || !rect || rect.w < 6 || rect.h < 6) return;
+    done = true;
+    if (invoke) invoke('snip_finish', { x: rect.x, y: rect.y, w: rect.w, h: rect.h }).then(function (r) {
+      if (r && r.error === 'SNIP_TOO_SMALL') { done = false; reset(); }
+    }).catch(function () {});
+  }
+  document.addEventListener('pointerdown', function (e) {
+    if (done || e.button !== 0 || (e.target.closest && e.target.closest('.bar, .tip'))) return;
+    if (rect) reset();
+    start = { x: e.clientX, y: e.clientY };
+    tip.style.display = 'none';
+    dim.classList.add('has-box');
+    box.classList.add('show');
+    draw({ x: start.x, y: start.y, w: 0, h: 0 });
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (!start || rect) return;
+    var r = rectFrom(e.clientX, e.clientY, square || e.shiftKey);
+    draw(r); box._r = r;
+  });
+  document.addEventListener('pointerup', function () {
+    if (!start || rect) return;
+    var r = box._r;
+    if (!r || r.w < 6 || r.h < 6) { reset(); return; }   // 只是点了一下：当没框
+    rect = r; start = null;
+    bar.classList.add('show');
+  });
+  for (var i = 0; i < ratioBtns.length; i++) ratioBtns[i].addEventListener('click', function (e) {
+    e.stopPropagation();
+    square = !square;
+    try { localStorage.setItem(RATIO_KEY, square ? '1' : '0'); } catch (_) {}
+    paintRatio();
+    if (square && rect) { rect = squareUp(rect); box._r = rect; draw(rect); }
+  });
+  paintRatio();
+  document.getElementById('ok').addEventListener('click', confirm);
+  document.getElementById('again').addEventListener('click', reset);
+  document.getElementById('cancel').addEventListener('click', cancel);
+  document.addEventListener('contextmenu', function (e) { e.preventDefault(); if (rect) reset(); else cancel(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { if (rect) reset(); else cancel(); }
+    else if (e.key === 'Enter') confirm();
+  });
+})();
+</script>
+
+
+</body></html>

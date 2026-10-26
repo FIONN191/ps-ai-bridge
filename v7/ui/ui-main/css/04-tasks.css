@@ -1,0 +1,447 @@
+/* ═══ ui-main/css/04-tasks.css —— 主界面主样式第 4 / 8 段 ═══
+   管什么：任务卡（入场出场动画 · 标题行 · 操作行 · 小眼睛 · 指哪抠哪 · 进度条）· 任务预览弹层
+   2026-10-21 从 ui.html 那一整段 <style> 原样切出来；ui.html 按编号顺序 <link> 进来（顺序 = 原来的先后，别调）。 */
+/* ── 以上是文件说明（拼回 ui.html 时会去掉）── */
+  /* ═══ 任务卡入场/出场动画 ═══
+     入场(Apple 语言): 从主卡下方"分离"出来 —— 起点被主卡遮住(往上缩 + 压扁 + 透明),
+       然后向下滑出到位, 带轻微回弹。像一张卡片从牌堆里被抽出来。
+     出场: 向下滑走 + 淡出, 高度收拢让后面的卡顶上来。 */
+  @keyframes taskEnter{
+    0%   { transform:translateY(-46px) scaleY(.86) scaleX(.97); opacity:0; }
+    55%  { transform:translateY(4px)   scaleY(1.02) scaleX(1);  opacity:1; }
+    100% { transform:translateY(0)     scaleY(1)    scaleX(1);  opacity:1; }
+  }
+  @keyframes taskLeave{
+    0%   { transform:translateY(0)   scaleY(1);   opacity:1; }
+    100% { transform:translateY(64px) scaleY(.9); opacity:0; }
+  }
+  .task.entering{
+    animation:taskEnter var(--m-slow) cubic-bezier(.22,1.1,.32,1) both;
+    transform-origin:top center;
+  }
+  .task.leaving{
+    animation:taskLeave var(--m-slow) cubic-bezier(.4,0,.7,.2) both;
+    transform-origin:top center;
+    pointer-events:none;
+  }
+  /* 添加成功反馈: 顶层卡描边闪一下(不动布局, 只给一个"收到了"的确认) */
+  @keyframes taskFlash{
+    0%   { box-shadow:0 20px 60px rgba(0,0,0,.5), 0 0 0 0 hsl(var(--accent-hsl, 211 100% 68%) / 0); }
+    35%  { box-shadow:0 20px 60px rgba(0,0,0,.5), 0 0 0 3px hsl(var(--accent-hsl, 211 100% 68%) / .55); }
+    100% { box-shadow:0 20px 60px rgba(0,0,0,.5), 0 0 0 0 hsl(var(--accent-hsl, 211 100% 68%) / 0); }
+  }
+  .task.flash{ animation:taskFlash .6s var(--ease-soft) both; }
+  /* ⭐ 2026-10-22（docs/263 第 13 条，用户拍板「毛玻璃只留最上面那层」）：
+     叠在下面的卡只露 24px 边，却每张都在实时算整块背景模糊 —— 白算。
+     压在下面的（JS 给 .stack-under）去掉模糊、底色加实；最上面那张照旧毛玻璃。报错堆同理（03-perf-errors.css）。 */
+  .task.stack-under,.error-card.stack-under{
+    backdrop-filter:none; -webkit-backdrop-filter:none;
+    background:hsl(var(--card-h, 220 28%) 11% / calc(.95 * var(--ui-bg-opacity,1)));
+  }
+
+  /* 任务卡: 矮条样式, 圆角与主卡一致(28px) */
+  .task{
+    position:absolute; top:0; left:0;
+    width:300px; height:150px; border-radius:28px; padding:15px;
+    background:hsl(var(--card-h, 220 28%) 11% / calc(.78 * var(--ui-bg-opacity,1))); backdrop-filter:blur(var(--blur)) saturate(1.5); -webkit-backdrop-filter:blur(var(--blur)) saturate(1.5);
+    border:1px solid var(--line);
+    transform-origin:top left; pointer-events:auto;
+    /* ⚠ 同主卡: 不过渡 box-shadow(重绘密集会掉帧), 只过渡 transform/opacity */
+    transition:transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-soft);
+    will-change:transform, opacity;
+  }
+  /* 任务卡有背景图时: 图 cover + 深色遮罩保证文字可读(多层背景) */
+  /* ⚠⚠ 底部压得更重（2026-09-13 用户截图）：
+     标题行现在钉在卡片下沿，而那一带原来只有 50% 的暗度 ——
+     压在亮图（那张绿衣服的图）上时白字基本读不出来。
+     改成【底部 40% 一路加深到 82%】：上半部分维持原样不变暗，
+     只把"有字的那一带"压实。这是可读性问题，不是审美问题。 */
+  .task.has-bg{
+    background-image:
+      linear-gradient(180deg,
+        hsl(var(--card-h, 220 28%) 6% / calc(.62 * var(--ui-bg-opacity,1))) 0%,
+        hsl(var(--card-h, 220 28%) 6% / calc(.34 * var(--ui-bg-opacity,1))) 34%,
+        hsl(var(--card-h, 220 28%) 6% / calc(.52 * var(--ui-bg-opacity,1))) 62%,
+        hsl(var(--card-h, 220 28%) 6% / calc(.82 * var(--ui-bg-opacity,1))) 100%);
+  }
+  .task-source-layer{position:absolute;inset:0;border-radius:inherit;background-position:center;background-size:cover;background-repeat:no-repeat;pointer-events:none;z-index:0;opacity:1;transition:opacity var(--m-slow) var(--ease-soft);}
+  .task-source-layer.task-source-next{opacity:0;z-index:0;}
+  .task-source-layer.task-source-next.reveal{opacity:1;}
+  /* ⚠⚠ 新加的内容块【必须加进这一行】，否则会被光裁切层(z2)盖住 ——
+     表现是"看得见位置但看不到、鼠标却能点中"。2026-09-13 加 .t-acts 时又栽了一次，
+     记忆里那条"光 z-index 盖功能层"说的就是这个。加任何新子元素先回来看这里。 */
+  /* 压暗层：叠压越深压得越黑（opacity 由 setTasks 设）。
+     ⚠ z4 = 压在普通内容(z3)【之上】，但在标题行和进度条(z5)【之下】——
+       上半部分跟着变暗表达层次，而露出带里那两样必须一直看得清。 */
+  .task .t-dim{
+    position:absolute; inset:0; border-radius:inherit;
+    background:#05070b; opacity:0; pointer-events:none; z-index:4;
+    transition:opacity var(--m-fast) var(--ease-soft);
+  }
+  .task > .t-head,.task > .t-bar{position:relative;z-index:5;}   /* 露出带里的两样：不被压暗 */
+  .task > .t-sub,.task > .t-acts,.task > .t-pick{position:relative;z-index:3;}   /* ⚠ 内容 z3: 在光裁切层(.task-light-clip z2)之上, 光永远压在文字/按钮之下 */
+  /* ⭐⭐ 标题行钉在卡片下沿（2026-09-13 用户要求）。
+     ┌────────────────────────┐
+     │                    ✕   │  ← ✕ 绝对定位右上，不跟标题挤
+     │ 正在生成 4/10 张        │
+     │ [提前结束] [传回 3]     │
+     │ ┄┄┄┄┄ 以下是叠压时露出的 34px ┄┄┄┄┄
+     │ 🔄 aji · AJbanana3 40% │  ← 标题+进度数字
+     │ ▓▓▓▓▓▓░░░░░░░░░░░░░░░░ │  ← 进度条
+     └────────────────────────┘
+     ⚠ 算过的：卡高 150、STEP=34 → 露出的是自身坐标 y=116~150。
+       标题行 y=114~132（顶上 2px 被压住，字还看得全）、进度条 y=134~139。
+     ⚠ 字号从 17 降到 15 —— 17px 的行高塞不进这条带子。 */
+  .task .t-head{
+    position:absolute; left:15px; right:15px; bottom:18px;
+    /* ⚠ justify-content:flex-start —— 标题必须【左对齐】（2026-09-13 用户要求）。
+       之前标题 max-width:58% + 次级信息 flex:1 right 的组合，
+       会让短标题看起来像浮在中间。现在标题左贴边，次级信息推到右边。 */
+    display:flex;align-items:baseline;justify-content:flex-start;gap:8px;height:18px;
+  }
+  .task .t-ic{display:none;}   /* 2026-09-13 起不显示 emoji 图标，保留类名免得别处引用炸 */
+  /* ⚠ 任务卡文字可读性(用户 2026-09-11): 文字加向下投影, 并按源图【上半部平均亮度】自动切黑白。
+     暗图(默认): 白字 + 深投影; 亮图(.on-light): 深字 + 浅投影。判定在 renderTaskEl 里, 阈值 L>0.55。
+     投影只加在文字上, 不加在进度条上(条本身有色)。 */
+  /* ⭐⭐ 2026-10-22（用户在任务卡对照台选定「方案 C · 字自带描边」）：
+     以前靠 8px 发散光晕 + 按源图上半部亮度翻深字 —— 光晕看着像发光、亮图上反而更糊，而字在卡片最下面，按上半部判亮度经常判错。
+     现在：字永远是浅色，外面套一圈紧贴字形的深色细边（四向 1px 硬投影 + 一层淡托底），白底 / 黑底 / 花底都有对比，不用猜图片亮度。
+     ⚠ 任务卡不再挂 .on-light（04-tasks.js / 05-errors-stack.js 那两处亮度判定已删）。对照台：tmp/task-card-bench/index.html */
+  .task .t-head, .task .t-sub, .task .t-engine-note, .task .t-act, .task .t-close{
+    text-shadow:1px 0 0 rgba(6,8,12,.9),-1px 0 0 rgba(6,8,12,.9),0 1px 0 rgba(6,8,12,.9),0 -1px 0 rgba(6,8,12,.9),0 1px 3px rgba(0,0,0,.6);
+    paint-order:stroke fill;
+  }
+  /* ⭐ 亮图上翻深字：整卡的变量一起翻，在 tokens.css 的 .on-light 里统一定义。
+     ⚠ 这里【只留投影】—— 投影是"亮底上的白描边"，没法用颜色变量表达，只能单列。
+       其余（文字/描边/按钮底/进度条槽）全部走变量，自动跟着 .on-light 走。
+     ⚠⚠ 2026-09-14 之前这里还有 4 条逐元素覆盖（.t-close / .t-close:hover / .t-bar / .t-act），
+       那是"清单式"写法 —— 加一个新元素就得回来登记一次，必漏。已全部消掉。 */
+  /* ⚠ 字号 17→15 并锁单行：这一行现在只有 18px 高（在叠压露出带里），17px 塞不下。
+     ⚠ 必须截断 —— 任务名有时很长（"aji · AJbanana3"还算短的），换行会把进度条挤掉。 */
+  /* ⚠ flex:0 1 auto + max-width：标题优先占位但不许独吞整行 ——
+     次级信息和进度数字也得有地方站。预设名很长时截断的是标题，不是那两样。 */
+  .task .t-name{font-size:15px;font-weight:700;color:#fff;-webkit-text-stroke:2.5px rgba(6,8,12,.88);flex:0 1 auto;min-width:0;max-width:58%;
+    line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .task .t-pct{font-size:12px;color:#a9d3ff;font-weight:700;flex:0 0 auto;line-height:18px;}
+  /* ⭐ 操作行（2026-09-13）：提前结束 / 传回。
+     ⚠⚠ 【不放在 t-head 里】—— 卡片只有 300px 宽，头部已经有 图标+名字+百分比+✕，
+        再塞按钮会把名字挤没（我一度这么干过，用户指出来了）。单独一行放在状态文字下面。
+     ⚠ 平时压淡、悬停卡片才亮 —— 不跟进度数字抢注意力（同 .t-close 的做法）。 */
+  .task .t-acts{
+    display:flex; gap:6px; align-items:center;
+    margin-top:8px; min-height:24px;
+  }
+  /* ⚠⚠ 【不压淡】（2026-09-13 用户反馈）。
+     我一开始按 .t-close 的做法给了 opacity:0.5、悬停卡片才亮 ——
+     用户的原话是"按钮暗下去没反应"：**他把"淡"读成了"禁用"**，
+     于是以为点了没用。这两个是这张卡上的主要动作，必须一直看得清。 */
+  .task .t-act{
+    flex:0 1 auto; padding:0 11px;
+    height:24px; line-height:22px; white-space:nowrap;
+    font:inherit; font-size:11px; font-weight:600;
+    border-radius:12px; cursor:pointer;
+    background:rgba(8,10,16,.45); border:1px solid rgba(255,255,255,.35);
+    color:#fff;
+    transition:background var(--m-fast), border-color var(--m-fast), transform var(--m-fast);
+  }
+  .task .t-act:hover{background:var(--surface-strong); border-color:var(--line-strong);}
+  .task .t-act:active{transform:scale(.96);}          /* 按下去有反馈，别让人怀疑没点到 */
+  /* 「传回」是这张卡上最该点的动作，给主色
+     ⚠ 2026-09-14 从 --glow-hsl 改成 --accent-hsl：
+       这是【实心控件】，该跟用户在设置里选的主题色走；
+       --glow-hsl 是从背景图反推的光效色，管的是卡片边缘那几道光。
+       两者混用会出现"改了主题色，按钮纹丝不动"（用户实测）。 */
+  .task .t-act.primary{
+    background:hsl(var(--accent-hsl, 211 100% 68%) / .65);
+    border-color:hsl(var(--accent-hsl, 211 100% 68%) / .95);
+  }
+  .task .t-act.primary:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .6);}
+  /* ⭐⭐ 2026-10-05（docs/143 §五）：任务级「小眼睛」—— 切「校色版 ↔ 底版」。
+     ⚠ 三种状态要一眼分得出，因为这是个【会改变画面】的开关：
+       · 默认（显示生成时那一版）→ 普通按钮样
+       · .on（切到了别的版本）    → 用主色填上，跟 primary 同一套色，用户一眼知道"现在看的不是生成时那张"
+         （2026-10-19 起默认不校色，生成时那一版常常就是底版 —— 所以不再按「是不是底版」亮）
+       · .off（没底版）     → 压淡 + 禁用光标，点了会弹"缺少文件"（老任务）
+     ⚠ 不用 opacity 表达"当前不在底版"（那会被读成"禁用"，2026-09-13 栽过）。 */
+  .task .t-act.t-eye{font-weight:600;}
+  .task .t-act.t-eye.on{
+    background:hsl(var(--accent-hsl, 211 100% 68%) / .65);
+    border-color:hsl(var(--accent-hsl, 211 100% 68%) / .95);
+  }
+  .task .t-act.t-eye.off{opacity:.5; cursor:not-allowed;}
+  .task .t-act.t-eye.off:hover{background:var(--surface); border-color:var(--line-strong);}
+  /* ⚠ 原来这里有两条 `.task.on-light .t-act{...}` 的逐元素覆盖（2026-09-14 删）。
+     现在颜色全走 --tx / --line-strong / --surface，.on-light 一翻变量就自动跟着变 ——
+     不需要为每个元素单独列一条。加新元素也不用回来登记（docs/14 五点七节）。 */
+
+  /* ── 指哪抠哪：三个候选让用户挑（2026-09-14 深夜）──
+     ⚠⚠ 这一整块必须写成 CSS 类，【不许用 HTML 里的 style="..."】——
+        本项目的 CSP 会把行内 style 属性整个吞掉，而且不报错，
+        表现成"样式完全不生效"（docs/12 那个"进度条永远是灰的"就是这么来的）。 */
+  .task .t-pick{ display:none; margin-top:8px; }
+  .task .t-pick.on{ display:block; }
+  .task .t-pick-tip{ font-size:11px; color:var(--tx2); margin-bottom:6px; }
+  .task .t-pick-row{ display:flex; gap:6px; align-items:flex-start; }
+  .task .t-pick-item{
+    flex:1 1 0; min-width:0; padding:0; cursor:pointer;
+    background:var(--surface); border:1px solid var(--line-strong);
+    border-radius:8px; overflow:hidden;
+    transition:border-color var(--m-fast), transform var(--m-fast), background var(--m-fast);
+  }
+  .task .t-pick-item:hover{ background:var(--surface-strong); }
+  .task .t-pick-item:active{ transform:scale(.97); }
+  /* 引擎最有把握的那个给主色描边 —— 只是"建议"，不替用户决定 */
+  .task .t-pick-item.best{ border-color:hsl(var(--accent-hsl, 211 100% 68%) / .85); }
+  .task .t-pick-item[disabled]{ opacity:0.5; cursor:default; }
+  /* ⚠ 缩略图用 checkerboard 垫底：mask 是黑白图，直接放在深色卡片上
+       "全黑的那块"和卡片背景连成一片，用户看不出边界在哪 */
+  .task .t-pick-thumb{
+    display:block; width:100%; height:52px; object-fit:contain;
+    background:
+      linear-gradient(45deg,#8a8a8a 25%,transparent 25%,transparent 75%,#8a8a8a 75%),
+      linear-gradient(45deg,#8a8a8a 25%,#bdbdbd 25%,#bdbdbd 75%,#8a8a8a 75%);
+    background-size:10px 10px; background-position:0 0,5px 5px;
+  }
+  .task .t-pick-cap{
+    display:block; font-size:10px; line-height:16px; text-align:center;
+    color:var(--tx2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  /* 关闭按钮: 平时压得很淡, 悬停卡片才亮起来 —— 不跟进度数字抢注意力 */
+  /* ⚠ ✕ 挪到右上角绝对定位（2026-09-13）：标题行下沉到卡片底部之后，
+     它不该跟着下去 —— "移除"不是常用动作，放右上角既好找又不占标题的宽度。 */
+  .task .t-close{
+    position:absolute;top:12px;right:12px;z-index:4;
+    width:22px;height:22px;flex:0 0 auto;
+    /* ⚠ 必须 flex 居中（2026-09-13 修）：光靠 line-height:1 的话，
+       ✕ 这个字形是按【基线】摆的，在 22px 的圆框里会偏上偏左 —— 用户一眼看出"X 歪了"。
+       padding 也要清零，否则按钮默认内边距会把字再推偏。 */
+    display:flex;align-items:center;justify-content:center;padding:0;
+    border:1px solid transparent;border-radius:999px;
+    background:transparent;color:#fff;
+    font:12px inherit;line-height:1;cursor:pointer;
+    opacity:.3;transition:opacity var(--m-fast) var(--ease-soft),background var(--m-fast) var(--ease-soft),color var(--m-fast) var(--ease-soft),transform var(--m-fast) var(--ease-out);
+  }
+  /* ⭐ 2026-10-22（docs/263 第 8 条，用户拍板）：关闭按钮不再藏起来 —— 平时 .3 压淡，移到卡上 .75，移到按钮上 1。
+     以前平时是 0，新用户根本不知道这里能关。 */
+  .task .t-close{opacity:.7;}
+  .task:hover .t-close{opacity:.9;}
+  .task .t-close:hover{opacity:1;background:var(--surface);color:var(--tx);border-color:var(--line);}
+  .task .t-close:active{transform:scale(.88);}   /* 按下反馈(2026-09-14)。22px 小按钮，缩狠一点才看得出来 */
+  /* ⭐⭐ 进度条钉在卡片【最下沿】（2026-09-13 用户要求）。
+     叠压时下面那几张只露出最下面 STEP=34px —— 进度条必须在这条带子里，
+     否则一叠压就被上面那张完全盖住，而"还剩几张"正是叠压时最该看到的。
+     ⚠ 用 absolute 而不是跟着文档流：上面的状态文字/操作行是变长的（有时没有操作行），
+       跟着流走的话进度条会上下跳，叠压时就时隐时现。钉死在底部最稳。 */
+  .task .t-bar{
+    position:absolute; left:15px; right:15px; bottom:11px;
+    height:6px;border-radius:4px;background:rgba(6,8,12,.55);box-shadow:0 0 0 1px rgba(255,255,255,.25);overflow:hidden;
+  }
+  /* 次级信息：张数 · 渠道 · 模型。跟标题【同一行】，靠字号拉开层级。
+     ⚠ 压小压淡 —— 它的作用是"需要时能查到"，不是"一眼看到"。
+     ⚠ min-width:0 + 截断：模型名有时很长，不截会把进度数字挤出卡外。 */
+  .task .t-meta{
+    flex:1 1 auto;min-width:0;text-align:right;
+    font-size:11px;font-weight:600;color:rgba(255,255,255,.92);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  /* 状态文字和操作行从卡片顶部往下排（✕ 占着右上角，给它让出 26px） */
+  .task .t-sub{margin-right:26px;margin-top:4px;}
+  .task .t-fill{display:block;width:100%;height:100%;border-radius:4px;overflow:hidden;background:transparent;}
+  /* 进度条从零重新建模：三个独立区域按完成/失败/未完成比例排列。
+     每个区域内部独立播放扫光，绝不跨越到其他颜色区域。 */
+  .task .t-progress-layer{display:flex;position:relative;width:100%;height:100%;border-radius:inherit;overflow:hidden;background:hsl(var(--accent-hsl, 211 100% 68%) / .18);}
+  .task .t-progress-segment{display:block;position:relative;flex:0 0 auto;height:100%;min-width:0;overflow:hidden;transition:width .52s var(--ease-soft);}
+  /* 2026-10-22（docs/263 第 20 条）：成功 / 失败段改实色（渐变只留给 .t-progress-live / 扫光这种「光」） */
+  .task .t-progress-segment.ok{background:hsl(var(--sem-ok) / .85);}
+  .task .t-progress-segment.err{background:rgba(255,125,125,.75);}
+  .task .t-progress-segment.pending{background:hsl(var(--accent-hsl, 211 100% 68%) / .18);}
+  .task .t-progress-sweep{position:absolute;z-index:1;inset:-2px auto -2px -32%;width:32%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.98),transparent);opacity:0;pointer-events:none;filter:drop-shadow(0 0 4px rgba(220,245,255,.85));}
+  .task .t-progress-live{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,hsl(var(--accent-hsl, 211 100% 68%) / .38),hsl(var(--accent-hsl, 211 100% 68%) / .62));transition:width .6s var(--ease-soft);pointer-events:none;}
+  .task .t-progress-segment.step .t-progress-sweep{animation:tProgressSegmentSweep .92s var(--ease-out) both;}
+  .task .t-progress-tip{position:absolute;z-index:2;right:0;top:50%;width:7px;height:7px;border-radius:50%;transform:translate(0,-50%) scale(.55);opacity:0;pointer-events:none;}
+  .task .t-progress-segment.ok .t-progress-tip{background:hsl(var(--sem-ok) / .35);box-shadow:0 0 10px 4px hsl(var(--sem-ok) / .98);}
+  .task .t-progress-segment.err .t-progress-tip{background:#ffd6d6;box-shadow:0 0 10px 4px rgba(255,107,107,.98);}
+  .task .t-progress-segment.step .t-progress-tip{animation:tProgressSegmentTip .92s var(--ease-out) both;}
+  @keyframes tProgressSegmentSweep{0%{transform:translateX(0);opacity:0}14%{opacity:1}88%{opacity:0.95}100%{transform:translateX(412%);opacity:0}}
+  @keyframes tProgressSegmentTip{0%{opacity:0;transform:translate(0,-50%) scale(.45)}30%{opacity:1;transform:translate(0,-50%) scale(1.6)}58%{opacity:0.75;transform:translate(0,-50%) scale(.92)}78%{opacity:1;transform:translate(0,-50%) scale(1.3)}100%{opacity:0;transform:translate(0,-50%) scale(.62)}}
+  /* ⚠ 2026-10-20 删掉了这里的 prefers-reduced-motion 规则：用户 Windows 关了「显示动画」，它会把这条动画静默掐掉（同 reference-card.css 那条的教训） */
+  /* ⚠ 单行截断（2026-09-13）：状态文字有时会很长（"剩下的在后台算 · 算完这里会出现「传回」"），
+     换行会把下面的操作行顶出 150px 的卡片外。卡片是固定高度，这里必须锁成一行。 */
+  .task .t-sub{font-size:11px;font-weight:600;color:#fff;margin-top:9px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  /* ⭐ Phase F：校色引擎没开就发出的单 —— 一行非阻断提示（点击操作一概不挡）。 */
+  .task .t-engine-note{position:relative;z-index:3;margin-top:6px;padding:3px 8px;border-radius:8px;
+    background:transparent;padding-left:0;color:#ffd28f;font-weight:600;font-size:10px;line-height:1.6;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .task.done .t-pct{color:#86f5ad;}
+  .task.failed .t-pct{color:#ffa6a6;}
+  /* ⭐ 2026-10-22：工作流采样步数画在缩略图沙漏下面（04-tasks.js taskStepsHtml） */
+  .pv-cell .pv-steps{position:absolute;left:8px;right:8px;bottom:12px;text-align:center;font-size:11px;color:var(--tx);font-variant-numeric:tabular-nums;pointer-events:none;}
+  .pv-cell .pv-steps b{font-size:13px;font-weight:600;}
+  .pv-cell .pv-steps i{display:block;height:3px;margin-top:4px;border-radius:2px;background:rgba(255,255,255,.14);overflow:hidden;}
+  .pv-cell .pv-steps i b{display:block;height:100%;background:hsl(var(--accent-hsl, 211 100% 68%));border-radius:inherit;transition:width var(--m-slow) var(--ease-soft);}
+  /* ⚠ 通知卡容器: 任务区上方(主卡400与任务520之间的空档), 独立于动态任务卡, 不会被叠压/裁切 */
+  .notice-wrap{
+    position:fixed; top:506px; left:60px;        /* ⚠ 主卡下方(body 坐标 60+446), 跟任务卡同区 */
+    z-index:80; pointer-events:auto;             /* ⚠ auto: 通知卡确认按钮要点得到 */
+    display:flex; flex-direction:column; align-items:flex-start; gap:10px;
+  }
+  /* ⚠ 通知卡(L2/L3): 像"正在进行的任务" —— 宽300同任务卡, 但更高可滚动, 确认后才消失。
+     形态跟任务卡一致(叠卡/磨砂/阴影), 但更矮扁的竖卡。 */
+  .notice-card{
+    position:absolute; top:0; left:0;
+    width:300px; border-radius:28px; padding:15px;
+    background:hsl(var(--card-h, 220 28%) 11% / calc(.9 * var(--ui-bg-opacity,1)));
+    border:1px solid var(--line);
+    transform-origin:top left; pointer-events:auto;
+    transition:transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-soft);
+    will-change:transform, opacity;
+    display:flex; flex-direction:column;
+  }
+  /* 通知卡本体: 可滚动(内容多时) */
+  .notice-card .nc-scroll{
+    flex:1; overflow-y:auto; min-height:0;
+    scrollbar-width:none;
+  }
+  .notice-card .nc-body{ font-size:12px; color:var(--tx2); line-height:1.6; }
+  .notice-card .nc-btns{
+    display:flex; gap:8px; margin-top:12px;
+  }
+  .notice-card .nc-btn{
+    flex:1; font-size:13px; padding:8px 0; border-radius:8px; cursor:pointer;
+    background:rgba(255,255,255,.12); border:1px solid var(--line-faint);
+    color:var(--tx); transition:var(--m-fast);
+  }
+  .notice-card .nc-btn:hover{ background:rgba(255,255,255,.24); }
+  .notice-card .nc-btn.primary{ background:hsl(var(--sem-info) / .85); border-color:transparent; font-weight:600; }
+  .notice-card .nc-btn.primary:hover{ background:hsl(var(--sem-info)); }
+  .notice-card .nc-btn.danger{ background:hsl(var(--sem-err) / .85); border-color:transparent; font-weight:600; }
+  .notice-card .nc-btn.danger:hover{ background:hsl(var(--sem-err)); }
+
+  /* ═══ 任务预览弹层: 紧贴任务卡右缘弹出, 高度与任务卡齐平 ═══ */
+  .task-preview{
+    /* ⚠ 2026-10-03 晚：308 → 340。用户要求弹出间隔跟【一级主卡 → 二级】那套一致。
+       一级是 #zones left:340（主卡右缘 300 + 40 间隔）。原来是 308（+8），
+       只有主卡那套的 1/5 —— 用户实测一眼看出"任务卡要推更远才出来"。 */
+    position:absolute; top:0; left:340px;   /* 间隔同 #zones（卡宽 300 + 40） */
+    height:150px;                            /* 高度与任务卡一致 */
+    z-index:calc(var(--z-detail,10000) + 1);                           /* 预览在任务卡外面展开, 保持在所有卡之上(光层已统一压到 z1, 这里不再是为了压光) */
+    display:flex; flex-direction:column; justify-content:center; gap:8px;
+    opacity:0; pointer-events:none;
+    transform:translateX(-24px);
+    transition:opacity var(--m-base) var(--ease-soft), transform var(--dur) var(--ease-out);
+  }
+  .task-preview.show{opacity:1; pointer-events:auto; transform:translateX(0);}
+  /* 预览条: 横向单行。图片区滚轮仍切换任务，右侧点状条专门负责当前任务分页。 */
+  .pv-strip{
+    display:flex; gap:4px; align-items:center; height:100%;
+    background:hsl(var(--card-h, 220 28%) 12% / .85); backdrop-filter:blur(var(--blur)) saturate(1.5); -webkit-backdrop-filter:blur(var(--blur)) saturate(1.5);
+    border:1px solid var(--line); border-radius:12px; padding:8px;
+    box-shadow:var(--shadow-mid);
+    overflow:visible;
+  }
+  .pv-strip.pv-animating{overflow:hidden; contain:paint;}
+  /* 图格滑动区: 翻页时只有这层上下滑动；外层 .pv-strip 负责把动画裁在预览外框内。 */
+  .pv-track{
+    display:flex; gap:4px; align-items:center; height:100%;
+  }
+  /* ⚠ 预览条固定总宽 = 540px, 目的是让它的右缘和【上方三级详情卡的右缘】对齐。
+     算式(全局 box-sizing:border-box):
+       540 - 边框2 - 内边距16 = 522 可用
+       图格区 .pv-track = 4格×118 + 3间隙×4 = 484
+       522 - 484 - 中间间隙4 = 34  →  分页条实际宽度
+     几何依据: .tasks 和 .anchor 同为 left:60px, 预览在 left:340px,
+       三级详情卡 left:580 + 宽300 = 右缘 880 → 340 + 540 = 880 ✓
+     ⚠⚠ 2026-10-03 晚：原来是 572（预览 left:308）。用户要求间隔统一到 340，
+       多出来的 32px 全部从【分页条】上扣 —— 四张缩略图格子宽度(118)【一个都没动】。
+       这正是用户要的："少掉的内容不要从缩略图上少，要从最右侧那条滑条上少。"
+     ⚠ 分页条宽度【不写死】, 用 flex 吃掉剩余空间 —— 以后图格尺寸或每页张数变了,
+       右缘照样自动对齐，不用重算。 */
+  .pv-strip.pv-paged{ width:var(--preview-panel-width); }
+  .pv-rail{
+    width:18px; min-width:18px; height:calc(100% - 8px); padding:4px 2px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+    border-radius:12px; cursor:ns-resize; opacity:0.5;
+    /* 常驻底色: 加宽后要让用户看出"这条是能滚的", 否则一大片空白配三个小点像是画错了 */
+    background:rgba(255,255,255,.06);
+    transition:opacity var(--m-fast) var(--ease-soft), background var(--m-fast) var(--ease-soft);
+  }
+  .pv-strip.pv-paged .pv-rail{ flex:1 1 auto; width:auto; min-width:0; }
+  .pv-rail:hover{opacity:1;background:rgba(255,255,255,.12);}
+  .pv-dot{width:5px;height:5px;border-radius:999px;background:var(--tx2);opacity:0.75;transition:height var(--m-base) var(--ease-out),background var(--m-base) var(--ease-out),box-shadow var(--m-base) var(--ease-out);}
+  .pv-dot.active{height:18px;background:var(--tx);opacity:1;box-shadow:0 0 10px hsl(var(--accent-hsl, 211 100% 68%) / .5);}
+  .pv-rail:hover .pv-dot:not(.active){background:var(--tx2);opacity:1;}
+  /* 空占位格(>4张时补齐到4格, 保证每页同宽 → 按钮位置不变) */
+  .pv-cell.pv-empty{ background:transparent; border-color:transparent; }
+  /* 每张图格: 高度撑满, 宽度受限确保一行4张不超窗口 */
+  .pv-cell{
+    height:130px; width:118px; border-radius:12px; position:relative; flex-shrink:0;
+    background:rgba(255,255,255,.06); border:1px solid var(--line-faint);
+    display:flex; align-items:center; justify-content:center;
+    transition:transform var(--m-fast) var(--ease-out);   /* Dock 弹性放大 */
+  }
+  /* macОS Dock 悬停放大: 图片 scale 放大, 盖住相邻格
+     ⚠ img 自己要圆角 —— .pv-cell 不能 overflow:hidden(否则放大被裁), 所以放大后
+       图片若无圆角就是方角。
+     ⚠ 圆角要反向补偿: scale(1.5) 会把 12px 圆角也放大到 18px 视觉,
+       所以基础值给 12px, hover 时改成 8px(8×1.5=12, 放大后视觉圆角仍是 12)。 */
+  .pv-cell .pv-media{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;transform-origin:center;transition:transform var(--m-fast) var(--ease-out);}
+  .pv-cell img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer;
+    border-radius:12px;
+    transition:border-radius var(--m-fast) linear, box-shadow var(--m-fast) var(--ease-out);}
+  .pv-cell.pv-ready:hover{ z-index:5; }
+  /* 图片和左上角序号在同一层放大，角标始终跟随被选中的缩略图。 */
+  .pv-cell.pv-ready:hover .pv-media{transform:scale(1.32);}
+  .pv-cell.pv-ready:hover .pv-media img{border-radius:8px;box-shadow:var(--shadow-mid), 0 0 0 2px rgba(255,255,255,.5);}
+  /* ⚠ 摇摆动画挂在容器上，SVG 是它的子元素，会跟着一起动 —— 不用给 SVG 单独写动画。
+     color 用语义警告色（原来写死 #ffcc80，和 --sem-warn 是同一个色，改成变量便于统一调） */
+  .pv-cell .pv-hourglass{font-size:30px;color:hsl(var(--sem-warn));opacity:0.95;
+    display:flex;align-items:center;justify-content:center;
+    animation:pvSand 1.4s ease-in-out infinite;}
+  @keyframes pvSand{0%,100%{transform:rotate(0);opacity:0.5}50%{transform:rotate(15deg);opacity:1}}
+  .pv-cell .pv-idx{position:absolute;top:3px;left:3px;font-size:10px;color:#fff;background:rgba(0,0,0,.55);border-radius:4px;padding:1px 4px;}
+  /* ⭐ 2026-10-19（docs/249）：每张的状态小标（等待 / 上传46% / 排队 / 处理 / 接收80% / ✓ / 简）。左上角序号下面 ——
+     ⚠ 不放底边：底边整条是「传回 / 替换」按钮（常驻）；右上角是「应用」。整句状态放在 title（悬停看）。 */
+  .pv-cell .pv-job{position:absolute;left:3px;top:19px;z-index:3;font-size:10px;line-height:14px;color:#fff;background:rgba(0,0,0,.62);border-radius:4px;padding:0 4px;white-space:nowrap;pointer-events:auto;font-variant-numeric:tabular-nums;}
+  .pv-cell .pv-job[data-stage="upload"],.pv-cell .pv-job[data-stage="download"]{background:hsl(var(--sem-info)/.85);}
+  .pv-cell .pv-job[data-stage="cloud-queue"],.pv-cell .pv-job[data-stage="local-queue"]{background:hsl(var(--sem-warn)/.85);color:#111;}
+  .pv-cell .pv-job[data-stage="processing"]{background:hsl(var(--glow-zone)/.85);}
+  .pv-cell .pv-job[data-stage="done"]{background:hsl(var(--sem-ok)/.85);}
+  .pv-cell .pv-job[data-stage="failed"],.pv-cell .pv-job[data-stage="fallback"]{background:hsl(var(--sem-err)/.85);}
+  /* 底栏那行字被状态接管时（有云端活在跑）：数字不跳宽度 */
+  .task .t-sub.t-sub-live{font-variant-numeric:tabular-nums;}
+  /* ── 细节补偿：右上角状态角标 + 底部两个档位按钮 ──
+     ⚠ 按钮平时【不显形】(opacity:0)，鼠标划到那一格才浮出来 ——
+       一排缩略图上常驻两排小按钮会把画面塞满，而且大部分时候用不到。
+     ⚠ 但 .on(当前档位) 那个要一直看得见，否则用户不知道自己选过没有。 */
+  /* ⭐ 2026-10-05：右上角「应用」（原来是只读角标 .pv-badge，带 pointer-events:none —— 点不动）。
+     ⚠ 现在是按钮，必须能点；位置、颜色跟原来那个角标一样，用户认得这个位置。 */
+  .pv-cell .pv-apply{position:absolute;top:3px;right:3px;z-index:2;
+    font:inherit;font-size:10px;line-height:1.5;font-weight:600;color:#0d1b12;
+    background:#7fe0a0;border:0;border-radius:4px;padding:1px 6px;cursor:pointer;
+    box-shadow:0 1px 4px rgba(0,0,0,.4);transition:background var(--m-fast) var(--ease-soft);}
+  .pv-cell .pv-apply:hover{background:#a2ecbc;}
+  .pv-cell .pv-apply:disabled{opacity:0.5;cursor:default;}
+  .pv-cell .pv-dtbar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:2px;
+    padding:2px;justify-content:center;opacity:.3;transition:opacity var(--m-fast) var(--ease-soft);}
+  /* ⭐ 2026-10-22（docs/263 第 8 条）：平时压淡露着（以前是 0，看不出能点），移到格子上 1 */
+  .pv-cell.pv-ready:hover .pv-dtbar,.pv-cell .pv-dtbar:focus-within{opacity:1;}
+  .pv-cell .pv-dt{flex:1;min-width:0;font:inherit;font-size:10px;line-height:1.5;padding:1px 0;
+    border:1px solid rgba(255,255,255,.22);border-radius:4px;background:rgba(10,14,20,.82);
+    color:var(--tx);cursor:pointer;}
+  .pv-cell .pv-dt:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .5);border-color:hsl(var(--accent-hsl, 211 100% 68%) / .8);}
+  .pv-cell .pv-dt.on{background:rgba(127,224,160,.32);border-color:rgba(127,224,160,.7);opacity:1;}
+  .pv-cell .pv-dtbar:has(.pv-dt.on){opacity:1;}
+  /* ⭐ 单张「传回」（2026-09-13）：还没贴进 PS 的那一格显示它。
+     ⚠ 这个【常驻显示】，不像提升纹理那两个要划上去才出来 ——
+       "这张还没传回"是必须让人一眼看到的状态，藏起来就等于没提示。 */
+  .pv-cell .pv-dtbar.one{opacity:1;}
+  .pv-cell .pv-dt.send{
+    background:hsl(var(--glow-hsl, 210 90% 60%) / .5);
+    border-color:hsl(var(--glow-hsl, 210 90% 60%) / .75);
+    color:#fff;
+  }
+  .pv-cell .pv-dt.send:hover{background:hsl(var(--glow-hsl, 210 90% 60%) / .72);}
+  .pv-cell.pv-error .pv-error-icon{font-size:38px;line-height:1;color:#ff7777;text-shadow:0 3px 12px rgba(255,70,70,.35);}
+  .pv-error-tip{position:fixed;left:-9999px;top:-9999px;width:210px;max-width:calc(100vw - 24px);padding:7px 9px;border:1px solid rgba(255,125,125,.35);border-radius:8px;background:rgba(25,15,20,.96);box-shadow:0 8px 24px rgba(0,0,0,.35);color:#ffd5d5;font-size:11px;line-height:1.45;white-space:normal;overflow-wrap:anywhere;text-align:left;pointer-events:none;opacity:0;transition:opacity var(--m-fast) var(--ease-soft),left .08s linear,top .08s linear;z-index:calc(var(--z-detail,10000) + 50);}
+  .pv-error-tip.show{opacity:1;}

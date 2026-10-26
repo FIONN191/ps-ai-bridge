@@ -1,0 +1,97 @@
+/* Free mode changes only placement. Existing cards retain their background keys and contents. */
+body.free-mode .anchor{left:0!important;top:0!important;z-index:auto!important;transform:none!important;}
+body.free-mode #stack{transform:none!important;transition:none;}
+body.free-mode #stack .block-card{transition:opacity var(--dur) var(--ease-soft),height var(--dur) var(--ease-out);}
+body.free-mode #stack .block-card [data-dragbar]{z-index:9;touch-action:none;}
+body.free-mode-switching .anchor *{pointer-events:none!important;}
+body.free-mode-switching #stack .block-card{transition:none!important;}
+body.free-mode-native-switch{opacity:0!important;}
+body.free-mode #stack .block-card .collapse-toggle{opacity:1;pointer-events:auto;}
+body.free-mode #stack .block-card.free-collapsed{height:var(--free-collapsed-height,44px);cursor:grab;}
+body.free-mode #stack .block-card.free-collapsed > *:not(.collapse-toggle):not(.free-release):not(.free-group-label){opacity:0!important;pointer-events:none!important;}
+body.free-mode #stack .block-card.free-group-hidden{visibility:hidden!important;pointer-events:none!important;}
+body.free-mode #stack .block-card.free-pile-buried{visibility:hidden!important;pointer-events:none!important;box-shadow:none!important;}
+body.free-mode #stack .block-card.free-pile-buried *{pointer-events:none!important;}
+/* Match ordinary-mode opacity: only the bottom title strip of pile members
+   2–4 remains visible. The class is based on this pile's z-order; global
+   .is-current is a navigation owner and must not decide the mask. */
+:root[data-stack-opacity-reveal="1"] body.free-mode:not(.free-mode-switching)
+  #stack .block-card.free-pile-layered:not(.free-collapsed):not(.free-group-hidden):not(.free-pile-buried){
+  clip-path:var(--free-stack-occlusion-clip,none);
+  mask-image:var(--free-stack-occlusion-mask,none);
+  mask-size:100% 100%;mask-repeat:no-repeat;mask-origin:border-box;
+}
+/* 折叠条上的卡名：一张就一个，多张用 · 串起来。
+   ⚠ 只占一行、放不下省略 —— 折叠厚度统一 44（见 free-mode-ui.js 的 FREE_FOLDED_HEIGHT），
+     名字换行会把折叠条撑高，单卡和多卡就不一样厚了（2026-09-28 用户实测）。 */
+.free-group-label{position:absolute;top:0;left:16px;right:72px;height:44px;display:flex;align-items:center;
+  color:var(--tx);font-size:11px;font-weight:600;line-height:20px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;pointer-events:none;z-index:10;}
+.free-group-label[hidden]{display:none;}
+.free-release{display:none;position:absolute;top:9px;right:44px;width:16px;height:16px;padding:0;z-index:9;align-items:center;justify-content:center;border:1px solid var(--line-strong);border-radius:4px;color:var(--tx2);background:hsl(var(--accent-hsl, 211 100% 68%) / .12);cursor:pointer;pointer-events:auto;transition:background var(--m-fast),color var(--m-fast),opacity var(--m-fast);}
+body.free-mode .free-release{display:flex;}
+.free-release svg{width:13px;height:13px;pointer-events:none;}
+.free-release:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .24);color:var(--tx);}
+.free-release:active{transform:scale(.94);}
+.free-release:disabled{opacity:0.3;cursor:default;}
+body.free-mode #stack .block-card.free-collapsed > .collapse-toggle,body.free-mode #stack .block-card.free-collapsed > .free-release{top:14px;}
+body.free-mode .free-dragging{cursor:grabbing!important;}
+/* Confirmation is transient; preserve the saved free-layout rank underneath. */
+body.free-mode #errors[data-v7-confirmation],body.free-mode #errors.has-blocking{z-index:calc(var(--z-workbench,9000) + 1)!important;}
+/* If a very short window cannot fit both stacks vertically, the error stack
+   moves into a side column and must remain above the task stack. */
+.errors.layout-overlap-fallback{z-index:calc(var(--z-stack,830) + 6)!important;}
+.free-stack-handle{display:none;position:absolute;left:8px;top:-30px;height:27px;padding:4px 10px;border:1px solid var(--line);border-radius:12px;background:var(--bg-solid,#20242f);color:var(--tx2);font:inherit;font-size:11px;z-index:100;pointer-events:auto;cursor:grab;touch-action:none;}
+body.free-mode .free-stack-handle{display:block;width:max-content;max-width:284px;white-space:nowrap;}
+.free-empty-card{display:none;position:absolute;top:0;left:0;width:300px;height:110px;padding:28px 22px;border:1px dashed var(--line-strong);border-radius:28px;background:var(--bg-solid,#20242f);box-shadow:none;color:var(--tx2);pointer-events:auto;cursor:grab;touch-action:none;opacity:.045;transition:opacity var(--m-fast) var(--ease-soft);}
+.free-empty-card strong{display:block;color:var(--tx);font-size:15px;margin-bottom:9px;}
+.free-empty-card span{font-size:12px;}
+body.free-mode .free-empty-card:not([hidden]){display:block;}
+body.free-mode .free-stack-empty .free-stack-handle{opacity:.06;transition:opacity var(--m-fast) var(--ease-soft);}
+body.free-mode .free-stack-empty:hover .free-empty-card,body.free-mode .free-stack-empty:focus-within .free-empty-card{opacity:.38;}/* ui-lint:opacity-ramp 空卡组渐亮序列 .045→.38→.64→.72 */
+body.free-mode .free-stack-empty:hover .free-stack-handle,body.free-mode .free-stack-empty:focus-within .free-stack-handle{opacity:.72;}/* ui-lint:opacity-ramp 同上：把手比卡片更实，hover 才看得见 */
+body.free-mode .free-stack-empty.free-dragging .free-empty-card{opacity:.64;}/* ui-lint:opacity-ramp 拖动时压淡，表示"这张只是占位" */
+.free-empty-card:focus-visible{outline:2px solid var(--accent);outline-offset:4px;}
+.free-snap-preview{position:absolute;width:300px;height:400px;border:2px solid var(--accent);border-radius:28px;background:transparent;z-index:var(--z-stage,800);pointer-events:none;opacity:0.75;}
+.free-snap-preview[hidden]{display:none;}
+/* 2026-10-22 对齐吸附辅助线 */
+.free-align-guide{position:absolute;z-index:var(--z-stage,800);pointer-events:none;background:hsl(var(--accent-hsl, 211 100% 68%) / .85);box-shadow:0 0 6px hsl(var(--accent-hsl, 211 100% 68%) / .6);}
+.free-align-guide[hidden]{display:none;}
+body.free-mode #stack .block-card.free-snap-target{outline:1px solid var(--accent);outline-offset:3px;}
+.free-mode-performance{position:absolute;right:16px;bottom:12px;max-width:280px;z-index:calc(var(--z-stage,800) + 29);pointer-events:none;font-size:11px;color:var(--tx2);background:var(--bg-solid,#20242f);border-radius:12px;padding:8px 12px;}
+.free-mode-performance[hidden]{display:none;}
+/* ⭐ 2026-10-19（docs/250 第 17 条）：一键收拢成小方块。只是藏起来 —— 位置、折叠、存档都不动，展开原样回来。
+   ⚠ 要用户做决定的 L3 / L4 卡照常弹（跟 workspace-stack-rail.css 同一条规矩），普通报错藏起来、只在方块上亮红角标。
+   ⚠ visibility 藏、不用 display:none：各模块还要量尺寸（任务堆、浮动条），量出 0 会把存档写坏。 */
+body.free-mode-compact #stack .block-card,body.free-mode-compact #stack .block-card *,
+body.free-mode-compact #zones,body.free-mode-compact #zones *,
+body.free-mode-compact #detail,body.free-mode-compact #detail *,
+body.free-mode-compact #tasks,body.free-mode-compact #tasks *,
+body.free-mode-compact .tween-box,body.free-mode-compact .tween-box *,
+body.free-mode-compact .v7-floating-bar,body.free-mode-compact .v7-floating-bar *,
+body.free-mode-compact .v7-primary-nav,body.free-mode-compact .v7-primary-nav *,
+body.free-mode-compact .planner-attention,body.free-mode-compact .free-snap-preview,
+body.free-mode-compact #errors:not(.has-blocking):not([data-v7-confirmation]):not(:has(.ec-l3,.ec-l4)),
+body.free-mode-compact #errors:not(.has-blocking):not([data-v7-confirmation]):not(:has(.ec-l3,.ec-l4)) *{visibility:hidden!important;pointer-events:none!important;}
+.free-block{position:absolute;left:0;top:0;width:300px;height:64px;box-sizing:border-box;z-index:calc(var(--z-stage,800) + 28);display:flex;align-items:center;gap:12px;padding:0 14px 0 18px;
+  border:1px solid var(--line);border-radius:var(--radius-zone, 16px);overflow:hidden;
+  background:hsl(var(--card-h, 220 28%) 11% / calc(.82 * var(--ui-bg-opacity,1)));backdrop-filter:blur(var(--blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.5);
+  box-shadow:var(--shadow-mid);color:var(--tx);cursor:pointer;pointer-events:auto;user-select:none;touch-action:none;}
+.free-block[hidden]{display:none;}
+.free-block:hover{border-color:var(--line-strong);}
+.free-block:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+.free-block.fb-dragging{cursor:grabbing;}
+/* PS 连接：绿 = 连着 / 橙 = 连着但 PS 在后台 / 红 = 没连上 */
+.fb-dot{flex:none;width:9px;height:9px;border-radius:50%;background:hsl(var(--sem-err));box-shadow:0 0 0 3px hsl(var(--sem-err) / .18);}
+.fb-dot[data-state="ok"]{background:hsl(var(--sem-ok));box-shadow:0 0 0 3px hsl(var(--sem-ok) / .18);}
+.fb-dot[data-state="bg"]{background:hsl(var(--sem-warn));box-shadow:0 0 0 3px hsl(var(--sem-warn) / .18);}
+.fb-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.fb-line1{font-size:13px;font-weight:600;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.fb-line2{font-size:11px;line-height:16px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.fb-badges{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+.fb-badge{font-size:11px;font-weight:600;line-height:16px;padding:1px 8px;border-radius:999px;white-space:nowrap;}
+.fb-badge[hidden]{display:none;}
+.fb-err{color:hsl(var(--sem-err));background:hsl(var(--sem-err) / .16);border:1px solid hsl(var(--sem-err) / .45);}
+.fb-ok{color:hsl(var(--sem-ok));background:hsl(var(--sem-ok) / .14);border:1px solid hsl(var(--sem-ok) / .4);}
+/* 有活在跑时底下一条细进度 */
+.fb-bar{position:absolute;left:0;bottom:0;height:2px;width:0;background:var(--accent);transition:width var(--m-slow) var(--ease-soft);pointer-events:none;}

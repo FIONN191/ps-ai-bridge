@@ -1,0 +1,12 @@
+{
+  "name": "wheelchair-v8-ui-desktop",
+  "version": "0.1.0",
+  "description": "V8 UI 桌面测试壳(透明无边框窗口, 可拖动)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.4.11"
+  }
+}

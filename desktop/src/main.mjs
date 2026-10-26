@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 import { HelperProcess, loginShellPath, waitForHelperReady } from './helper-process.mjs';
 import { createInstaller, isPhotoshopRunning } from './plugin-installer.mjs';
 import { Updater } from './updater.mjs';
@@ -16,6 +17,8 @@ const REPO = path.resolve(here, '..', '..');
 const RES = app.isPackaged ? process.resourcesPath : REPO;
 const HELPER_DIR = path.join(RES, 'helper');
 const PLUGIN_DIR = path.join(RES, 'plugin');
+// 夏三七的修图轮椅 V7（界面、PS 桥接插件、Electron 主程序），由 scripts/import-v7.mjs 从官方安装包导入
+const V7_DIR = path.join(RES, 'v7');
 const PORT = Number(process.env.PS_AI_BRIDGE_PORT) || 47811;
 
 let DATA_DIR = '';
@@ -41,6 +44,12 @@ const writeSettings = (patch) => {
 
 const send = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
 
+// 修图轮椅 V7 的悬浮面板是主界面；V7 主程序把恢复面板的方法挂在 __PSAI_V7_HOST__ 上
+function showPanel() {
+  if (globalThis.__PSAI_V7_HOST__?.showPanel) globalThis.__PSAI_V7_HOST__.showPanel();
+  else showWindow();
+}
+
 function showWindow() {
   if (!helper) return; // 还在启动，start() 会自己开窗口
   if (!win || win.isDestroyed()) createWindow();
@@ -64,7 +73,8 @@ function createWindow() {
   if (process.platform !== 'darwin') win.removeMenu();
   organizerDesktop?.attachWindow(win);
   win.loadFile(path.join(here, 'renderer', 'index.html'));
-  win.once('ready-to-show', () => { if (!startHidden) win.show(); });
+  // 启动时不弹这个窗口（主界面是修图轮椅面板）；首次使用要看说明时才弹
+  win.once('ready-to-show', () => { if (!startHidden && !readSettings().onboarded) win.show(); });
   // 页面里的外部链接用系统浏览器打开
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
   let hintedTray = false;
@@ -95,7 +105,8 @@ function updateTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: STATUS_TEXT[helper.state.status] || '本机服务', enabled: false },
     { type: 'separator' },
-    { label: '打开主窗口', click: showWindow },
+    { label: '显示修图轮椅面板', click: showPanel },
+    { label: '设置与免 API 生图', click: showWindow },
     { label: '打开控制台', click: () => openTarget('console') },
     { label: '打开专用 Chrome', click: () => openTarget('chrome').catch((e) => dialog.showErrorBox('打不开专用 Chrome', e.message)) },
     { label: '检查更新', click: () => { showWindow(); updater.check({ manual: true }); } },
@@ -284,9 +295,12 @@ function registerIpc() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', showWindow);
-  app.on('activate', showWindow);
-  app.on('before-quit', () => { quitting = true; organizerDesktop?.dispose(); });
+  app.on('second-instance', showPanel);
+  app.on('activate', showPanel);
+  app.on('before-quit', () => {
+    quitting = true;
+    organizerDesktop?.dispose();
+  });
   app.on('will-quit', (e) => {
     if (!helper?.child) return;
     e.preventDefault();
@@ -294,11 +308,30 @@ if (!app.requestSingleInstanceLock()) {
   });
   // 窗口关掉不退出：一直留在托盘/菜单栏
   app.on('window-all-closed', () => {});
+  loadV7();
   // 不能在顶层 await app.whenReady()：ESM 入口没执行完之前 Electron 不发 ready，会一直卡住
   app.whenReady().then(start).catch((e) => {
     dialog.showErrorBox('AI 生图贴回启动失败', e?.stack || String(e));
     app.exit(1);
   });
+}
+
+// 加载 V7 的 Electron 主程序（v7/ui/main.js，原样使用）。它自己注册 IPC、开悬浮面板、起 37889 端口的 PS 链路。
+// 它缺的共享模块在 v7/foundation（我们补写）；要用到本程序能力的地方从 __PSAI_V7_HOST__ 取。
+function loadV7() {
+  const entry = path.join(V7_DIR, 'ui', 'main.js');
+  if (!fs.existsSync(entry)) return;
+  globalThis.__PSAI_V7_HOST__ = {
+    createInstaller,
+    pluginExtras: app.isPackaged ? [] : [path.join(REPO, 'LICENSE'), path.join(REPO, 'NOTICE')],
+    isQuitting: () => quitting,
+    showSettings: () => showWindow(),
+  };
+  try {
+    createRequire(import.meta.url)(entry);
+  } catch (e) {
+    app.whenReady().then(() => dialog.showErrorBox('修图轮椅面板加载失败', e?.stack || String(e)));
+  }
 }
 
 async function start() {

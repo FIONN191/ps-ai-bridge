@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>修图轮椅 V7 连接 PS 插件工具</title>
+  <style>
+    :root { color-scheme: dark; font-family: -apple-system, "Segoe UI", sans-serif; }
+    body { margin: 0; padding: 16px; color: #eef1f7; background: #20232b; font-size: 13px; overflow-y: auto; }
+    h1 { margin: 0 0 12px; font-size: 16px; }
+    .status { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: #9aa3b8; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; }
+    .dot.ok { background: #4ade80; }
+    #last { color: #9aa3b8; line-height: 1.5; white-space: pre-wrap; }
+    .meta { margin-top: 12px; padding: 10px; border: 1px solid #444956; border-radius: 6px; background: #1a1d24; }
+    .meta .head { font-weight: 600; margin-bottom: 6px; color: #eef1f7; }
+    .meta .body { font-size: 12px; line-height: 1.6; color: #9aa3b8; }
+    .meta .body strong { color: #bbc3d3; }
+    #launchRow { display: none; margin: 4px 0 10px; }
+    #launch { padding: 6px 14px; border: 0; border-radius: 6px; background: #3b82f6; color: #fff; font-size: 13px; cursor: pointer; }
+    #launch:disabled { opacity: .5; }
+    #launchHint { margin-top: 6px; color: #9aa3b8; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <h1>修图轮椅 V7 连接 PS 插件工具</h1>
+  <div class="status"><span id="dot" class="dot"></span><span id="status">正在找修图轮椅…</span></div>
+  <div id="launchRow">
+    <button id="launch">启动修图轮椅</button>
+    <div id="launchHint">Photoshop 会先问「是否允许插件打开外部程序」，点允许就行。</div>
+  </div>
+  <div id="last">这个插件只负责在 Photoshop 和修图轮椅之间传图、执行操作，不含账号和密钥。</div>
+  <div class="meta">
+    <div class="head">版本信息</div>
+    <div class="body">
+      <div><strong>版本：</strong><span id="version"></span></div>
+    </div>
+  </div>
+  <script src="index.js"></script>
+</body>
+</html>

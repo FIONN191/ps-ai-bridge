@@ -1,0 +1,409 @@
+/* ═══════════════════════════════════════════════════════════════
+   工具工作面（2026-09-28 实装）
+
+   把「工具与功能」里的工具做成【原地展开】的 880×400 面板：
+   横向占满一级卡+二级卡+三级卡的总宽，操作位置不动。
+
+   复用了现成的撑开机制：.detail-card.workspace-host + --workspace-* 变量
+   （见 ui.html 的 resizeWorkspace）。这里只补三件事：
+     ① 展开/收起的过渡（原来是瞬移）
+     ② 面板内部的紧凑布局（左看右调）
+     ③ 自由模式下的几何
+
+   ⚠ 不变量：所有类名带 v7tw- 前缀，避免跟既有样式打架。
+   ⚠ 竖向是稀缺资源：880 宽只有 400 高。控件 26px、字段间距 5px、标签行内。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── ① 展开/收起过渡 ──────────────────────────────────────────
+   ⚠ 必须把 base 的 transform/opacity 也写进来 —— transition 是简写，
+     写在这里会【整体替换】.detail-card 上那条，漏了就会丢掉弹出动画。
+   ⚠ 只过渡 left/top/width/height + transform/opacity，别过渡 box-shadow
+     （重绘密集，项目里栽过）。 */
+.detail-card.workspace-host.v7tw-host{
+  transition:
+    left var(--dur) var(--ease-out),
+    top var(--dur) var(--ease-out),
+    width var(--dur) var(--ease-out),
+    height var(--dur) var(--ease-out),
+    border-radius var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out),
+    opacity var(--dur) var(--ease-soft);
+}
+/* 展开后内容自己淡入一点，避免"框先到、内容瞬现" */
+.detail-card.v7tw-host .dc-slide{
+  animation: v7twContentIn var(--m-base) var(--ease-out) both;
+}
+@keyframes v7twContentIn{
+  0%{opacity:0; transform:translateY(8px)}
+  100%{opacity:1; transform:none}
+}
+@keyframes v7twPanelIn{
+  0%{opacity:0; transform:scale(.985)}
+  100%{opacity:1; transform:none}
+}
+
+/* ── 工具模式下藏掉三级卡自带的导航条 ─────────────────────────
+   ⚠ 不藏的话是【双层标题】：上面一条"← 生成台 / 预设列表 ×"，下面又是工具自己的
+   "← 工具名 … 开始"，两个返回箭头、白吃 43px（本来竖向就只有 400）。
+   工具顶栏自己有 ←（回列表）和 ×（全部收起），导航条的活它都接了。 */
+.detail-card.v7tw-host .v7-detail-nav{display:none}
+.detail-card.v7tw-host.has-navigation .dc-scroll,
+.detail-card.v7tw-host .dc-scroll{
+  top:0 !important;
+  padding:6px 14px 12px !important;
+  border-radius:28px !important;
+}
+/* 拉幕式展开：面板内容始终按最终宽度排版（--v7tw-final-w 由 ui.html 的 setToolGeometry 写入，
+   减去 .dc-scroll 左右各 14px 内边距），卡片宽度从当前卡长到最终宽度时，只是把内容逐渐露出来，
+   由 .dc-scroll 的 overflow:hidden 负责裁掉还没露出来的部分。 */
+.detail-card.v7tw-host .v7tw{min-width:calc(var(--v7tw-final-w, 880px) - 28px)}
+.v7tw-x{width:26px; padding:0; font-size:15px; line-height:1; color:var(--tx2)}
+.v7tw-x:hover{color:var(--tx)}
+
+/* ── ② 面板本体 ────────────────────────────────────────────── */
+.v7tw{
+  display:flex; flex-direction:column; height:100%; min-height:0;
+  animation:v7twPanelIn var(--m-slow) var(--ease-out) both;
+}
+/* 顶栏 44px：返回 / 标题 / 状态 / 主操作 */
+.v7tw-top{
+  flex:0 0 44px; display:flex; align-items:center; gap:9px; padding:0 2px 0 0;
+  border-bottom:1px solid var(--line-faint);
+}
+.v7tw-top h2{margin:0; font-size:13px; font-weight:600; white-space:nowrap; color:var(--tx)}
+/* 按住顶栏空白处拖大卡（聚合模式拖整个窗口，自由模式只挪大卡；ui.html setupToolCardDrag） */
+.v7tw-top{cursor:grab; user-select:none}
+.v7tw-top button{cursor:pointer}
+body.v7tw-dragging, body.v7tw-dragging .v7tw-top{cursor:grabbing}
+.v7tw-tag{
+  font-size:10px; color:var(--tx2); background:var(--surface-faint);
+  border:1px solid var(--line-faint); border-radius:4px; padding:2px 7px;
+  white-space:nowrap;
+}
+.v7tw-tag:empty{display:none}   /* 没有状态文字的面板别留一个空圆角框（截图 2026-09-29 抓到） */
+.v7tw-tag.ok{color:hsl(var(--sem-ok)/.95); border-color:hsl(var(--sem-ok)/.35); background:hsl(var(--sem-ok)/.10)}
+.v7tw-tag.warn{color:hsl(var(--sem-warn)/.95); border-color:hsl(var(--sem-warn)/.35); background:hsl(var(--sem-warn)/.10)}
+.v7tw-tag.err{color:hsl(var(--sem-err)/.95); border-color:hsl(var(--sem-err)/.35); background:hsl(var(--sem-err)/.10)}
+.v7tw-spacer{flex:1}
+
+/* 主体：左看右调 */
+.v7tw-body{flex:1; min-height:0; display:flex}
+.v7tw-pv{
+  padding:10px 12px; min-width:0; min-height:0; flex:1 1 0;
+  display:flex; flex-direction:column;
+}
+.v7tw-params{
+  padding:10px 12px; min-height:0; overflow-y:auto;
+  flex:0 0 292px; border-left:1px solid var(--line-faint);
+}
+.v7tw-params::-webkit-scrollbar{width:6px}
+.v7tw-params::-webkit-scrollbar-thumb{background:hsl(var(--accent-hsl, 211 100% 68%) / .14); border-radius:4px}
+/* 两栏参数（场景/尻特效那种密工具） */
+.v7tw-params.two{flex:0 0 430px; display:grid; grid-template-columns:1fr 1fr; gap:0 14px; align-content:start}
+.v7tw-params.two > .v7tw-span2{grid-column:1 / -1}
+
+/* 分组标题 16px */
+.v7tw-sect{
+  font-size:10px; color:var(--tx2); letter-spacing:.09em; margin:0 0 5px;
+  display:flex; align-items:center; gap:7px; height:16px; line-height:16px;
+  text-transform:uppercase; white-space:nowrap;
+}
+.v7tw-sect::after{content:''; flex:1; height:1px; background:var(--line-faint)}
+.v7tw-sect.mt{margin-top:9px}
+
+/* 字段：行内标签 */
+.v7tw-f{display:flex; align-items:center; gap:7px; margin-bottom:5px; min-height:26px}
+.v7tw-f > label{
+  flex:0 0 72px; font-size:11px; color:var(--tx2); text-align:right;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.v7tw-f > input, .v7tw-f > select, .v7tw-f > .v7tw-ctl{flex:1; min-width:0}
+.v7tw-f.wide{display:block}
+.v7tw-f.wide > label{display:block; text-align:left; margin-bottom:4px}
+
+.v7tw input[type=text], .v7tw input[type=number], .v7tw textarea, .v7tw select{
+  width:100%; height:26px; background:var(--surface-faint);
+  border:1px solid var(--line-faint); border-radius:8px; color:var(--tx);
+  font:inherit; font-size:11px; padding:0 8px; outline:none;
+}
+.v7tw textarea{height:auto; padding:6px 8px; line-height:1.5; resize:none}
+.v7tw input:focus, .v7tw textarea:focus, .v7tw select:focus{
+  border-color:hsl(var(--accent-hsl)/.5);
+}
+.v7tw select{
+  appearance:none; padding-right:22px; cursor:pointer;
+  background-image:
+    linear-gradient(45deg,transparent 50%,var(--tx2) 50%),
+    linear-gradient(135deg,var(--tx2) 50%,transparent 50%);
+  background-position:calc(100% - 12px) 52%, calc(100% - 8px) 52%;
+  background-size:4px 4px, 4px 4px; background-repeat:no-repeat;
+}
+.v7tw input[readonly]{color:var(--tx2)}
+
+/* 滑块 */
+.v7tw-slider{display:flex; align-items:center; gap:7px; min-height:26px; margin-bottom:5px}
+.v7tw-slider > label{
+  flex:0 0 72px; font-size:11px; color:var(--tx2); text-align:right;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.v7tw-slider > input[type=range]{
+  flex:1; min-width:0; -webkit-appearance:none; height:3px; border-radius:0px;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .16); outline:none;
+}
+.v7tw-slider > input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:12px; height:12px; border-radius:50%;
+  background:var(--accent); cursor:pointer;
+  box-shadow:0 0 0 3px hsl(var(--accent-hsl)/.16);
+}
+.v7tw-slider > .v7tw-val{
+  flex:0 0 30px; text-align:right; font-size:10px; color:var(--tx2);
+  font-variant-numeric:tabular-nums;
+}
+
+/* 开关 */
+.v7tw-tog{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  min-height:26px; font-size:11px; color:var(--tx); margin-bottom:5px;
+}
+.v7tw-tog > span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.v7tw-sw{
+  width:32px; height:18px; border-radius:8px; background:hsl(var(--accent-hsl, 211 100% 68%) / .16);
+  position:relative; flex:none; cursor:pointer;
+  transition:background var(--m-fast) var(--ease-out);
+}
+.v7tw-sw::after{
+  content:''; position:absolute; left:2px; top:2px; width:14px; height:14px;
+  border-radius:50%; background:#fff; transition:transform var(--m-fast) var(--ease-out);
+}
+.v7tw-sw.on{background:var(--accent)}
+.v7tw-sw.on::after{transform:translateX(14px)}
+
+/* 芯片 */
+.v7tw-chips{display:flex; flex-wrap:wrap; gap:5px; margin-bottom:5px}
+.v7tw-chip{
+  font-size:11px; color:var(--tx2); background:var(--surface-faint);
+  border:1px solid var(--line-faint); border-radius:4px; padding:0 9px;
+  height:22px; line-height:20px; cursor:pointer; white-space:nowrap;
+  font-family:inherit;
+}
+.v7tw-chip:hover{background:var(--surface); color:var(--tx)}
+.v7tw-chip.on{
+  background:hsl(var(--accent-hsl)/.18);
+  border-color:hsl(var(--accent-hsl)/.45); color:var(--tx);
+}
+
+/* 按钮 */
+.v7tw-btn{
+  font:inherit; font-size:11px; height:26px; padding:0 12px;
+  border-radius:8px; cursor:pointer; white-space:nowrap;
+  border:1px solid var(--line-faint); background:var(--surface-faint); color:var(--tx);
+  transition:background var(--m-fast) var(--ease-out);
+}
+.v7tw-btn:hover{background:var(--surface)}
+.v7tw-btn:disabled{opacity:0.5; cursor:default}
+.v7tw-btn.primary{
+  background:hsl(var(--accent-hsl)/.16);
+  border-color:hsl(var(--accent-hsl)/.42); font-weight:600;
+}
+.v7tw-btn.primary:hover{background:hsl(var(--accent-hsl)/.26)}
+.v7tw-btn.danger:hover{background:hsl(var(--sem-err)/.18); color:hsl(var(--sem-err)/.95)}
+.v7tw-btnrow{display:flex; gap:6px; margin-top:9px; flex-wrap:wrap}
+.v7tw-btnrow .v7tw-btn.wide{flex:1; text-align:center}
+/* 竖排按钮组：别用 flex:1（竖排时它会把按钮高度压扁，2026-09-29 截图抓到） */
+.v7tw-btnrow.col{flex-direction:column; gap:6px}
+.v7tw-btnrow.col .v7tw-btn, .v7tw-btnrow.col .v7tw-btn.wide{flex:none; width:100%}
+
+/* 预览盒 */
+.v7tw-box{
+  background:var(--bg); border:1px solid var(--line-faint); border-radius:8px;
+  display:grid; place-items:center; color:var(--tx2); font-size:11px;
+  position:relative; overflow:hidden; min-height:0;
+}
+.v7tw-box > .v7tw-boxlbl{
+  position:absolute; left:8px; top:6px; font-size:10px; color:var(--tx2);
+  background:rgba(0,0,0,.45); border-radius:4px; padding:2px 6px; z-index:2;
+}
+.v7tw-box > svg{position:absolute; inset:0; width:100%; height:100%}
+.v7tw-box.fill{flex:1}
+/* 真缩略图（颜色工具的 A/B/结果等）：铺满框、等比、标注条压在左下 */
+.v7tw-box > img.v7tw-thumb{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#0b0d12}
+.v7tw-box > .v7tw-cap{
+  position:absolute; left:8px; bottom:6px; z-index:2; max-width:calc(100% - 16px);
+  font-size:10px; color:var(--tx); background:rgba(0,0,0,.55); border-radius:4px; padding:2px 6px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.v7tw-box.v7tw-colorthumb{height:84px; flex:none}
+/* 进度条（DLSS 等长任务） */
+.v7tw-progress{height:4px; border-radius:0px; background:var(--line-faint); margin-top:8px; overflow:hidden; flex:none}
+.v7tw-progress > .v7tw-bar{height:100%; width:0; background:hsl(var(--accent-hsl)/.85); transition:width var(--m-slow) ease}
+
+/* 说明条 */
+.v7tw-hint{
+  font-size:10px; color:var(--tx2); line-height:1.6;
+  background:var(--surface-faint);
+  border-left:2px solid hsl(var(--accent-hsl)/.5);
+  border-radius:0 6px 6px 0; padding:6px 9px; margin-bottom:5px;
+}
+
+/* 列表行 */
+.v7tw-row{
+  display:flex; align-items:center; gap:7px; padding:0 7px; height:36px;
+  border-radius:8px; border:1px solid transparent; font-size:11px;
+}
+.v7tw-row:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .035)}
+.v7tw-row.sel{background:hsl(var(--accent-hsl, 211 100% 68%) / .045); border-color:var(--line-faint)}
+.v7tw-row > .v7tw-idx{
+  flex:0 0 auto; font-size:10px; color:var(--tx2); width:14px;
+  font-variant-numeric:tabular-nums;
+}
+.v7tw-row > .v7tw-th{
+  flex:0 0 34px; height:28px; border-radius:4px; background:var(--bg);
+  border:1px solid var(--line-faint);
+}
+.v7tw-row > .v7tw-txt{
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; color:var(--tx2);
+}
+.v7tw-row > .v7tw-mini{
+  font-size:10px; color:var(--tx2); background:var(--surface-faint);
+  border:1px solid var(--line-faint); border-radius:4px; padding:0 7px;
+  height:20px; line-height:18px; cursor:pointer; flex:none; font-family:inherit;
+}
+.v7tw-row > .v7tw-mini:hover{background:var(--surface); color:var(--tx)}
+.v7tw-row > .v7tw-del{
+  flex:none; width:20px; height:20px; display:grid; place-items:center;
+  border:0; border-radius:4px; background:transparent; color:var(--tx2);
+  cursor:pointer; font-size:13px; line-height:1; font-family:inherit;
+}
+.v7tw-row > .v7tw-del:hover{background:hsl(var(--sem-err)/.18); color:hsl(var(--sem-err)/.95)}
+
+/* 整行可点的列表项（AI 修图痕迹检测：点一条 = PS 跳过去）。按钮外观清零，看上去和普通行一样 */
+.v7tw-row.v7tw-pick{
+  width:100%; text-align:left; background:transparent; color:inherit;
+  font-family:inherit; cursor:pointer; margin:0;
+}
+.v7tw-row.v7tw-pick:disabled{cursor:default; opacity:0.5}
+.v7tw-row.v7tw-pick:disabled:hover{background:transparent}
+.v7tw-row.v7tw-pick:focus-visible{outline:1px solid hsl(var(--accent-hsl)/.7); outline-offset:-1px}
+.v7tw-row.v7tw-pick.sel > .v7tw-txt{color:var(--tx)}
+.v7tw-row > .v7tw-tag{flex:none}
+.v7tw-row > .v7tw-th{overflow:hidden}
+.v7tw-row > .v7tw-th > img{width:100%; height:100%; object-fit:cover; display:block}
+.v7tw-row > .v7tw-mini:disabled, .v7tw-row > .v7tw-del:disabled{opacity:0.3; cursor:default}
+.v7tw-row > .v7tw-txt b{font-weight:600; color:var(--tx)}
+
+/* 可滚列表容器 */
+.v7tw-list{flex:1; min-height:0; overflow-y:auto}
+.v7tw-list::-webkit-scrollbar{width:6px}
+.v7tw-list::-webkit-scrollbar-thumb{background:hsl(var(--accent-hsl, 211 100% 68%) / .14); border-radius:4px}
+
+/* 示波器：4 格铺满 */
+.v7tw-scopes{
+  display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr;
+  gap:7px; flex:1; min-height:0;
+}
+.v7tw-scope{
+  background:var(--bg); border:1px solid var(--line-faint); border-radius:8px;
+  position:relative; overflow:hidden; min-height:0;
+}
+.v7tw-scope > .v7tw-boxlbl{
+  position:absolute; left:7px; top:5px; font-size:10px; color:var(--tx2); z-index:2;
+}
+.v7tw-scope > svg{position:absolute; inset:0; width:100%; height:100%}
+.v7tw-scope > canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+
+/* 物品格子 */
+.v7tw-cells{display:grid; gap:6px; margin-bottom:5px}
+.v7tw-cell{
+  height:42px; border-radius:8px; background:var(--bg);
+  border:1px solid var(--line-faint); display:grid; place-items:center;
+  font-size:10px; color:var(--tx2); cursor:pointer; text-align:center;
+  padding:2px; line-height:1.25; overflow:hidden; font-family:inherit;
+}
+.v7tw-cell:hover{border-color:var(--line-strong); color:var(--tx)}
+.v7tw-cell.on{
+  border-color:hsl(var(--accent-hsl)/.5);
+  background:hsl(var(--accent-hsl)/.10); color:var(--tx);
+}
+
+/* 粒子特效紧凑行 */
+.v7tw-fx{display:flex; align-items:center; gap:6px; height:24px; margin-bottom:3px}
+.v7tw-fx > span{
+  flex:0 0 42px; font-size:11px; color:var(--tx2); white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.v7tw-fx > input[type=range]{
+  flex:1; min-width:0; -webkit-appearance:none; height:3px; border-radius:0px;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .16); outline:none;
+}
+.v7tw-fx > input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:10px; height:10px; border-radius:50%;
+  background:var(--accent); cursor:pointer;
+}
+
+/* ── ③ 让位（卡片的淡出 / 淡入）──────────────────────────────
+   ⚠ 卡片的下垂量是【内联 transform】—— setStack() 里逐张写的
+     `c.style.transform = translate(0, ${clamped*STEP}px)`，STEP=34，最多 3 层 = 102px。
+     内联优先级高于类，CSS 改不动它。所以"让位"必须由 Web Animations API 驱动
+     （见 tool-workbench.js 的 V7ToolWorkbenchMotion），这里只做 CSS 管得了的两件事。 */
+
+/* 展开期间一律不吃鼠标 —— 否则用户点到"看不见的卡" */
+body.v7tw-covering #stack,
+body.v7tw-covering #zones{
+  pointer-events:none !important;
+}
+/* ⚠ 这里【不写 visibility:hidden / opacity:0】——
+   本次让位是"动画负责淡出、动画负责淡回"。
+   写成 CSS 常量的话，收起那一刻会瞬间跳变，过渡就没了。 */
+
+/* ── ④ 自由模式 ──────────────────────────────────────────────
+   自由模式没有"三张卡排成一行"这个前提，横跨三段宽度没有意义。
+   改成：在三级卡当前位置展开，尺寸取 880×400 与工作区的较小值，
+   再夹回工作区。位置留在原地 —— 跟自由模式"东西在你放的位置"一致。 */
+body.free-mode .v7tw-pv{padding:8px 10px}
+body.free-mode .v7tw-params{padding:8px 10px}
+
+/* ══ ⑤ 落位编排：内容依次到 ══════════════════════════════════
+   面板框先到，内容再轻轻落位 —— 避免"框到了、内容瞬现"的割裂。
+   ⚠ 只给前 10 个排 delay，后面的共用最后一档：
+     全量 stagger 在密面板（尻特效 50+ 控件）上会变成明显的"逐行刷屏"。 */
+@keyframes v7twRowIn{
+  0%{opacity:0; transform:translateY(7px)}
+  100%{opacity:1; transform:none}
+}
+.v7tw-params > *, .v7tw-pv > *{
+  animation:v7twRowIn var(--m-slow) var(--ease-out) both;
+}
+.v7tw-params > *:nth-child(1), .v7tw-pv > *:nth-child(1){animation-delay:200ms}
+.v7tw-params > *:nth-child(2), .v7tw-pv > *:nth-child(2){animation-delay:214ms}
+.v7tw-params > *:nth-child(3), .v7tw-pv > *:nth-child(3){animation-delay:228ms}
+.v7tw-params > *:nth-child(4), .v7tw-pv > *:nth-child(4){animation-delay:242ms}
+.v7tw-params > *:nth-child(5), .v7tw-pv > *:nth-child(5){animation-delay:256ms}
+.v7tw-params > *:nth-child(6), .v7tw-pv > *:nth-child(6){animation-delay:270ms}
+.v7tw-params > *:nth-child(7), .v7tw-pv > *:nth-child(7){animation-delay:284ms}
+.v7tw-params > *:nth-child(8), .v7tw-pv > *:nth-child(8){animation-delay:298ms}
+.v7tw-params > *:nth-child(9), .v7tw-pv > *:nth-child(9){animation-delay:312ms}
+.v7tw-params > *:nth-child(n+10), .v7tw-pv > *:nth-child(n+10){animation-delay:326ms}
+/* 顶栏先到，不参与逐行 */
+.v7tw-top{animation:v7twPanelIn var(--m-base) var(--ease-out) both}
+
+/* ⚠ 这里原来有一段 prefers-reduced-motion 把整段过渡掐成 0.01ms 的规则，已删（2026-09-28）。
+   Windows 里关掉「动画效果」就会命中它 —— 用户看到的就是"根本没动画"，而项目别处的动画都照常播。
+   减速偏好改由 tool-workbench.js 处理：照样淡入淡出，只是不做位移。 */
+
+/* ⚠ ui.html 里有条老规则：.anchor:has(.detail-card.workspace-host) #zones{visibility:hidden!important}
+   —— 普通工作面打开时把二级卡直接藏掉。工具工作面复用了 workspace-host，
+   于是工具列表一打开就被【瞬间】藏掉，轮不到收拢动画（2026-09-28 实测抓到）。
+   工具工作面的二级卡由 tool-workbench.js 负责淡出 / 淡回，这里把那条规则盖回去。
+   （选择器多一个类，优先级更高；两边都是 !important，高的赢） */
+.anchor:has(.detail-card.workspace-host.v7tw-host) #zones{
+  visibility:visible !important;
+}
+
+/* 让位期间被收起来的元素（叠压卡、二级卡、任务堆、报错堆、当前卡）一律不吃鼠标。
+   ⚠ 必须连子元素一起压：卡片内部按钮自己写了 pointer-events:auto，只压外层压不住 ——
+     自由模式下这些卡的层级比大卡高，不压的话透明的卡会挡住大卡的点击。 */
+.v7tw-yielded,
+.v7tw-yielded *{
+  pointer-events:none !important;
+}

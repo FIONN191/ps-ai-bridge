@@ -1,0 +1,185 @@
+/* ══════════════════════════════════════════════════════════════════════════
+ * 云功能闸门（ui-pure/cloud-gate.css）
+ * ══════════════════════════════════════════════════════════════════════════
+ * 2026-10-14 · 用户要求：
+ *   「所有的和云相关的功能，就是跟我们账号相关的功能，在不登录的时候就直接不显示。」
+ *   → 追问后改成：「换成灰色，不点按就行了，无法点按就行了」
+ *
+ * 所以这里是【变灰 + 点不动】，不是移走：
+ *   · 移走的话用户不知道有这功能，而且版面会跳来跳去
+ *   · 变灰的话一眼能看出"这功能在，但要先登录"
+ *
+ * ⚠⚠ 三条边界（跟 card-architecture.js 里 applyCloudGate 的注释是一对，别只改一边）：
+ *   ① 【公告不锁】—— /v1/public/announcement 本来就在公开白名单里，
+ *      用户明确要求"公告无论如何登不登录都要尝试拉取一次"。
+ *   ② 【登录框不锁】—— 锁了就永远登不上。
+ *   ③ 【本地功能不锁】—— 生成、预设、抠像、引擎、布局、外观一个都不锁。
+ *
+ * ⚠ 为什么单独一个文件、不塞进 settings-card.css：
+ *   那份当时正被另一个对话改着，新开一个文件不会跟人抢。
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 被锁的那一节：整节变灰、点不动 ───────────────────────── */
+[data-cloud-locked] {
+  opacity:0.5;
+  filter: saturate(.35);
+  /* ⚠ 用 pointer-events 整节挡住，比逐个控件加 disabled 稳：
+     节里的按钮/输入/滑杆形态各异，逐个加容易漏（漏一个就是"看着灰了其实能点"）。 */
+  pointer-events: none;
+  /* 告诉辅助技术和自动化：这里现在不可用（不是"坏了"） */
+  user-select: none;
+}
+
+/* ⚠ 光标也换成"禁止"——光变灰容易被当成"样式就这样"，
+   给个 not-allowed 才能一眼看出是"现在不能点"。 */
+[data-cloud-locked] * {
+  cursor: not-allowed !important;
+}
+
+/* ── 未登录时，在设置面板顶部挂一句说明 ───────────────────── */
+/*   ⚠ 不能只变灰不解释 —— 用户会以为是坏了（这个项目最忌讳"看着像坏了"）。
+     用 CSS 生成内容而不是插 DOM：这样不用改别人的渲染代码，
+     也不会在登录/退出时反复插删节点。 */
+.settings-panel[data-cloud-signed-in="0"]::before {
+  /* ⭐ 2026-10-15：顶上这条横幅【撤了】（用户说设置页"太散"，最顶上第一眼该是公告）。
+     同样的话搬进了「登录账号」那一节的状态行（ui.html accountStatus：未登录时写明哪些功能置灰）。
+     ⚠ 规则留着、只把 content 关掉 —— 以后要恢复，把下面这行换回原文：
+       '未登录：账号、积分、云同步、云备份、客服、社区这些要连平台的功能已置灰，登录后即可使用。公告不受影响。' */
+  content: none;
+  display: block;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius:8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: hsl(var(--card-h, 220 28%) 78% / .92);
+  background: rgba(255, 255, 255, calc(.06 * var(--ui-bg-opacity, 1)));
+  border: 1px solid rgba(255, 255, 255, calc(.10 * var(--ui-bg-opacity, 1)));
+}
+
+/* ⚠ 登录之后那条说明要消失 —— 靠 data-cloud-signed-in="1" 不匹配 ::before 自动生效，
+   这里不用写额外的规则。写出来只是让人知道它是故意的： */
+.settings-panel[data-cloud-signed-in="1"]::before { content: none; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * 平台公告框（2026-10-14 用户点名改造）
+ * ══════════════════════════════════════════════════════════════════════════
+ * 用户原话：
+ *   「设置卡顶上有一个公告与状态，有一个平台公告。你这两个也挺奇怪的。」
+ *   「把这个公告变成最大的顶栏放在上面，合并公告与状态和平台公告」
+ *   「把这个 V7开始测试了，包在这个公告框里面」
+ *
+ * ⇒ 这一节现在只有一个标题「平台公告」，正文包在 .announce-box 里。
+ *   ⚠ 「最大的顶栏」的意思不是字号最大，而是：它是设置卡的第一节、
+ *     标题就在最上面、内容一眼能看到。字号跟别的节标题保持一致，
+ *     只有它一个人变大反而会跟整个设计语言不搭。
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 公告框本体：一眼能看出"这是一条公告"，不是普通说明文字 ── */
+.announce-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: var(--radius-button, 12px);
+  /* ⚠ 背景/边框跟主面板用同一档不透明度（0.78 / --ui-bg-opacity），
+     跟参考图卡、报错卡同一套语义 —— 全局调透明度时它要跟着变。 */
+  background: hsl(var(--card-h, 220 28%) 11% / calc(.78 * var(--ui-bg-opacity, 1)));
+  border: 1px solid rgba(255, 255, 255, calc(.12 * var(--ui-bg-opacity, 1)));
+  /* 左边一条主题色竖条：它现在是"平台在跟你说话"，值得一个记号 */
+  border-left: 3px solid var(--accent, hsl(var(--accent-h, 268) 62% 58%));
+}
+
+/* ── 公告正文 ── */
+.announce-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--tx);
+  /* ⚠ 保留换行：长公告是一段一段写的（用户说"如果是长公告的话"），
+     不保留的话整篇挤成一坨。 */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ── 拿不到公告时的话（说清是"没读到"，不是"没有公告"）── */
+.announce-empty {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--tx2);
+}
+
+/* ── 公告里带的跳转链接 ── */
+.announce-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+}
+
+/* ── 服务状态容器（account-center 挂进来的那块）── */
+/*   ⚠ 不登录时 account-center 会画一句
+ *     "请先登录，再查看本人的账单、客服记录和服务公告。"
+ *     —— 公告【已经】在上面那个框里显示了，这句话在这儿既多余又误导
+ *       （用户会以为公告要登录才能看）。所以未登录时把它藏掉。
+ *   ⚠ 用一个专门的容器类而不是去改 account-center 的类名：
+ *     那一块是它的地盘，这里只控制"要不要显示"，不碰它内部结构。 */
+.settings-panel[data-cloud-signed-in="0"] .announce-service { display: none; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * 公告 · 分段富文本 + 连接状态 + 服务状态（2026-10-15 用户重定）
+ * ══════════════════════════════════════════════════════════════════════════
+ * ⚠ .ann-s-* / .ann-c-* 的字号和颜色【必须】跟后台 backend/admin/styles.css 里的同名类一致
+ *   （后台预览 = 用户看到的样子），档位表跟后端 normalize_announcement_blocks 一致。三处一套。
+ * ⚠ 正文段落全是 textContent 画的，这里只管样式。 */
+.ann-b { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; color: var(--tx); }
+.ann-s-s  { font-size: 12px; }
+.ann-s-m  { font-size:13px; }
+.ann-s-l  { font-size: 17px; }
+.ann-s-xl { font-size: 22px; line-height: 1.35; }
+.ann-c-accent { color: var(--accent); }
+.ann-c-red    { color: hsl(var(--sem-err)); }
+.ann-c-orange { color: hsl(32 100% 65%); }
+.ann-c-green  { color: hsl(var(--sem-ok)); }
+.ann-c-muted  { color: var(--tx2); }
+.ann-bold   { font-weight: 700; }
+.ann-center { text-align: center; }
+
+/* ── 设置卡那一节：标题行右边挂「已连上 / 连不上」小胶囊 ── */
+.ann-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.ann-head .settings-section-title { margin: 0; }
+.ann-conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--tx2);
+  padding: 3px 10px; border-radius: 999px; background: rgba(255, 255, 255, calc(.06 * var(--ui-bg-opacity, 1))); }
+.ann-conn i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.ann-conn-ok      { color: hsl(var(--sem-ok)); }
+.ann-conn-fail    { color: hsl(var(--sem-warn)); }
+.ann-conn-loading { color: var(--tx2); }
+.announce-box .ann-b + .ann-b { margin-top: 2px; }
+
+/* ── 服务状态小签：一行排开，挤不下自动换行 ── */
+.ann-services { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 10px; }
+.ann-services[hidden] { display: none; }
+.ann-svc { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--tx);
+  padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, calc(.10 * var(--ui-bg-opacity, 1))); }
+.ann-svc i { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.ann-svc-ok i   { background: hsl(var(--sem-ok)); }
+.ann-svc-warn i { background: hsl(var(--sem-warn)); }
+.ann-svc-err i  { background: hsl(var(--sem-err)); }
+.announce-links { margin-top: 8px; }
+
+/* ── 报错卡里的公告：卡片跟着正文长高（最多约 260），再长就在卡里滚 ──
+ *   ⚠ 普通报错卡是固定 300×100 + 两行截断；公告卡要看全文，所以单独放开。
+ *   ⚠ 选择器写到 .error-card.ec-rich .ec-desc.ec-rich-body —— 压过 ui.html 里的
+ *     `.error-card .ec-desc{-webkit-line-clamp:2}`，跟样式表加载先后无关。
+ *   ⚠ 滚轮：ui.html 全局滚轮那里对 .ec-rich-body 放行原生滚动（还能滚就不切卡）。 */
+.error-card.ec-rich { height: auto; min-height: 100px; max-height: 260px; display: flex; flex-direction: column; }
+.error-card.ec-rich .ec-desc.ec-rich-body {
+  display: block; -webkit-line-clamp: unset; overflow-x: hidden; overflow-y: auto;
+  flex: 1 1 auto; min-height: 0; max-height: 196px; padding-right: 4px;
+  scrollbar-width: thin;
+}
+.ann-card-body { display: flex; flex-direction: column; gap: 2px; }
+.ann-card-body .ann-s-xl { font-size:20px; }

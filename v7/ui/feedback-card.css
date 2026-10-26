@@ -1,0 +1,59 @@
+/* 问题反馈卡（feedback-card.js）· 2026-10-18 深夜（docs/248）
+ * ⚠ 卡面规则收在 .fb-face 里；大二级规则收在 #feedbackZone 里 —— 不漏到别的卡。
+ *   大二级的外壳（540×400、右边导航、节标题）跟生成卡共用 settings-card.css / card-architecture.css
+ *   （那两份的 :is(#settingsZone,#generationZone,#feedbackZone) 选择器）。
+ * ⚠ 颜色一律用 tokens.css 的代币，不写死色值（主题一换就花）。
+ */
+
+/* ═══ 卡面 ═══ */
+/* ⚠ 2026-10-20（用户截图「问题反馈界面的一级没有占满」）：.bc-fields 默认是 2 列网格（ui.html），
+ *   卡面只有一个 .fb-face 子元素 ⇒ 只占左边一列。跟设置卡 / 分类卡一样压成 1 列（card-architecture.css:17）。 */
+.bc-fields[data-feedback-face]{grid-template-columns:minmax(0,1fr)}
+.fb-face{display:flex;flex-direction:column;gap:8px;min-width:0;padding:2px 0;color:var(--tx)}
+.fb-face-lead{margin:0;font-size:12px;line-height:1.6;color:var(--tx)}
+.fb-face-draft{box-sizing:border-box;min-height:58px;max-height:96px;overflow:hidden;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface-faint);font-size:11px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.fb-face-draft.empty{color:var(--tx2)}
+.fb-face-meta{font-size:10px;color:var(--tx2);line-height:1.5}
+.fb-face-btns{display:flex;gap:8px;flex-wrap:wrap}
+.fb-face-btns .ai-btn{flex:1 1 auto}
+.fb-status{margin:0;font-size:11px;line-height:1.6;color:var(--tx2);white-space:pre-wrap;overflow-wrap:anywhere}
+.fb-status:empty{display:none}
+.fb-status[data-kind="ok"]{color:hsl(var(--sem-ok))}
+.fb-status[data-kind="warn"]{color:hsl(var(--sem-warn))}
+.fb-status[data-kind="err"]{color:hsl(var(--sem-err))}
+
+/* ═══ 大二级 ═══ */
+#feedbackZone .fb-kinds{display:flex;gap:6px;flex-wrap:wrap}
+#feedbackZone .fb-kind{all:unset;box-sizing:border-box;cursor:pointer;height:26px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface-faint);color:var(--tx2);font-size:11px;line-height:24px}
+#feedbackZone .fb-kind:hover{color:var(--tx)}
+#feedbackZone .fb-kind.sel{border-color:var(--accent);color:var(--tx);background:hsl(var(--glow-zone)/.16)}
+#feedbackZone .fb-kind:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#feedbackZone .fb-context{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--radius-control);background:hsl(var(--sem-warn)/.12);font-size:11px;line-height:1.5;color:var(--tx)}
+#feedbackZone .fb-context[hidden]{display:none}
+#feedbackZone .fb-context-text{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+#feedbackZone .fb-context-x{all:unset;cursor:pointer;flex:none;font-size:10px;color:var(--tx2);text-decoration:underline}
+#feedbackZone .fb-guide{margin:0;padding-left:18px;font-size:11px;line-height:1.7;color:var(--tx2)}
+/* ⚠ 输入框跟着内容长高，不自己出滚动条：大二级里的滚轮只滚整列（ui.html 那条监听），框里滚不动 */
+#feedbackZone .fb-text{box-sizing:border-box;width:100%;min-height:180px;resize:none;overflow:hidden;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface-faint);color:var(--tx);font-family:inherit;font-size:12px;line-height:1.6}
+#feedbackZone .fb-text:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+#feedbackZone .fb-text::placeholder{color:var(--tx2);opacity:0.75}
+#feedbackZone .fb-count{font-size:10px;color:var(--tx2);text-align:right}
+#feedbackZone .fb-count[data-kind="err"]{color:hsl(var(--sem-err))}
+#feedbackZone .fb-drop{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:12px;border:1px dashed var(--line);border-radius:var(--radius-button);background:var(--surface-faint);font-size:11px;line-height:1.5;color:var(--tx2)}
+#feedbackZone .fb-drop b{color:var(--tx);font-weight:600}
+#feedbackZone .fb-drop.over{border-color:var(--accent);background:hsl(var(--glow-zone)/.12)}
+#feedbackZone .fb-drop.full{opacity:0.5}
+#feedbackZone .fb-drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#feedbackZone .fb-thumbs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#feedbackZone .fb-thumbs[hidden]{display:none}
+#feedbackZone .fb-thumb{position:relative;display:flex;flex-direction:column;gap:3px;min-width:0}
+#feedbackZone .fb-thumb img{display:block;width:100%;height:96px;object-fit:contain;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface-faint)}
+#feedbackZone .fb-thumb-x{all:unset;cursor:pointer;position:absolute;right:4px;top:4px;width:22px;height:22px;border-radius:50%;text-align:center;line-height:21px;font-size:15px;background:var(--bg-solid);color:var(--tx);border:1px solid var(--line)}
+#feedbackZone .fb-thumb-x:hover{border-color:hsl(var(--sem-err));color:hsl(var(--sem-err))}
+#feedbackZone .fb-thumb-meta{font-size:10px;color:var(--tx2)}
+#feedbackZone .fb-check{display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.5;cursor:pointer}
+#feedbackZone .fb-check input{margin-top:2px;flex:none}
+#feedbackZone .fb-diag summary{cursor:pointer;font-size:11px;color:var(--tx2)}
+#feedbackZone .fb-diag-text{margin:6px 0 0;padding:8px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface-faint);font-size:10px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--tx2)}
+#feedbackZone .fb-last,#feedbackZone .fb-foot{margin:0;font-size:11px;line-height:1.6;color:var(--tx2)}
+#feedbackZone .fb-last:empty{display:none}

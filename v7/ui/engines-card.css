@@ -1,0 +1,866 @@
+/* ============================================================================
+   外挂能力卡 · 2026-10-04 深夜重排
+   ============================================================================
+
+   一级卡面 = 【一张总表】：横轴三档，纵轴能力，格子里写"这一档下它是什么形态"。
+   二级大卡 = 【顶部：机器配置 + 引擎状态 / 左：当前页内容 / 右：四页导航】。
+
+   ⚠⚠ 全部规则收在 #enginesZone / .block-card[data-card="engines"] 或 .ec-* 下 ——
+     不这么收会漏到别的卡上去（记录卡/预设卡都有 .tcard，撞过一次）。
+   ⚠ 滚轮【不在这里挂】—— 二级滚轮归 ui.html 统一管。
+   ⚠ 颜色一律用 tokens.css 的代币，不写死色值（主题一换就花）。
+
+   ⚠⚠ 2026-10-04 修掉的一个真 bug（重写时别再犯）：
+     表头原来是"问号 + 三个档位"塞进同一个 grid，而问号绝对定位不占格子 →
+     三个档位【自动落到第 1/2/3 列】，第 1 列却是 46px 的能力名栏 → 表头整体左移一格。
+     （10-02 也踩过同一个：档位显示成 2、1、3。根因都是"靠 grid 自动排位"。）
+     ⇒ 现在的结构：.ec-thead 是【普通竖排】，里面 .ec-hint 一行 + .ec-hrow 一行；
+        .ec-hrow 和 .ec-crow 共用同一个 --ec-cols 变量。两边共用变量才不会漂。
+*/
+
+/* ═══════════════════════════════════════════════════════════
+   一级卡面 · 总表
+   ═══════════════════════════════════════════════════════════ */
+/* ⚠⚠⚠ 2026-10-05 修掉的真 bug（别再犯，探针已量到实数）：
+   `.bc-fields` 是【2 列网格】(ui.html 的 `grid-template-columns:1fr 1fr`)，它本来是给
+   "一行放两个小控件"用的。别的卡（设置卡 / 项目卡）都靠子元素带 `.full` 类
+   (`grid-column:1/-1`，见 main-card-shortcuts.css) 才占满 248px。
+   ⭐ 外挂卡的 `.ec-stack`【没有那个类】→ 被当成"一个格子"塞进左半边：
+        · .ec-stack 实宽 120px（内容区是 248）
+        · 每个档位格被压到 22px —— "已内置"要 29、"快速对齐"要 34、"引擎没起"要 34
+        · 探针 `_probe-card1-textfit.cjs` 扫出【26 处文字被切】，全在这张卡上
+   ⇒ 这里把外挂卡的 .bc-fields 直接压成【1 列】。
+     ⚠ 用 1 列而不是给 .ec-stack 加 `.full` 类：类名要 JS 挂，少挂一次就静默回到 120px；
+       CSS 钉死在这儿，重建 DOM 也不会丢。
+     ⚠ 只作用于 [data-card="engines"]，别的卡的 2 列网格原样不动。 */
+.block-card[data-card="engines"] .bc-fields{
+  grid-template-columns:1fr;       /* 只有一张表，不需要两列 */
+  grid-template-rows:1fr;          /* 撑满 322 高（默认 align-content:start 会缩到内容高） */
+  align-content:stretch;
+  gap:0;
+}
+.ec-stack{
+  display:flex; flex-direction:column; min-width:0; min-height:0;
+  /* ⚠ 左栏 46px：短名上限 3 字（实测「指哪抠哪」4 字被切过）。
+     格子 3 列：(248 − 46 − 3×3) / 3 ≈ 64px —— 放得下 4 个中文字（9.5px）+ 内边距。
+     ⚠ 这个 248 只有在外挂卡 .bc-fields 压成 1 列时才成立（见上）。 */
+  --ec-label:46px; --ec-gap:3px;
+  --ec-cols:var(--ec-label) repeat(3,minmax(0,1fr));
+}
+
+/* ── 表头 ── */
+.ec-thead{flex:none;display:flex;flex-direction:column;gap:5px;padding-bottom:5px}
+/* 提示行：左边一句人话，右边问号（⚠ 两者都是普通流，不绝对定位） */
+.ec-hint{
+  display:flex;align-items:center;justify-content:space-between;gap:6px;
+  font-size:10px;color:var(--tx2);line-height:1;padding:0 1px;
+}
+.ec-hint>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ec-q{
+  flex:none;width:16px;height:16px;padding:0;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);background:hsl(var(--accent-hsl, 211 100% 68%) / .12);
+  color:var(--tx2);font-size:10px;font-weight:700;line-height:1;cursor:pointer;
+  transition:background var(--m-fast) var(--ease-soft),color var(--m-fast),border-color var(--m-fast);
+}
+.ec-q:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .24);color:var(--tx);border-color:var(--line-strong)}
+/* 三个档位：跟数据行共用 --ec-cols */
+.ec-hrow{display:grid;grid-template-columns:var(--ec-cols);gap:0 var(--ec-gap)}
+/* ⚠⚠⚠ 必须【显式指定列】—— 这是本项目踩过两次的坑，别偷懒：
+ *   .ec-hrow 里只有 3 个格子，而模板是 `46px repeat(3,1fr)` 共 4 列。
+ *   靠 grid 自动排位的话，这 3 个格子会落到【第 1/2/3 列】——
+ *   于是第一个档位正好压在 46px 的【能力名栏】上，整个表头左移一格。
+ *   （10-02 那次是"档位显示成 2、1、3"，根因相同；10-04 我写这版时又犯了一次，
+ *     是探针逐列量 left 才抓出来的 —— 肉眼看着"差不多"，量出来差了 49px。）
+ *   ⚠ 共用 --ec-cols 只保证【列宽】一致，【不保证起点】一致。两件事都要做。 */
+.ec-hrow>.ec-hcell:nth-child(1){grid-column:2}
+.ec-hrow>.ec-hcell:nth-child(2){grid-column:3}
+.ec-hrow>.ec-hcell:nth-child(3){grid-column:4}
+.ec-hcell{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  padding:5px 3px;border-radius:8px;min-width:0;line-height:1.15;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .05);border:1px solid transparent;
+  cursor:pointer;user-select:none;
+  transition:background var(--m-fast) var(--ease-soft),border-color var(--m-fast) var(--ease-soft);
+}
+.ec-hcell:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .1)}
+/* ⚠ 选中那一档 = 亮绿描边。这是"当前是哪一档"的唯一表达，别用别的颜色
+   （用户 2026-10-01 强调过三次"有些功能它只能开一档"）。 */
+.ec-hcell.sel{background:hsl(var(--sem-ok)/.12);border-color:hsl(var(--sem-ok)/.4)}
+.ec-hn{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.ec-hs{
+  font-size:10px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:100%;color:var(--tx2);min-height:10px;
+}
+.ec-hs.ok{color:hsl(var(--sem-ok))}
+.ec-hs.warn{color:hsl(var(--sem-warn))}
+
+/* ── 数据区：一行一样能力 ──
+   ⚠⚠ 2026-10-05 改：行高【不再写死 26px】，改成 flex:1 均摊剩余空间。
+     原来写死 26px → 8 行只占 222px，容器有 261px，底下白留 39px（用户看到的那块空）。
+     现在：装得下就每行等分撑满（好看的排版）；将来加能力装不下，靠 min-height:26px
+     兜底 + .ec-grid 自己的 overflow-y 滚 —— "以后加功能也不会撑破"这条没丢。 */
+.ec-grid{
+  flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;
+  overscroll-behavior:contain;display:flex;flex-direction:column;gap:2px;
+}
+.ec-grid::-webkit-scrollbar{display:none}
+
+.ec-crow{
+  flex:1 1 26px;min-height:26px;max-height:38px;
+  display:grid;grid-template-columns:var(--ec-cols);gap:0 var(--ec-gap);align-items:stretch;border-radius:4px;
+}
+.ec-cname{
+  font-size:11px;color:var(--tx);padding-left:2px;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+/* ⚠⚠⚠ 2026-10-05 用户："外挂能力的主卡片，也就是一级卡片，存在着选中内容之后，
+ *   感觉整体的锐度也会有轻微的跳变的状态。"
+ *   真因：旧写法用 `opacity:0.5` 把没选中的两列压灰 ——
+ *   opacity < 1 会让浏览器给这些格子【单独建合成层】，文字改走 GPU 栅格化；
+ *   点一下选中（opacity 回到 1）层又拆掉，栅格化方式切回去 ⇒ 整行字看着"跳"了一下。
+ *   ⇒ 改成【用颜色压灰，不碰 opacity】：
+ *     没选中的格子把字色压到 --tx3、底色再暗一档，视觉上一样是"灰下去"，
+ *     但它始终在同一个渲染层里，字不会重栅格化。
+ *   ⚠⚠ 三档互斥的表达【必须保住】（用户 2026-10-01 强调过三次"有些功能只能开一档"）——
+ *     所以这里仍然是"选中一列亮、另两列暗"，只是暗的手段从透明度换成颜色。 */
+.ec-cell{
+  display:flex;align-items:center;justify-content:center;
+  height:24px;border-radius:4px;padding:0 4px;
+  font-size:10px;letter-spacing:.1px;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .03);color:var(--tx2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;
+  transition:background var(--m-fast) var(--ease-soft),color var(--m-fast) var(--ease-soft);
+}
+/* 没选中的两列：灰字 + 更暗的底（不是 opacity）
+ * ⚠⚠ `--tx3` 这个变量【项目里没有定义】（tokens.css 只到 --tx2）——
+ *   直接写 var(--tx3) 是【静默失效】：颜色会退回继承值，看着跟没压灰一样。
+ *   必须带兜底，跟 ui.html:1794 / :2138 那两处的写法保持一致。 */
+.ec-cell:not(.sel){color:var(--tx3,rgba(255,255,255,.42));background:hsl(var(--accent-hsl, 211 100% 68%) / .02)}
+/* 当前档那一格 */
+.ec-cell.sel{color:var(--tx);background:hsl(var(--accent-hsl, 211 100% 68%) / .07)}
+.ec-cell.sel:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .13)}
+.ec-cell:focus-visible{outline:2px solid hsl(var(--accent));outline-offset:-2px}
+/* 这一档没有它 → 打叉、暗、且【点不动】（JS 里也拦了一道，这里是视觉交代） */
+.ec-cell.none{background:hsl(var(--accent-hsl, 211 100% 68%) / .015);color:var(--tx3,rgba(255,255,255,.42));cursor:default}
+.ec-cell.none svg{opacity:0.75}
+
+/* ── 底栏进度条（装模型时用）── */
+.block-card[data-card="engines"] .bc-foot .pgbar{
+  position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:0px;
+  background:hsl(var(--accent));transition:width var(--m-base) var(--ease-out);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   二级大卡（540×400：左 416 内容 + 右 108 导航）
+   ═══════════════════════════════════════════════════════════ */
+#enginesZone{
+  width:540px;height:400px;
+  border:0; box-shadow:var(--shadow-mid), inset 0 0 0 1px var(--line);
+}
+#enginesZone::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;
+  background-color:var(--bg-solid);
+  /* 2026-10-22（docs/263 第 20 条）：平铺同一深浅（原来上中下三档的中间值），不再竖向渐变 */
+  background-image:linear-gradient(hsl(var(--card-h, 220 28%) 8% / .6), hsl(var(--card-h, 220 28%) 8% / .6)),
+    var(--card-bg-image, none);
+  background-size:cover;background-position:center;
+  opacity:var(--ui-bg-opacity,1);
+}
+/* ⚠⚠ 左半区是【flex 列】：上面一条常驻状态、下面内容页。
+   为什么不用"绝对定位 + 量高度写变量"：量的时候二级卡可能还是 display:none，
+   量到 0 → 内容区 top 归 0 → 顶部那一条直接压在标题上。
+   flex 交给浏览器排，一行都不用算（这一版踩过，别改回去）。 */
+/* ⚠⚠⚠ 2026-10-07 用户实测："顶栏的右侧有什么东西被遮罩挡住了，然后按钮也没有露出来"。
+   真因（图层级铁证）：
+     顶栏宽度是 540，但它的父容器 .rc-main 只有 416 宽、而且【overflow:hidden】
+     ⇒ 顶栏伸出去的那一段（= 「启动引擎」按钮右半 + "展开机器状态"按钮，x416~527）
+       被父容器【裁掉】了。用户看到的就是"按钮没露出来、右侧像被遮住"。
+   查证记录（从按钮往上逐级看谁在裁）：
+     … 3. trow(x16~527,visible) → 4. rc-top(x0~540,visible) → 5. rc-main(x0~416,HIDDEN) ← 元凶
+   ⇒ 修法：把【裁决权交给正文自己】——.rc-main 不再裁、也不再钉死 416，让顶栏能铺满 540；
+     正文 .rc-left 自己 overflow:hidden（它本来就是 416×360，页面动画也在它里面）。
+   ⚠ 别再给 .rc-main 加回 overflow:hidden —— 那会把顶栏右端重新裁掉。
+   ⚠ 也别把 .rc-main 钉回 width:416px：它是 flex 列容器，钉死后子元素超出部分仍会被裁。 */
+#enginesZone .rc-main{
+  position:absolute;left:0;top:0;width:540px;height:400px;
+  display:flex;flex-direction:column;
+}
+#enginesZone .rc-left{position:relative;flex:1;min-height:0;width:416px;overflow:hidden}
+#enginesZone .rs-page{position:absolute;inset:0}
+
+/* ── 右栏 = 四页导航（内嵌格，不是另一张卡）──
+   ⚠⚠ 2026-10-07 用户实测报的："顶栏 UI 没对齐，还有几块颜色不一样"。查明三件事：
+     ① 右栏原来只有 108px，而里面最长的一行「机器情况 · 模型文件 · 引擎设置」要 122px
+        ⇒ 文字被砍掉一半（实测 scrollWidth 122 vs clientWidth 60）。同一个毛病还有
+        「不用装任何东西」(63/60) 和底部两行 (61/41、56/38)。
+     ② 右栏原来从【卡片最顶上】开始（top:0），而正文是从 y=40 开始的
+        ⇒ 右栏顶部跟顶栏那条深色带抢同一条横带，两种底色叠在一起（就是"颜色不一样"）。
+     ③ 底色原来是在卡片底上【提亮 2.5%】，而顶栏是【压暗到 6%】
+        ⇒ 两块相邻的底一深一浅，看着像没对齐的两截。
+   ⇒ 改法（只改数值，不动结构）：
+     · 宽度 108 → 150px，左缘不动（432）⇒ 右缘正好落在卡片右缘（432+1+150=583）。
+       ⚠ 左缘必须留在 432：rail-in 有 12px 内边距 + 1px 左边框 = 13，
+         卡右缘 583−13=570；正文那边 16px 内边距 ⇒ 540−16=524… 两边各自贴自己的边，
+         所以【不能】为了让两边数字相等去挪左缘（那会把右栏右缘推出卡片）。
+     · top:0 → 40px、高 400 → 360px ⇒ 右栏跟正文同一条起跑线，不再压着顶栏。
+     · 底色改成跟顶栏同一套（card-h 6% + 同一段渐变）⇒ 顶栏和右栏连成一片，不再两截色。 */
+/* ── 右栏 = 四页导航（内嵌格，不是另一张卡）──
+   ⚠⚠ 2026-10-07 用户两次纠正我，记下来别再犯：
+     ① 【宽度别动】—— 用户只要求"右栏文字换行"，我却顺手把 108 → 150 加宽了，
+        结果右栏跟顶栏对不齐。用户原话："谁让你把右侧那个栏拉宽的？拉宽之后它和上面没对齐了。"
+        ⇒ 宽度、左缘【回到原样】：left:432、width:108。
+     ② 【底色别硬写】—— 我一度把这里写成顶栏那套 card-h 6%，等于把颜色写死；
+        而这个项目有主题系统（「卡片底色」改 --card-h 色相、「去掉卡片的彩色底」走统一中性色）。
+        写死 = 主题一换这里就不跟着走。⇒ 底色交回原样（在卡片底上提亮 2.5%，跟 --ui-bg-opacity 走）。
+     ③ 【顶栏对齐】用户说"顶栏 UI 没对齐"⇒ 根因是右栏原来 top:0、跟顶栏那条横带抢同一条位置
+        （顶栏的设计意图就是横跨整宽，见 engines-card.js:543-545 记的用户原话）。
+        ⇒ 右栏 top:0 → 40、高 400 → 360：跟正文同一条起跑线，上方 40px 整条归顶栏。
+        （用户 2026-10-07 说"你看着来"，我按"顶栏横跨整宽"的原始设计意图定成 40。） */
+#enginesZone .rc-rail{
+  position:absolute;left:432px;top:40px;width:108px;height:360px;
+  border-radius:0 0 20px 0;
+  box-shadow:none;
+  background-color:transparent;background-image:none;
+  overflow:hidden;
+  border:0;border-left:1px solid var(--line-faint);
+}
+/* 内嵌区底色：⚠ 2026-10-07 跟顶栏同一条口径 —— 去掉那层"颜色遮罩"。
+   原来这里是在卡片底上【提亮 2.5%】，跟顶栏那层暗色叠在一起，看着像两块不同的底；
+   用户定案："直接不要去加颜色遮罩了" ⇒ 现在跟顶栏/正文同一块底（--bg-solid 由卡片自己出），
+   这里只压一道极淡的白色做层次。 */
+#enginesZone .rc-rail::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .025);
+  opacity:var(--ui-bg-opacity,1);
+}
+#enginesZone .rail-in{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;padding:12px 12px 10px}
+#enginesZone .rail-head{
+  display:flex;align-items:baseline;justify-content:space-between;gap:4px;
+  padding:0 2px 7px;font-size:11px;font-weight:600;
+  border-bottom:1px solid var(--line-faint);
+}
+#enginesZone .rail-head small{font-size:10px;color:var(--tx2);font-weight:400;font-variant-numeric:tabular-nums}
+#enginesZone .rail-list{
+  position:relative;flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;
+  display:flex;flex-direction:column;padding-top:8px;
+}
+#enginesZone .rail-list::-webkit-scrollbar{display:none}
+#enginesZone .rail-nodes{margin:auto 0;display:flex;flex-direction:column;gap:5px}
+
+/* 页节点（沿用老的 .tiern 类名 —— 宿主 ui.html 的样式钩子还认它） */
+#enginesZone .tiern{
+  position:relative;padding:7px 8px 7px 14px;border-radius:8px;cursor:pointer;
+  background:transparent;border:1px solid transparent;
+  transition:background var(--m-fast) var(--ease-soft),border-color var(--m-fast);
+}
+#enginesZone .tiern:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .04)}
+#enginesZone .tiern.sel{background:hsl(var(--accent-hsl, 211 100% 68%) / .06);border-color:var(--line)}
+#enginesZone .tiern:focus-visible{outline:2px solid hsl(var(--accent));outline-offset:-2px}
+#enginesZone .tiern>i{
+  position:absolute;left:0;top:50%;width:7px;height:7px;margin-top:-3.5px;
+  border-radius:50%;border:1.5px solid hsl(var(--accent-hsl, 211 100% 68%) / .35);background:transparent;
+  transition:background var(--m-fast),border-color var(--m-fast),box-shadow var(--m-fast);
+}
+#enginesZone .tiern.sel>i{
+  border-color:hsl(var(--glow-detail));background:hsl(var(--glow-detail)/.85);
+  box-shadow:0 0 8px hsl(var(--glow-detail)/.5);
+}
+#enginesZone .tiern .tt{display:flex;flex-direction:column;min-width:0;font-size:11px;font-weight:600;line-height:1.3}
+/* ⚠⚠ 2026-10-07 用户定：这一行【换行】，不要截断。
+   （原来是 nowrap + ellipsis，实测「机器情况 · 模型文件 · 引擎设置」需要 122px、
+     右栏只给得出 102px ⇒ 被砍成「机器情况 · 模…」，信息丢了。）
+   ⚠ 换行会【长高】：右栏那几格的高度由内容撑，所以下面 em（状态那行）跟着往下走，
+     四格的高度就可能不一样了。右栏是 flex 列 + margin:auto 居中，参差一点不影响功能；
+     真要整齐，看下面 .tiern 的 align-items 注释。
+   ⚠ word-break:keep-all 是为了中文按词换行，别在一个词中间断开。 */
+#enginesZone .tiern .tt b{font-size:10px;font-weight:400;color:var(--tx2);margin-top:1px;
+  white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;overflow-wrap:anywhere}
+#enginesZone .tiern .tt em{
+  display:flex;align-items:center;gap:2px;font-size:10px;font-style:normal;margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+#enginesZone .tiern .tt em.got{color:hsl(var(--sem-ok))}
+#enginesZone .tiern .tt em.miss{color:var(--tx2)}
+#enginesZone .tiern .tt em.miss.off{color:hsl(var(--sem-warn))}
+#enginesZone .rail-foot{
+  display:flex;align-items:baseline;justify-content:space-between;gap:4px;
+  padding-top:7px;border-top:1px solid var(--line-faint);
+  font-size:10px;color:var(--tx2);
+}
+/* ⚠ 2026-10-07 用户定：这一行也【换行】，跟副标题一个口径（别再截断）。
+   原来 nowrap+省略号，实测「当前档占 10.6G」需要 61px、只给 41px ⇒ 被砍成「当前档…」，
+   「要 N 卡 6-12G」需要 56px、只给 38px ⇒「要 N 卡…」。信息全丢。
+   换行会把这行变成两行（右栏是 flex 列，内容自己撑高，不影响别的块）。 */
+#enginesZone .rail-foot span{white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;overflow-wrap:anywhere}
+
+/* ── 顶部：机器配置 + 引擎状态（2026-10-05 重做）──
+   ⚠⚠ 它【在 .rs-page 之外】—— 换页动画只滑 .tp，这一条要一直看得见。
+   ⚠⚠⚠ 三条用户要求（10-05）：
+     ① "折叠的一个情况，这样它就不用占用太多的【一直留存】的空间了" → .folded 系列
+     ② "引擎的跑和性能监看其实可以摆成横排，这样更省空间" → .specchip 片横排
+     ③ "它右侧有一定的空位，这个空位和最右边的四个大选项没有对齐"
+        ⇒ 原来 width:416px（缩在左半区里），右栏却从 432 起 —— 顶条右边空一截。
+          现在【横跨整宽 540】，右边距跟右栏节点对齐（508 = 540 − 32）。
+   ⚠ 折叠态只剩一行 30px：点 + 状态 + 主按钮 + 展开箭头。
+     展开箭头【永远在】—— 折起来之后用户得有地方展开（入口要幂等）。 */
+#enginesZone .rc-top{
+  /* ⚠ 值改成 relative→relative 不变，但必须【显式声明】：机器数据那一行是 absolute，
+     它的定位依据就是这层（见 .specline 的说明）。absolute 子元素不占父容器高度，
+     这正是"展开机器状态时上面那排按钮不许位移"的关键。 */
+  position:relative;flex:none;z-index:5;
+  /* ⚠⚠ 2026-10-07 用户实测："顶栏还没修好呀" —— 真因是【右上角差 4px】：
+       顶栏整条横跨 0→540，内边距左右都是 16 ⇒ 里面最右那个按钮的右缘 = 540−16 = 524；
+       而右栏内层是 433→540、内边距 12 + 左边框 1 ⇒ 右栏里标题/格子/底部的右缘 = 540−13 = 528。
+       两条右边只差 4px，肉眼就是"顶栏右边没跟下面那栏对齐"。
+     ⇒ 顶栏右侧内边距改成 13（= 右栏的 12 内边距 + 1 边框），左内边距保持 16（左边是对齐正文的）。
+     ⚠ 别把左右都改成 13：左边要跟正文/横幅的 16 对齐（正文块的左缘也是 16）。 */
+  /* ⚠⚠⚠ 2026-10-07 用户最终定案（原话）：
+     「启动引擎右边还有一个很小的按钮叫展开机器状态，你把顶上的直接铺满整个顶呀。」
+     ⇒ 顶栏【铺满整卡】（432 → 540），做成一条完整的顶带；
+       右栏从 y=40 开始（本来就是这样）⇒ 顶带在上、右栏在下，两者【不重叠】，
+       所以按钮也不会再被右栏盖住（上一版把顶栏收窄到 432 是为了躲重叠，
+       但用户要的是"铺满顶部"，那就让右栏从 40 起、顶带独占上面那 40px）。
+     ⚠ 改完必须验：按钮右缘 ≤ 卡宽，且顶栏与右栏的 y 不重叠、x 上顶栏整条在上层。
+     ⚠ 别再改回 432（那是躲重叠的临时办法，用户否了）。 */
+  width:540px;box-sizing:border-box;
+  /* ⚠⚠ 内边距只在这里写一次！下面第 355 行附近还有一条 padding ——
+     两条同优先级的规则管同一个属性时【后者赢】，改了这条等于白改。
+     2026-10-07 我就栽在这里：把 10px 那条删了、统一成 7px 左右对称，
+     但漏删了这里，于是"展开态到底用哪个值"变成碰运气。
+     ⚠ 规矩：.rc-top 的内边距【只许有一处声明】（折叠态那条另算，它带 .folded、优先级更高）。 */
+  /* ⚠⚠⚠ 2026-10-07 用户定案（原话）：
+     「现在这个红色又太亮了，它是不是没有被纳入到我们的整个的UI的框架当中？它是个独立元素啊」
+     查证（像素级）：卡片底盘那层（就是"框架"）是这么画的 ——
+        底 = --bg-solid（用户选的颜色）
+        再叠渐变 = hsl(var(--card-h) 8% / .7) → 8% / .45 → …   ← 框架给卡片压的那道暗遮罩
+     而我一开始给顶带用的是【纯 --bg-solid、不叠遮罩】⇒ 顶带比卡片其他地方亮一截
+       （实测：顶带亮度 68 vs 正文 71 但色相/饱和度完全不同档位，看着就是"一块独立亮红"）。
+     ⇒ 正确做法 = 【用跟卡片同一套遮罩参数】（这才叫"纳入框架"）：
+         底 --bg-solid + hsl(var(--card-h) 8% / .7 …) 同一串渐变。
+       ⚠ 这就是用户说的"不要加颜色遮罩"的反面 —— 他要的是【跟卡片一样】，
+         而卡片的"一样"本来就包含这道遮罩。别再用纯色了。
+       ⚠ 色相/饱和走 --card-h（跟卡片一致），不写死。 */
+  /* 2026-10-22（docs/263 第 20 条）：卡片底遮罩已改成平铺 .6 —— 「跟卡片一样」的规矩不变，这里跟着平铺 */
+  background:linear-gradient(hsl(var(--card-h,220 28%) 8% / .6), hsl(var(--card-h,220 28%) 8% / .6)), var(--bg-solid);
+  border-bottom:1px solid var(--line-faint);
+  /* ⚠ 折叠/展开要有过渡（用户要"好看的动画"）——高度变化由内容决定，
+     这里给 padding 和内容块做过渡，收起时是【淡出+上滑】，不是硬切。
+     ⚠⚠ 2026-10-07：展开态的上内边距跟折叠态【必须一样是 7px】——
+       因为机器数据那一行现在是绝对定位（不占高度），
+       上面那排按钮的纵向位置 = 上内边距 + 行高，**只由上内边距决定**。
+       上内边距一变（原来是 10），按钮就会位移 —— 那正是用户不要的"被向下移动一下"。
+     ⚠ 下内边距 7→6 的作用只是"给绝对定位那一行留出呼吸空间"，
+       因为行高 26 + 7 + 6 + 1(边框) ≈ 40 = 折叠态的顶栏高度 ⇒ 那一排的纵向位置完全不变。 */
+  padding:7px 13px 6px 16px;
+  transition:padding var(--m-base) var(--ease-out),min-height var(--m-base) var(--ease-out);
+}
+/* ⚠⚠⚠ 2026-10-07：展开态必须【显式给高度】——
+   机器数据那一行是绝对定位（不占高度），所以顶栏不会自己长高，
+   不给高度的话那一行会直接盖到正文上面（实测：行底 117 > 正文顶 100）。
+   算出来的值：上内边距 7 + 那一排 26 + 那一行 18 + 下内边距 6 + 边框 1 + gap 13 ≈ 71。
+   ⚠ 折叠态要显式 min-height:0（不然继承不了 0，两条规则会打架）。 */
+/* ⚠⚠⚠ 2026-10-07 用户实测："你没有加小电脑图标，没有加上去" —— 查出来是【图标被自己的填充盖住了】：
+   图标库里那些 rect/circle 是【闭合图形】，而 svg 上没有 fill="none"（只有 stroke="currentColor"）
+   ⇒ 浏览器按默认值 fill:black 把它们填成纯黑，正好把浅色笔画盖掉。
+   症状：凡是"闭合图形"的图标（内存、停止、显示器…）都显不出来；只有折线类的（箭头）能看到 ——
+   所以用户看到的是"一个没有按钮的状态"。
+   像素取证（关掉填充之前）：那个 24×24 按钮范围里亮度>90 的像素只有 1 个 / 共 360。
+   ⇒ 这里统一给图标 svg 关掉填充。⚠ 别删 —— 删了闭合图形类图标又会变黑。
+   ⚠ 作用域：#enginesZone 里的 svg（本文件只服务这张卡）。 */
+#enginesZone svg{fill:none}
+
+/* ⚠⚠⚠ 2026-10-07 用户实测："第一按钮还在动" —— 上一版我只验了"上下"，漏了【横向】：
+   折叠态右边距 13px、展开态 16px ⇒ 展开时那一排往左挪 3px（主按钮右缘 895→892、折叠按钮 927→924）。
+   ⇒ 两条内边距必须【同口径】：左 16（对齐正文）、右 13（= 右栏 12 内边距 + 1 边框）。
+   ⚠ 教训：判"按钮动没动"要把【上下左右四个方向】都量一遍，只量一个方向等于没量。 */
+/* ⚠ 展开态【只写 min-height】——padding 已经在上面那条 .rc-top 里写过了（7px 13px 6px 16px）。
+   这里别再写一遍 padding：重复声明会让"到底用哪个值"变成碰运气。 */
+#enginesZone .rc-top{min-height:71px}
+#enginesZone .rc-top.folded{min-height:0;padding:7px 13px 6px 16px}
+#enginesZone .rc-top .trow{display:flex;align-items:center;gap:8px;min-width:0}
+#enginesZone .engline{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+/* ⭐ 2026-10-22（docs/263 第 15 条）：没在跑 = 空心圈、在跑 = 实心点，去掉颜色也分得清 */
+#enginesZone .edot{flex:none;box-sizing:border-box;width:8px;height:8px;border-radius:50%;
+  border:2px solid hsl(var(--sem-warn));background:transparent;box-shadow:0 0 7px hsl(var(--sem-warn)/.6)}
+#enginesZone .edot.ok{border-color:hsl(var(--sem-ok));background:hsl(var(--sem-ok));box-shadow:0 0 7px hsl(var(--sem-ok)/.55)}
+#enginesZone .etx{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+#enginesZone .etx b{font-size:12px;font-weight:600}
+#enginesZone .etx small{font-size:10px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 收展按钮：24×24 方块，箭头随状态翻 */
+#enginesZone .topfold{flex:none;width:24px;min-width:24px;height:24px;padding:0;
+  display:inline-flex;align-items:center;justify-content:center}
+/* 机器数据那一排（横排的小片，会自己换行）
+   ⚠⚠⚠ 2026-10-07 用户实测三连后重做（"粗暴向下变大 / 遮挡下面内容 / 有闪烁"）：
+     ① 这一行现在【常驻在 DOM 里】（以前折叠时根本不渲染）⇒ 折叠才有东西可过渡。
+     ② 折叠 = 收起高度（max-height 28→0）+ 淡出 + 负 margin 抵消那个 7px 间距，
+        所以它是【平滑收起来】的，不再"瞬间往下跳一大块、压住下面的内容"。
+     ③ ⚠⚠ 把原来那句 `animation:etRowIn` 从【基础态】挪走了 —— 这是闪烁的真凶：
+        基础态带 animation 的话，只要节点被重建/重排就会重播一次淡入+上滑；
+        而这个卡片以前每 1.5 秒重建一次顶条 ⇒ 每 1.5 秒闪一下。
+        现在动画只挂在 .rc-top.topped 上（只在"用户刚点展开"那一刻加、var(--m-slow) 后摘掉）。
+     ⚠ 别再给基础态加 animation。 */
+#enginesZone .specline{
+  /* ⚠⚠⚠ 2026-10-07 用户实测："在我们展开机器状态的时候，它的上面的引擎没启动、启动引擎的按钮
+     和展开机器状态的按钮，它会被向下移动一下。我希望这个不要向下移动，而是只是向下展开机器状态。"
+     真因：这一行以前是【正常流】里的一个块 ⇒ 它一出现就把上面那一排往下顶，同时把顶栏撑高。
+     ⇒ 改成【绝对定位】钉在顶栏的下缘：absolute 子元素【不占父容器高度】，
+       所以那一排按钮的位置永远不动，展开的只是"这一行自己"。
+     ⚠ 顶栏的高度变化改由 padding-bottom 过渡来做（见 .rc-top 的 padding 过渡），
+       给这一行腾出地方 —— 也就是"往下展开机器状态"而不是"把按钮往下挤"。
+     ⚠ 别改回正常流：那样按钮又会被顶下去。
+     ⚠⚠ 定位用【bottom:6px】而不是 top:100%：
+       顶栏的下内边距是 6px，所以 bottom:6px 正好贴在"内边距盒的底部"= 框内。
+       上一版用 top:100%（= 贴着顶栏的底边外沿）⇒ 那一行正好压在下边框上，
+       看着像"硬件信息被挪到框外面去了"（用户原话）。
+     ⚠ max-height 既是"展开时的上限"也是"折叠时的终点"：实测一行芯片 18px，
+       给 46px = 够放两行（窄一点的环境芯片会换行），写 28px 第二行会被切。 */
+  position:absolute;left:16px;right:16px;bottom:6px;
+  display:flex;flex-wrap:wrap;align-items:center;gap:5px 10px;
+  max-height:46px;overflow:hidden;
+  transition:opacity var(--m-fast) var(--ease-out),max-height var(--m-base) var(--ease-out);
+}
+#enginesZone .rc-top.folded .specline{opacity:0;max-height:0}
+#enginesZone .rc-top.topped .specline{animation:etRowIn var(--m-base) var(--ease-out) both}
+@keyframes etRowIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+#enginesZone .specline.dim{font-size:10px;color:var(--tx2)}
+/* 一个机器数据小片：图标 名称 值 [细条] [百分比] */
+#enginesZone .specchip{display:inline-flex;align-items:center;gap:5px;min-width:0;
+  height:18px;font-size:10px;color:var(--tx2)}
+#enginesZone .specchip .sc-i{flex:none;display:flex;opacity:.75}
+#enginesZone .specchip .sc-k{flex:none}
+#enginesZone .specchip .sc-v{flex:none;color:var(--tx);font-variant-numeric:tabular-nums;
+  white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+#enginesZone .specchip .sc-bar{flex:none;width:38px;height:3px;border-radius:0px;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .12);overflow:hidden}
+#enginesZone .specchip .sc-bar>i{display:block;height:100%;border-radius:0px;
+  background:hsl(var(--accent));transition:width var(--m-slow) var(--ease-out)}
+#enginesZone .specchip .sc-x{flex:none;font-variant-numeric:tabular-nums;opacity:0.75}
+/* ── 旧的两个类留着（别的地方可能还引用），这里只保证不会画成两条竖排 ── */
+#enginesZone .specrow{display:flex;align-items:center;gap:6px;height:16px;font-size:10px;min-width:0}
+#enginesZone .specrow .sbar{flex:none;width:52px;height:4px;border-radius:4px;background:hsl(var(--accent-hsl, 211 100% 68%) / .1);overflow:hidden}
+#enginesZone .specrow .sbar>i{display:block;height:100%;border-radius:4px;
+  background:hsl(var(--accent));transition:width var(--m-slow) var(--ease-out)}
+
+/* ── 二级内容页 ── */
+/* ⚠⚠ 2026-10-05 用户："我觉得字体的缩放有点问题，感觉锐度不对。"
+ *   这条 `will-change:transform` 就是两个真凶之一：
+ *   它把整页提成【常驻合成层】，文字走 GPU 栅格化；
+ *   而页面一进来 / 一滚动 / 一换页，渲染路径在"有层"和"没层"之间切，
+ *   两次栅格化的字重看起来就不一样 —— 用户感觉到的"锐度跳变"。
+ *   ⇒ 按项目规范（docs/14「不设常驻 will-change，动画播完就该释放」）拿掉。
+ *   ⚠ 换页动画本身还走 transform，浏览器会临时提层，动完自己释放 ——
+ *     不需要常驻，性能也不亏（这一页的动画只有换页那一下）。
+ *   ⚠ 另一个真凶是半像素字号（8.5/9.5/10.5/11.5/12.5px），已全部取整套回
+ *     docs/14 的字阶（9/11/13/15/17/22 里就近取值）。两处一起改才有效果。 */
+#enginesZone .tp{position:absolute;inset:0;display:flex;flex-direction:column}
+#enginesZone .tp-head{flex:none;padding:14px 16px 0}
+#enginesZone .tp-headline{display:flex;align-items:center;gap:8px}
+#enginesZone .tp-title{font-size:15px;font-weight:600;line-height:1.2}
+#enginesZone .tp-sub{margin-top:2px;font-size:10px;color:var(--tx2)}
+#enginesZone .tp-body{
+  flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;
+  overscroll-behavior:contain;padding:8px 16px 10px;
+  display:flex;flex-direction:column;gap:2px;
+}
+#enginesZone .tp-body::-webkit-scrollbar{display:none}
+/* ⚠⚠ .tp-body 是 flex 列容器，肚子里的块默认会被"挤压"——
+   统一 flex:none，让它们保自然高、由 .tp-body 自己滚。
+   （老的 .ec-dbody 踩过这个：压成 0 之后 scrollHeight 量出来是 22 而不是真实值。） */
+#enginesZone .tp-body>*{flex:none}
+
+/* ═══ 通用零件 ═══ */
+#enginesZone .sec{display:flex;flex-direction:column;gap:6px}
+#enginesZone .sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+#enginesZone .sec-h h4{font-size:12px;font-weight:600;letter-spacing:.2px}
+#enginesZone .sec-h em{font-size:10px;font-style:normal;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#enginesZone .hintline{display:flex;align-items:flex-start;gap:6px;font-size:10px;line-height:1.55;color:var(--tx2)}
+#enginesZone .hintline>svg{flex:none;margin-top:1px}
+#enginesZone .hintline.warn{color:hsl(var(--sem-warn))}
+#enginesZone .row{
+  display:flex;align-items:center;gap:8px;min-height:34px;padding:6px 9px;
+  border-radius:8px;background:hsl(var(--accent-hsl, 211 100% 68%) / .03);border:1px solid var(--line-faint);
+}
+#enginesZone .row .rl{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+#enginesZone .row .rl b{font-size:11px;font-weight:600}
+#enginesZone .row .rl small{font-size:10px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#enginesZone .row .rc{flex:none;display:flex;align-items:center;gap:6px}
+#enginesZone .btn{
+  display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;line-height:1;
+  border-radius:8px;border:1px solid var(--line);
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .07);color:var(--tx);
+  font:inherit;font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer;
+  transition:background var(--m-fast) var(--ease-soft),border-color var(--m-fast),transform var(--m-fast) var(--ease-out);
+}
+#enginesZone .btn:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .14);border-color:var(--line-strong)}
+#enginesZone .btn:active{transform:scale(.97)}
+#enginesZone .btn:disabled{opacity:0.5;cursor:default}
+/* ⚠⚠ 2026-10-07 用户实测指出："外观里有一个统一深色，有一块东西没有关联上原来的彩色和统一深色，
+   所以它的颜色出了问题。" 查证结果就是下面这几处：
+     · 原来写死 hsl(211 100% 68%)（一个固定蓝）—— 这个值【就是】--accent-hsl 的默认值，
+       等于把代币的默认值抄了一遍。用户改「主题色」时它不跟着走，就成了"没关联上"。
+       ⚠ tokens.css:94-101 记过同一类教训：2026-09-14 之前全项目 23 处写死 rgba(90,169,255,…)，
+         改主题色时一个都不变（用户当时实测："为什么不影响选中高亮色"）。
+   ⇒ 一律改成 hsl(var(--accent-hsl, 211 100% 68%) / …)，跟 ui.html 里 30 多处的写法一致。
+   ⚠⚠ 千万别写成 hsl(var(--accent) / …)：--accent 是【完整十六进制色 #5aa9ff】，
+     塞进 hsl() 里算不出颜色（我第一版就这么写的，等于把按钮写没了）。
+     要带透明度的主题色只能用 --accent-hsl（三分量）。 */
+#enginesZone .btn.pri{background:hsl(var(--accent-hsl, 211 100% 68%) / .22);border-color:hsl(var(--accent-hsl, 211 100% 68%) / .45)}
+#enginesZone .btn.pri:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .32)}
+#enginesZone .btn.done{background:hsl(var(--sem-ok)/.22);border-color:hsl(var(--sem-ok)/.45)}
+
+/* ── 可折叠的一节（2026-10-05 用户："详细配置…要允许折叠和收纳，默认是收纳的状态"）──
+ * ⚠ 收起来时【一个数据都不印】—— 这就是"收纳"。
+ * ⚠ 用 <button> 当标题行（键盘能按、能读屏），不是 div 绑 onclick。
+ * ⚠ 展开/收起【重画整页】（见 engines-card.js 的 detail-fold 分支）——
+ *   这一节的高度变化很大，留着旧滚动位置反而会跳到半截。 */
+#enginesZone .fold{
+  display:flex;flex-direction:column;
+  border-radius:8px;background:hsl(var(--accent-hsl, 211 100% 68%) / .03);border:1px solid var(--line-faint);
+  overflow:hidden;
+}
+#enginesZone .fold-h{
+  display:flex;align-items:center;gap:8px;width:100%;height:32px;padding:0 9px;
+  border:0;background:transparent;color:var(--tx);font:inherit;font-size:11px;font-weight:600;
+  text-align:left;cursor:pointer;
+  transition:background var(--m-fast) var(--ease-soft);
+}
+#enginesZone .fold-h:hover{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)))}
+#enginesZone .fold-h:focus-visible{outline:2px solid hsl(var(--accent));outline-offset:-2px}
+#enginesZone .fold-h .fold-t{flex:1;min-width:0}
+#enginesZone .fold-h .fold-x{flex:none;display:flex;color:var(--tx2);opacity:.75}
+#enginesZone .fold-b{padding:2px 10px 10px;border-top:1px solid var(--line-faint)}
+
+/* 「详细配置」里的键值对：左边名、右边值。
+ * ⚠ 用现成的字阶（10.5 / 11px），【不用 9.5 这种半像素】—— 见下面锐度那段说明。 */
+#enginesZone .kvlist{display:flex;flex-direction:column;gap:0}
+#enginesZone .kv{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  min-height:26px;padding:5px 0;
+}
+#enginesZone .kv + .kv{border-top:1px solid var(--line-faint)}
+#enginesZone .kv-k{flex:none;font-size:11px;color:var(--tx2)}
+#enginesZone .kv-v{min-width:0;font-size:11px;color:var(--tx);text-align:right;
+  overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+
+/* ── 模型文件那一块 ──
+ * ⚠ 一行一个模型：状态点 + 名字 + 状态字。不印文件名 / 哈希（那是日志的事）。 */
+#enginesZone .mrow-head{
+  display:flex;align-items:baseline;gap:8px;min-width:0;
+  padding:7px 9px;border-radius:8px;background:hsl(var(--accent-hsl, 211 100% 68%) / .04);
+}
+#enginesZone .mrow-head .mh-k{flex:none;font-size:10px;color:var(--tx2)}
+#enginesZone .mrow-head .mh-v{min-width:0;font-size:11px;color:var(--tx);overflow-wrap:anywhere}
+#enginesZone .mlist{display:flex;flex-direction:column;gap:0}
+#enginesZone .mrow{
+  display:flex;align-items:center;gap:8px;min-height:28px;padding:5px 9px;
+  border-radius:8px;
+}
+#enginesZone .mrow + .mrow{border-top:1px solid var(--line-faint)}
+#enginesZone .mrow .m-dot{
+  flex:none;width:7px;height:7px;border-radius:50%;
+  background:var(--tx2);opacity:0.5;
+}
+#enginesZone .mrow.on .m-dot{background:hsl(var(--sem-ok));opacity:1;box-shadow:0 0 7px 1px hsl(var(--sem-ok)/.5)}
+#enginesZone .mrow.bad .m-dot{background:hsl(var(--sem-warn));opacity:1}
+#enginesZone .mrow .m-name{flex:1;min-width:0;font-size:11px;color:var(--tx2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#enginesZone .mrow.on .m-name{color:var(--tx)}
+#enginesZone .mrow .m-state{flex:none;font-size:10px;color:var(--tx2)}
+#enginesZone .mrow.on .m-state{color:hsl(var(--sem-ok))}
+#enginesZone .mrow.bad .m-state{color:hsl(var(--sem-warn))}
+
+/* 探测到的东西 */
+#enginesZone .probe{display:flex;flex-wrap:wrap;gap:4px}
+#enginesZone .probe>span{
+  display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:4px;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .05);border:1px solid var(--line-faint);
+  font-size:10px;color:var(--tx2);
+}
+#enginesZone .probe>span i{font-style:normal;color:var(--tx3,rgba(255,255,255,.42))}
+#enginesZone .probe>span.wide{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 三档总表（配置信息页） */
+#enginesZone .tbl{display:flex;flex-direction:column;gap:3px}
+#enginesZone .tr{
+  display:grid;grid-template-columns:46px 1fr 40px 18px;gap:8px;align-items:center;
+  height:30px;padding:0 9px;border-radius:8px;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .03);border:1px solid transparent;font-size:10px;
+}
+#enginesZone .tr.on{background:hsl(var(--accent-hsl, 211 100% 68%) / .07);border-color:var(--line)}
+#enginesZone .tr .tn{font-weight:600}
+#enginesZone .tr .td{display:flex;align-items:center;gap:5px;color:var(--tx2);min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#enginesZone .tr .t-size{text-align:right;color:var(--tx2);font-variant-numeric:tabular-nums}
+#enginesZone .tr .ta{display:flex;justify-content:flex-end;color:hsl(var(--sem-ok))}
+
+/* 三档横幅（能力页顶部）
+ * ⚠⚠ 2026-10-05：瘦成【一行】。原来两行 48px，而页头本来就在写
+ *   「高性能 / 要 N 卡」—— banner 把同一句话说了两遍。
+ *   现在只有：状态标记 + 一句话 + 按钮。 */
+#enginesZone .tbanner{
+  display:flex;align-items:center;gap:8px;min-width:0;
+  padding:6px 9px;border-radius:8px;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .04);border:1px solid var(--line-faint);
+}
+#enginesZone .tbanner.has{border-color:hsl(var(--sem-ok)/.32);background:hsl(var(--sem-ok)/.07)}
+#enginesZone .tbanner.err{border-color:hsl(var(--sem-warn)/.32);background:hsl(var(--sem-warn)/.07)}
+#enginesZone .tbanner .tbn{
+  flex:none;display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .1);white-space:nowrap;
+}
+#enginesZone .tbanner.has .tbn{color:hsl(var(--sem-ok))}
+#enginesZone .tbanner.err .tbn{color:hsl(var(--sem-warn))}
+/* ⚠ 2026-10-07：这一行原来 nowrap + 省略号 —— 而它左边有"装好了"徽章、右边有"启动引擎"
+   按钮，剩下给它只有 154px，实测那句话要 315px ⇒ 被砍成「引擎没启动 —— 模型文件都在，…」。
+   用户定的方向是【换行，别截断】（跟右栏那条同一个要求）⇒ 改成允许换行，信息不丢。
+   代价：横幅会变高一点（内容自己撑，不影响功能）。 */
+#enginesZone .tbanner .tbt{flex:1;min-width:0;font-size:10px;color:var(--tx2);
+  white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.4}
+#enginesZone .tbanner .tbr{flex:none;display:flex;align-items:center;gap:5px;font-size:10px;color:hsl(var(--sem-ok))}
+
+/* ── 一样能力 = 一行（收起式，2026-10-05）──
+ * ⚠⚠ 原来每样能力把整套设置项全铺开印在页面上 → 这一页实测 2379px、可视 291px，
+ *   用户要滚七屏半（他原话："还是留了大量的要滚动的内容"）。
+ *   现在：收起时只有一行（约 26px），点开才展开说明和设置项。
+ * ⚠ 收起态【不渲染】设置项 HTML（capBlock 里判 expanded），所以节点数也少了几百个。
+ * ⚠⚠⚠ 这里【不能】写 overflow:hidden —— 展开态的 .cb-head 是 position:sticky，
+ *   而被 overflow:hidden 的祖先会把它自己的盒子变成 scrollport，
+ *   sticky 会退化成"钉在 .capblk 里"= 完全不动（正是用户报的"那个栏没有"）。
+ *   圆角改用 border-radius 各自给，不靠裁切。 */
+#enginesZone .capblk{
+  display:flex;flex-direction:column;gap:0;
+  border-radius:12px;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .03);border:1px solid var(--line-faint);
+  transition:border-color var(--m-base) var(--ease-soft),background var(--m-base) var(--ease-soft);
+  /* 2026-10-07 用户实测（原话）：
+     “已内置它会变成深色，然后会有一个动画下来，因为我们已内置的边缘是圆角，
+      但是这个动画是一个方形的收回。”
+     ⇒ 说的是：展开/收起时那块内容【突破了块的圆角】，看着是方的。
+     真因：上面那条注释写着「这里不能写 overflow:hidden」——展开态的 .cb-head 是 sticky，
+       而 overflow:hidden 会把祖先变成 scrollport，让 sticky 退化成「钉在块里」（历史坑）。
+     ⇒ CSS 还有【overflow:clip】：它【裁切、却不当滚动容器】，
+       所以既能裁掉方角，又不破坏 sticky。这正是这里要的东西。
+     ⚠ 别改成 overflow:hidden（sticky 会坏）；⚠ 也别删掉它（方角就回来了）。 */
+  overflow:clip;
+}
+/* ⚠ 2026-10-07：同上，写死的蓝改成主题代币（见上面 .btn.pri 那段注释，别写成 --accent） */
+#enginesZone .capblk.focus{border-color:hsl(var(--accent-hsl, 211 100% 68%) / .5);background:hsl(var(--accent-hsl, 211 100% 68%) / .07)}
+/* ⚠ 闪一下走 JS 加 class + 定时摘。
+   不给"已存在的元素"直接加 class 播 animation —— 那会先画终态再播、闪两次（项目里踩过）。 */
+/* ⚠ 2026-10-07：闪光的颜色原来也写死 hsl(211 100% 68%)，跟着主题色走才对
+   （这是"点格子跳到某样能力"时的提示光 —— 主题色换了它不换就成了错颜色）。 */
+#enginesZone .capblk.flash{animation:ecFlash .9s var(--ease-soft) 1}
+@keyframes ecFlash{
+  0%{box-shadow:0 0 0 0 hsl(var(--accent-hsl, 211 100% 68%) / .5)}
+  55%{box-shadow:0 0 0 5px hsl(var(--accent-hsl, 211 100% 68%) / 0)}
+  100%{box-shadow:0 0 0 0 hsl(var(--accent-hsl, 211 100% 68%) / 0)}
+}
+/* 标题行本身是个按钮（整行可点 = 展开/收起）
+ * ⚠⚠ 2026-10-05：收起态做成【单行 26px】。
+ *   原来标题里 form 和 name+plain 是上下两行 → 每行 47px，
+ *   8 样就是 376px，加 banner 一屏（291px）根本放不下（实测要滚 265px）。
+ *   现在收起态一行装下：图标 + 形态名 + 说明 + 箭头。
+ *   展开态才恢复成上下两行（那时有空间了，也不差这一点）。 */
+/* ⚠⚠ 2026-10-05 用户："左侧的展开的UI和收起来的UI，有一部分间距不同，互相叠压，
+ *   有重合或者有轻微的挤压。"
+ *   真因（量出来的）：收起态左内边距 8px、展开态 9px、正文 10px ——
+ *   **三个值都不一样**，所以一点开，标题里的图标和文字会横着挪一格，
+ *   看起来就像"两套界面没对齐、挤在一起"。
+ *   ⇒ 统一成一个值：左右都 9px（下面 .cb-body 的左右也是 9px）。
+ *   ⚠ 以后再往里加东西，左右内边距【只能用这 9px】—— 别再各写各的。 */
+#enginesZone .capblk .cb-head{
+  display:flex;align-items:center;gap:8px;min-width:0;width:100%;
+  height:26px;padding:0 9px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;
+  cursor:pointer;transition:background var(--m-fast) var(--ease-soft);
+}
+/* ⭐⭐ 展开时【吸顶】（用户 10-05 原话："某一个展开之后我往下滑，
+   它顶部会留有一个方便我收纳的那个栏，就是在我滚动的时候被顶到顶上就不会再被滚走的那个栏"）。
+   ⚠ 展开态必须给它一个【不透明底】—— 滚动时底下有内容经过，
+     透明的话文字会叠在一起糊成一片（看着像 bug）。
+   ⚠ sticky 的 top 是相对 .tp-body（滚动容器）的，top:0 就贴在滚动区顶边。
+   ⚠ z-index 要压过后面滚上来的能力块。 */
+#enginesZone .capblk.open .cb-head{
+  position:sticky;top:0;z-index:3;
+  height:30px;padding:0 9px;
+  border-radius:8px 10px 0 0;
+  /* ⚠⚠⚠ 2026-10-07 用户实测："这些卡片在收起来的时候是正常的，一旦我展开它们就会变成跟我们刚才说的一样的黑色。"
+     真因（实测）：这一条展开态是【粘顶的标题带】，原来是 hsl(var(--card-h) 9% / .96) + blur(10px)：
+       · 亮度只有 9%、不透明度 .96 ⇒ 在亮色主题（比如用户选的红色）下它是一块【几乎不透明的暗带】，
+         而卡片其他地方是亮的 ⇒ 看着就是"展开就变黑"。（默认深绿主题下两者都暗，所以以前不明显。）
+       · 那层 blur(10px) 在这里【没有用】：本层已经 96% 不透明，几乎不透东西，只是白烧一次合成。
+     ⇒ 提亮到 13%（比卡片底 8% 略亮一档：它要压住下面滚上来的内容，但不能再是"黑带"），
+       颜色仍走 --card-h 代币（跟卡片同色系），去掉那层没用的模糊。
+     ⚠ 别改回 9%/.96 —— 那是"变成黑色"的本身。 */
+  background:hsl(var(--card-h,220 28%) 13% / .96);
+  box-shadow:inset 0 -1px 0 var(--line-faint);
+}
+#enginesZone .capblk .cb-head:hover{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)))}
+#enginesZone .capblk.open .cb-head:hover{background:hsl(var(--card-h,220 28%) 16% / .97)}
+/* 展开态的内边距挪到 head 之后的正文上（head 要满宽才能吸顶时铺满）
+ * ⚠⚠ 左右必须是 9px，跟上面的 .cb-head 对齐（见那条注释：三个不一样的值就是"挤压"的真因）。 */
+#enginesZone .capblk .cb-body{
+  display:flex;flex-direction:column;gap:8px;
+  padding:2px 9px 10px;
+}
+#enginesZone .capblk:not(.open) .cb-body{display:none}
+#enginesZone .capblk .cb-i{flex:none;color:var(--tx2);display:flex}
+#enginesZone .capblk .cb-t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+#enginesZone .capblk .cb-t b{font-size:12px;font-weight:600}
+#enginesZone .capblk .cb-t i{font-size:10px;font-style:normal;color:var(--tx2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 收起态：那一行横着排（形态名 + 说明同一行） */
+#enginesZone .capblk:not(.open) .cb-t{flex-direction:row;align-items:baseline;gap:7px}
+#enginesZone .capblk:not(.open) .cb-t b{flex:none}
+#enginesZone .capblk:not(.open) .cb-t i{flex:1;min-width:0}
+#enginesZone .capblk .cb-s{flex:none}
+#enginesZone .capblk:not(.open) .tagswap{display:none}
+/* 展开箭头 */
+#enginesZone .capblk .cb-x{flex:none;display:flex;color:var(--tx2);opacity:0.75;
+  transition:opacity var(--m-fast),transform var(--m-fast) var(--ease-out)}
+#enginesZone .capblk .cb-head:hover .cb-x{opacity:1}
+#enginesZone .tagswap{
+  display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:4px;
+  font-size:10px;font-style:normal;white-space:nowrap;
+  background:hsl(var(--sem-warn)/.14);color:hsl(var(--sem-warn));border:1px solid hsl(var(--sem-warn)/.3);
+}
+#enginesZone .capblk .cb-set{margin-top:2px}
+
+/* ── 展开区里「说明」/「设置」两个分块（2026-10-05 用户要求分门别类）──
+ * 用户原话："现在排版的节奏和空间冗余太低了…有大量的非常高密度的信息和巨量的文字说明。
+ *   我希望说明放到一起，路径放到一起，设置放到一起。"
+ * ⚠ 以前说明和设置项是【一坨】排下来的，没有分界，扫过去全是一样的灰字。
+ *   现在每块有个小标题 + 上方一条细线，眼睛能一眼分开"这是解释"和"这是能改的"。 */
+#enginesZone .cbb{display:flex;flex-direction:column;gap:6px}
+#enginesZone .cbb + .cbb{margin-top:10px;padding-top:10px;border-top:1px solid var(--line-faint)}
+#enginesZone .cbb-h{font-size:10px;font-weight:600;color:var(--tx2);letter-spacing:.3px}
+/* 说明文字：行高放宽到 1.7（原来 1.55 太挤），块间距 6px —— "空间冗余"就是从这里来的 */
+#enginesZone .capblk .noteline{
+  font-size:11px;line-height:1.7;color:var(--tx2);overflow-wrap:anywhere;
+}
+#enginesZone .capblk .noteline.warn{color:hsl(var(--sem-warn))}
+
+/* ── 配置页的「这台机器能跑到哪一档」结论块（2026-10-05）──
+ * ⚠ 这一页原来 808px、可视 291px，要滚 1.8 屏，而且滚出来的是
+ *   Python / onnxruntime / DirectML 这些运行时名字。现在只留一句结论 + 占用空间。 */
+#enginesZone .verdict{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:12px;border-radius:12px;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .05);border:1px solid var(--line-faint);
+}
+#enginesZone .verdict .vd-i{flex:none;color:var(--accent);display:flex;margin-top:1px}
+#enginesZone .verdict .vd-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;line-height:1.4}
+#enginesZone .verdict .vd-t b{font-size:13px;font-weight:600}
+#enginesZone .verdict .vd-t small{font-size:10px;color:var(--tx2)}
+
+/* 「回左边点格子」那块留白提示 */
+#enginesZone .goto-left{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  padding:16px 14px;border-radius:12px;text-align:center;
+  border:1px dashed var(--line-faint);
+}
+#enginesZone .goto-left .gl-t{font-size:12px;font-weight:600}
+#enginesZone .goto-left .gl-s{font-size:10px;color:var(--tx2);line-height:1.6}
+
+/* 内嵌的设置项（宿主给的那块 HTML） */
+#enginesZone .ec-settings{display:flex;flex-direction:column;gap:6px}
+#enginesZone .ec-settings .settings-grid{gap:7px 8px}
+
+/* ⭐⭐ 2026-10-06 docs/150 §5.1（Phase B）：配置页新布局的四个钩子。
+ *   [data-engine-status] 状态条 / [data-env-row] 环境行 / [data-models-summary] 模型行 /
+ *   引擎设置折叠。DOM 全在、只用 [hidden] 收起（§三-1 隐藏不移除）。 */
+#enginesZone [hidden]{display:none!important}
+#enginesZone .engstatus{
+  display:flex;flex-direction:column;gap:2px;padding:7px 12px;border-radius:12px;
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .05);border:1px solid var(--line-faint);
+}
+#enginesZone .engstatus .engline2{display:flex;align-items:center;gap:8px;min-height:32px;min-width:0}
+#enginesZone .engstatus .estx i{font-style:normal;font-size:11px;color:var(--tx2)}
+/* ⭐ Phase F：一级卡面的能力框色（名字格）——绿=引擎在跑 / 黄=校色无增强 / 灰=抠像没起。
+ *   ⚠⚠ 选择器【不能】写 #enginesZone：一级卡面在 .block-card[data-card="engines"] 里，
+ *     而 #enginesZone 是它的二级容器 —— 写错前缀规则永远不命中（探针一度只查了类名没查计算样式，
+ *     差点把"框根本没画出来"放过去）。框在 .ec-stack 里，就锚 .ec-stack。 */
+.ec-stack .ec-cname[data-cap-frame]{border-radius:4px;padding:2px 5px;transition:box-shadow var(--m-fast) var(--ease-soft);box-shadow:inset 0 0 0 1.5px transparent}
+.ec-stack .ec-cname.frame-ok{box-shadow:inset 0 0 0 1.5px hsl(var(--sem-ok)/.95);background:hsl(var(--sem-ok)/.12)}
+.ec-stack .ec-cname.frame-degraded{box-shadow:inset 0 0 0 1.5px hsl(var(--sem-warn)/.95);background:hsl(var(--sem-warn)/.12)}
+.ec-stack .ec-cname.frame-off{box-shadow:inset 0 0 0 1.5px hsl(var(--accent-hsl, 211 100% 68%) / .3)}
+/* ⭐ Phase F：能力块里的"引擎状态 + 启动/停止"一行 */
+#enginesZone .cb-engine{display:flex;align-items:center;gap:8px;padding:7px 9px;margin-bottom:8px;border-radius:8px;background:hsl(var(--accent-hsl, 211 100% 68%) / .04);border:1px solid var(--line-faint)}
+#enginesZone .cb-engine .cbe-t{flex:1;min-width:0;font-size:11px;color:var(--tx2);overflow-wrap:anywhere}
+#enginesZone .cb-engine .cbe-t b{color:var(--tx);font-weight:600}
+#enginesZone .cb-engine .cbe-a{flex:none;display:flex;gap:6px}
+#enginesZone .engstatus .edot{flex:none;box-sizing:border-box;width:8px;height:8px;border-radius:50%;border:2px solid var(--tx3,hsl(var(--accent-hsl, 211 100% 68%) / .35));background:transparent}
+#enginesZone .engstatus .edot.ok{border-color:hsl(var(--sem-ok));background:hsl(var(--sem-ok));box-shadow:0 0 7px hsl(var(--sem-ok)/.55)}
+#enginesZone .engstatus .estx{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+#enginesZone .engstatus .estx b{font-size:12px;font-weight:600}
+#enginesZone .engstatus .estx small{font-size:10px;color:var(--tx2)}
+#enginesZone .engstatus .eacts{flex:none;display:flex;gap:6px}
+#enginesZone .envwrap{padding:9px 12px;border-radius:12px;background:hsl(var(--accent-hsl, 211 100% 68%) / .05);border:1px solid var(--line-faint)}
+#enginesZone .envrow{display:flex;align-items:center;gap:12px;min-width:0;flex-wrap:wrap}
+#enginesZone .envrow .envcell{display:flex;align-items:baseline;gap:6px;min-width:0}
+#enginesZone .envrow .ek{font-size:10px;color:var(--tx2)}
+#enginesZone .envrow .ev{font-size:11px;font-weight:600}
+#enginesZone .envrow .ev.ok{color:hsl(var(--sem-ok))}
+#enginesZone .envrow .envact{margin-left:auto;flex:none}
+#enginesZone .envrow .envnote{font-size:10px;color:var(--tx2)}
+/* ⚠ 2026-10-08：`.envrow .envact` 是 margin-left:auto（把按钮推到最右）。
+   加速那一行要的是【按钮在左、勾选框跟在后面】，所以把 auto 收回来。 */
+#enginesZone .envrow-accel{margin-top:7px;gap:9px;align-items:center}
+#enginesZone .envrow-accel .envact{margin-left:0}
+/* 主按钮（开启加速）：这是这一页用户最该点的那一颗，要看得出来 */
+#enginesZone .eng-btn.pri{
+  background:hsl(var(--accent-hsl, 211 100% 68%) / .16);
+  border-color:hsl(var(--accent-hsl, 211 100% 68%) / .45);
+  color:hsl(var(--accent-hsl, 211 100% 68%));font-weight:600;
+}
+#enginesZone .eng-btn.pri:hover{background:hsl(var(--accent-hsl, 211 100% 68%) / .3)}
+#enginesZone .eng-btn[disabled]{opacity:0.5;cursor:default}
+/* ☐ 下次自动开 */
+#enginesZone .envcheck{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--tx2);cursor:pointer;user-select:none}
+#enginesZone .envcheck input{margin:0;width:12px;height:12px;accent-color:hsl(var(--accent-hsl, 211 100% 68%));cursor:pointer}
+/* 一条实时进度线：只在真干活的时候出现（平时这一页是干净的）。
+   ⚠ 圆点要动起来 —— 用户在等一件可能要好几分钟的事（下 3GB），
+     一个静止的画面和"卡死了"长得一模一样。 */
+#enginesZone .envlive{
+  display:flex;align-items:center;gap:7px;margin-top:7px;
+  font-size:11px;color:var(--tx);min-width:0;
+}
+#enginesZone .envlive > span{min-width:0;overflow-wrap:anywhere}
+#enginesZone .envdot-live{
+  flex:none;width:7px;height:7px;border-radius:50%;
+  background:hsl(var(--accent-hsl, 211 100% 68%));
+  animation:envlive 1.05s ease-in-out infinite;
+}
+@keyframes envlive{0%,100%{opacity:0.3;transform:scale(.75)}50%{opacity:1;transform:scale(1.1)}}
+/* ⚠ 2026-10-20 删掉了这里的 prefers-reduced-motion 规则：用户 Windows 关了「显示动画」，它会把这条动画静默掐掉（同 reference-card.css 那条的教训） */
+#enginesZone .modelsec .mrow-head{flex-wrap:wrap;gap:6px 8px}
+#enginesZone .modelsec .mh-acts{margin-left:auto;display:flex;gap:6px;flex:none}
+#enginesZone .modelsec .mlist{padding-top:6px}
+#enginesZone .modelsec .mlist .mdl-list{display:flex;flex-direction:column;gap:0}
+
+/* ═══ 2026-10-18 云端外挂（docs/237）═══════════════════════════════════════
+   用户：「在外挂能力卡片的左上角……新建一个和千问的开关一样……打开了之后，和本地相关的部署的内容全部都冻结，变为灰色」
+   ⚠ 开关按钮复用 .ps-crumb-qwen（样式在 ui.html：跟顶部拖动横条一样高 14px、上沿对齐 top:10px），这里只管摆位置。 */
+.block-card[data-card="engines"] .ec-cloudsw{
+  position:absolute; left:14px; top:10px; height:14px; z-index:7;
+  pointer-events:none; display:flex; align-items:stretch;
+  /* 兜底：最宽只到拖动横条（宽 130px、居中）左边再留 8px —— 卡再窄也只会被截短，不会压上横条 */
+  max-width:calc(50% - 65px - 22px);
+}
+.block-card[data-card="engines"] .ec-cloudsw .ec-cloud-btn{
+  min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis;
+}
+/* 冻结区：还在、看得见、点不动（灰）。⚠ 不删节点 —— 关掉云端时要原样回来 */
+#enginesZone .ec-local-frozen{
+  opacity:0.3; filter:grayscale(1); pointer-events:none; user-select:none;
+}
+#enginesZone .ec-frozen-note{
+  display:flex; align-items:center; gap:6px; margin:8px 0 6px;
+  font-size:11px; color:var(--tx2); line-height:1.4;
+}
+#enginesZone .ec-frozen-note > span{min-width:0}
+#enginesZone .ec-cloud-verdict.ok .vd-i{color:hsl(142 60% 52%)}
+#enginesZone .ec-cloud-verdict:not(.ok) .vd-i{color:hsl(38 92% 58%)}
+#enginesZone .ec-cloud-acts .rc{display:flex; gap:6px; flex:none}
+#enginesZone .ec-cloud-eng .cbe-t b{color:hsl(var(--accent-hsl, 211 100% 68%))}

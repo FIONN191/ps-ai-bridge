@@ -1,0 +1,1122 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="utf-8">
+<title>轮椅 V7</title>
+<!-- ⭐ 2026-10-18 新手教程（docs/243）：⚠ 必须是页面里【第一个】脚本 —— 它要在任何脚本读存储、建 uiwin 之前，
+     先把 ?tutorial=1 的界面切到假 PS / 假后台 / 断网 / 单独存储。平时（没有 ?tutorial）第一行就退出，什么都不做。 -->
+<script src="tutorial-host.js"></script>
+<script src="tutorial-engine.js"></script>
+<!-- ⭐ 2026-10-20（docs/256 F2）：拦掉浏览器刷新键（Ctrl+R / F5），一按就整个界面重载、任务和输入全丢 -->
+<script src="reload-guard.js"></script>
+<!-- ⭐ 2026-10-22（docs/263 第 16 条）：统一的时间 / 数字写法（几分钟前、千分位）。纯函数，放前面谁都能用 -->
+<script src="ui-format.js"></script>
+<!-- ⭐ 2026-10-22（docs/263 第 9 条）：提交类按钮防双击（只吞系统判定为双击的第二下，正常连点照常一下一单） -->
+<script src="submit-guard.js"></script>
+<!-- ⭐ 2026-10-22（docs/263 第 7 条）：悬停弹出统一「停 120ms 才弹、开着时挪到隔壁立刻换」 -->
+<script src="hover-delay.js"></script>
+<!-- ⭐ 2026-10-22（docs/263 1.6）：JS 动画三档时长 +「减少动画」开关 + 列表增删 / 内容切换 / 数值变化的小动画 -->
+<script src="motion-tokens.js"></script>
+<!-- ⭐ 2026-10-22（docs/263 2.5）：被截断的文字（… 和 N 行截断），鼠标停上去自动给出全文 -->
+<script src="overflow-title.js"></script>
+<!-- ⚠⚠ tokens.css 必须【第一个】加载：--dur / --ease-out / --tx 这些全在里面，
+     少了它所有动画时长变 0、文字没颜色。2026-09-14 栽过一次（批量脚本漏了主窗口）。 -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="ui-select.css">
+<link rel="stylesheet" href="icons.css">
+<link rel="stylesheet" href="preset-references.css">
+<!-- 2026-10-18：旧参考图弹窗 reference-dialog.css/.js 已删（新参考图卡取代，用户定）。摘要那一行的样式搬进了 preset-references.css。 -->
+<link rel="stylesheet" href="reference-card.css"><!-- 参考图卡（2026-10-13：参考图改常驻，取代弹窗） -->
+<link rel="stylesheet" href="glow-tool.css">
+<link rel="stylesheet" href="semantic-selection.css">
+<link rel="stylesheet" href="project-schedule.css">
+<link rel="stylesheet" href="vendor/litegraph-0.7.18/css/litegraph.css">
+<link rel="stylesheet" href="canvas-workbench.css">
+<link rel="stylesheet" href="region-workbench.css">
+<link rel="stylesheet" href="dlss-tool.css">
+<script src="dlss-runtime.js"></script>
+<script src="dlss-tool.js"></script>
+<link rel="stylesheet" href="camera-light.css">
+<link rel="stylesheet" href="creative-tools.css">
+<script src="creative-effects.js"></script>
+<script src="creative-poster-templates.js"></script>
+<script src="assets/creative/poster-templates.js"></script>
+<script src="assets/creative/hemisynth-templates.js"></script>
+<script src="creative-tools-core.js"></script>
+<script src="creative-tools-store.js"></script>
+<script src="creative-tools-media.js"></script>
+<script src="creative-presets.js"></script>
+<script src="creative-tools.js"></script>
+<link rel="stylesheet" href="setup-center.css">
+<!-- ⭐ 2026-10-14：云功能闸门（未登录时账号/积分/云同步/云备份/客服/社区变灰不可点）。
+     ⚠ 公告【不在】被锁之列 —— 它不登录也要能读。见 cloud-gate.css 的文件头说明。 -->
+<link rel="stylesheet" href="cloud-gate.css">
+<!-- ⚠ 2026-10-14：tutorial.css / tutorial.js 跟着「使用教程」卡一起删了（用户定：教程要重做）。
+     重做时把这两行加回来，并恢复 ui-pure/tutorial.js 和 tutorial.css（清单见 docs/217）。 -->
+<link rel="stylesheet" href="card-architecture.css">
+<link rel="stylesheet" href="main-card-shortcuts.css">
+<link rel="stylesheet" href="free-mode-ui.css">
+<!-- ⭐⭐ 2026-10-14：平台公告模块（每次启动拉一次 + 本地缓存离线可用）。
+     ⚠⚠ 必须排在【主脚本之前】—— 主脚本末尾的 announceBoot() 一跑就要用 window.V7Announce。
+     我第一版把它放在了文件底部那段卡面脚本区（那其实在主脚本【之后】），
+     结果 announceBoot 跑的时候 V7Announce 还是 undefined，
+     【静默什么都不做】—— 界面上看不出任何异常，只有那个启动探针（__announceBoot）
+     能看出 hasModule:false。这是这个项目最典型的静默失效，记在这儿。 -->
+<script src="announce.js"></script>
+<!-- ⭐ 2026-10-15：阿吉价目表（美元/张，后端 /v1/public/aji-prices）。生成卡估算 + 记录卡算花费都读它。
+     ⚠ 同公告：必须在主脚本之前 —— 主脚本里 modelUnitPrice / 记录核心的价目来源要用 window.V7AjiPrices。 -->
+<script src="aji-prices.js"></script>
+<script src="card-architecture.js"></script>
+<!-- ⭐ 2026-10-11：传回的组标注色 + 完成音效（照 V6 搬，用户要求）。
+     ⚠ 必须排在 card-architecture.js 之后 —— 设置卡的字段表要用它的颜色清单。 -->
+<script src="return-appearance.js"></script>
+<script src="return-lab-ui.js"></script>
+<link rel="stylesheet" href="return-lab-ui.css">
+<script src="main-card-shortcuts.js"></script>
+<link rel="stylesheet" href="preset-field-history.css">
+<link rel="stylesheet" href="manual-center.css">
+<script src="setup-window.js"></script>
+<script src="setup-center.js"></script>
+<script src="preset-field-history.js"></script>
+<script src="vendor/litegraph-0.7.18/build/litegraph.core.min.js"></script>
+<script src="canvas-store.js"></script>
+<script src="canvas-runtime.js"></script>
+<script src="canvas-workbench.js"></script>
+<script src="browser-preferences.js"></script>
+<script src="browser-bookmarks.js"></script>
+<link rel="stylesheet" href="browser-preferences.css">
+<script src="region-workbench-core.js"></script>
+<script src="region-workbench-store.js"></script>
+<script src="region-workbench-media.js"></script>
+<script src="region-workbench-runtime.js"></script>
+<script src="region-workbench.js"></script>
+<script src="vendor/three-0.160.1/build/three.min.js"></script>
+<script src="camera-light-core.js"></script>
+<script src="camera-light-store.js"></script>
+<script src="camera-light-scene.js"></script>
+<script src="camera-light.js"></script>
+<script src="icons.js"></script>
+<script src="motion.js"></script>
+<script src="storage-namespace.js"></script>
+<script src="free-layout-core.js"></script>
+<script src="product-data.js"></script>
+<script src="project-manager.js"></script>
+<script src="project-schedule.js"></script>
+<script src="eagle-archive.js"></script>
+<script src="history-prompts.js"></script>
+<script src="v6-history-migration.js"></script>
+<script src="history-library.js"></script>
+<link rel="stylesheet" href="history-library.css">
+<script src="workspaces.js"></script>
+<script src="network-doctor.js"></script>
+<script src="image-scopes.js"></script>
+<script src="seam-review.js"></script>
+<link rel="stylesheet" href="image-scopes.css">
+<link rel="stylesheet" href="workspaces.css">
+<script src="checkpoints.js"></script>
+<!-- ⭐ 记录与恢复卡（2026-09-30）：纯逻辑先在 core（能被 node 单测），渲染在 card。
+     ⚠ 顺序不能反 —— card 启动时要读 V7RecordsCore。 -->
+<script src="records-core.js"></script>
+<link rel="stylesheet" href="records-card.css">
+<script src="records-card.js"></script>
+<link rel="stylesheet" href="settings-card.css">
+<script src="settings-card.js"></script>
+<!-- ⭐ 2026-10-20 设置卡顶上的搜索框：全拼字表 + 模糊打分（拼音首字母表 pinyin-initials.js 在下面预设那组里） -->
+<script src="pinyin-full.js"></script>
+<script src="fuzzy-search.js"></script>
+<!-- ⭐ 外挂能力卡（2026-10-01）：分层同记录卡 —— 纯逻辑在 core（node 可单测），渲染在 card。
+     ⚠ 顺序不能反：card 建实例时要读 V7EnginesCore。 -->
+<script src="engines-core.js"></script>
+<link rel="stylesheet" href="engines-card.css">
+<script src="engines-card.js"></script>
+<script src="cache-settings.js"></script>
+<script src="assistant-runtime.js"></script>
+<!-- 夏三六黑匣子（2026-10-17 夜）：每圈请求、每个工具、卡在哪，一行一件事写进磁盘；要在 assistant-panel.js 之前 -->
+<script src="agent-trace.js"></script>
+<script src="assistant-generation.js"></script>
+<script src="assistant-proactive.js"></script>
+<script src="knowledge-base.js"></script>
+<script src="manual-content.js"></script>
+<script src="manual-center.js"></script>
+<script src="assistant-panel.js"></script>
+<link rel="stylesheet" href="assistant.css">
+<!-- ⭐ 2026-10-17 夏三六（docs/231）：提示词 / 中间人 / 二级大卡 + 主卡卡面。
+     ⚠ 顺序：要在 assistant-panel.js 之后、floating-bars.js 之前（悬浮框一加载就订阅中间人）。 -->
+<script src="agent-prompt.js"></script>
+<script src="agent-service.js"></script>
+<script src="agent-zone.js"></script>
+<link rel="stylesheet" href="agent-ui.css">
+<!-- ⭐ 2026-10-18 深夜：问题反馈卡的样式（脚本在下面 backend-client.js 后面 —— 它一加载就订阅登录状态） -->
+<link rel="stylesheet" href="feedback-card.css">
+<link rel="stylesheet" href="community-card.css">
+<!-- ui-css:begin —— 主样式：按顺序加载 ui-main/css/ 下 8 个文件（顺序 = 原来的先后，别调）-->
+<link rel="stylesheet" href="ui-main/css/01-base.css">
+<link rel="stylesheet" href="ui-main/css/02-forms-cards.css">
+<link rel="stylesheet" href="ui-main/css/03-perf-errors.css">
+<link rel="stylesheet" href="ui-main/css/04-tasks.css">
+<link rel="stylesheet" href="ui-main/css/05-popups-preview.css">
+<link rel="stylesheet" href="ui-main/css/06-settings-engines.css">
+<link rel="stylesheet" href="ui-main/css/07-presets.css">
+<link rel="stylesheet" href="ui-main/css/08-prompt-input.css">
+<!-- ui-css:end -->
+<link rel="stylesheet" href="floating-bars.css">
+<link rel="stylesheet" href="workspace-stack-rail.css">
+</head>
+<body>
+<nav class="v7-primary-nav" id="v7PrimaryNav" aria-label="主要功能">
+  <button type="button" data-v7-primary="generation" aria-current="page"><span data-icon-static="wand"></span><span>生成台</span></button>
+  <button type="button" data-v7-primary="settings"><span data-icon-static="gear"></span><span>设置中心</span></button>
+  <button type="button" data-v7-primary="records"><span data-icon-static="scroll"></span><span>记录与恢复</span></button>
+  <button type="button" data-v7-primary="tools"><span data-icon-static="package"></span><span>工具箱</span></button>
+</nav>
+<div class="anchor">
+  <div id="stack" style="position:relative;width:300px;height:400px;">
+    <!-- 修图/特效/合成/上课 四张占位主卡已于 2026-09-08 移除(见 docs/22)。
+         它们只会弹一句"（占位）"，属于假入口。功能做出来时按 docs/22 的规矩逐张加回。 -->
+    <div class="block-card" data-b="0" data-card="generation" data-bgkey="card.generation" data-bglabel="生成" data-bgtype="main">
+      <div class="dragbar" data-dragbar=""><span class="db-line"></span></div>
+      <button class="collapse-toggle" data-collapse-toggle="" aria-label="折叠面板" title="折叠面板" aria-expanded="true" data-collapsed="false"></button>
+      <!-- ⚠ 生成卡跟别的主卡不同(2026-09-11 用户定案): 常用参数直接放卡面上，不用开三级。
+           标题压成一行(图标+名字+描述横排)，腾出的高度全给参数区；
+           原来那个 150px 高的 .bc-thumb 只是个装饰占位(没有任何 JS 用它)，已去掉。 -->
+      <div class="bc-inner gc-inner">
+        <!-- ⭐ 2026-09-13：标题从【顶部】搬到【底部】(gc-foot)。
+             理由：主卡叠压时只露出最下面 34px —— 标题在顶部的话，
+             一叠压就全被上面那张盖住，分不清下面压着哪几张卡。
+             底栏同时显示 张数·分辨率·比例·模型（原来这些在别处显示，一并收到这里）。 -->
+        <div class="gc-fields" data-generation-fields=""></div>
+        <div class="gc-foot">
+          <span class="gc-foot-ico" data-icon-static="wand"></span>
+          <span class="gc-foot-name">生成</span>
+          <span class="gc-foot-info"></span>
+        </div>
+        <!-- ⚠「打开生成」按钮 2026-09-11 移除: 参数已经全在卡面上，它只剩"打开三级"一个作用，
+             而三级本来就能从卡片右滑推进打开 —— 留着纯占地方。 -->
+      </div>
+    </div>
+    <!-- ⚠ 预设卡跟别的主卡【不是一套逻辑】(用户 2026-09-10 定案, 见 docs/28):
+         卡面整个是剪影画布, 没有 bc-inner / bc-thumb / bc-corebtn;
+         二级不是 4 张分区卡而是 1 张长列表卡(#presetZone);
+         三级要点了预设才出现。渲染全部交给 preset-ui.js, 这里只留一个空壳。 -->
+    <div class="block-card" data-b="1" data-card="presets" data-bgkey="card.presets" data-bglabel="预设" data-bgtype="main">
+      <div class="dragbar" data-dragbar=""><span class="db-line"></span></div>
+      <button class="collapse-toggle" data-collapse-toggle="" aria-label="折叠面板" title="折叠面板" aria-expanded="true" data-collapsed="false"></button>
+      <!-- .ps-canvas / .ps-crumb / .ps-gear 由 preset-ui.js 注入 -->
+    </div>
+    <div class="block-card" data-b="2" data-card="settings" data-bgkey="card.settings" data-bglabel="设置" data-bgtype="main">
+      <div class="dragbar" data-dragbar=""><span class="db-line"></span></div>
+      <button class="collapse-toggle" data-collapse-toggle="" aria-label="折叠面板" title="折叠面板" aria-expanded="true" data-collapsed="false"></button>
+      <!-- ⭐ 2026-09-13 改造：学生成卡的做法 —— 卡面直接放最常用的开关，
+           标题泉到底栏（叠压时只露出最下面 34px，标题在顶部等于看不见）。
+           ⭐ 卡面控件一律用 data-setting= ，和设置页共用同一个 settingsRuntime，
+             两边改哪边都同步 —— 跟生成卡那两个（抓取分辨率/传回图层）一模一样。 -->
+      <div class="bc-inner bc-compact">
+        <div class="bc-fields" data-settings-fields=""></div>
+        <div class="bc-foot">
+          <span class="bc-foot-name">设置</span>
+          <span class="bc-foot-info" data-settings-foot=""></span>
+        </div>
+      </div>
+      <!-- ⚠⚠ 2026-09-13 这里删掉了一个 bc-thumb 空框（内容是个 🛠）—— 用户实测"莫名其妙的占位框"。
+           那是老版式留下的 150px 纯装饰空框（没有任何 JS 读它），而这张卡改成卡面放开关之后
+           它正好压在开关上面 —— 既是个看不懂的空盒子，还挡住下面开关的点击命中。
+           生成卡 2026-09-11 就删过同一个东西，这两张卡当时漏了。 -->
+    </div>
+    <!-- ⭐ 第 4 张主卡：外挂能力(2026-09-12 用户要的)。
+         管所有"装了才有、不装也能用"的东西：校色加速引擎、各种模型、
+         以及它们各自的能力开关。
+         ⚠ 加主卡的三步规矩见 docs/22：① 这段 HTML ② ZONE_SETS 同位置加一组
+           ③ fillDetailBody 加分支。少一步会明着显示"没接入详情渲染器"。 -->
+    <div class="block-card" data-b="3" data-card="engines" data-bgkey="card.engines" data-bglabel="外挂能力" data-bgtype="main">
+      <div class="dragbar" data-dragbar=""><span class="db-line"></span></div>
+      <button class="collapse-toggle" data-collapse-toggle="" aria-label="折叠面板" title="折叠面板" aria-expanded="true" data-collapsed="false"></button>
+      <div class="bc-inner bc-compact">
+        <div class="bc-fields" data-engines-fields=""></div>
+        <div class="bc-foot">
+          <span class="bc-foot-name">外挂能力</span>
+          <span class="bc-foot-info" data-engines-foot=""></span>
+        </div>
+      </div>
+      <!-- ⚠⚠ 2026-09-13 这里删掉了一个 bc-thumb 空框（带 data-engines-badge，内容是个破折号）。
+           同设置卡：150px 装饰空框，压在开关上面。
+           而且 data-engines-badge 从来没接线（引擎状态是写在底栏 [data-engines-foot] 里的），
+           它显示的那个"—"永远是"—"，属于假信息。 -->
+    </div>
+    <!-- ⭐ 第 5 张主卡：项目时间线（包括从任务栏收起的历史）。
+         列出全部缓存（包括从任务栏收起的），点了能恢复到任务栏。
+         ⚠ 加主卡的三步规矩见 docs/22：① 这段 HTML ② ZONE_SETS 同位置加一组
+           ③ fillDetailBody 加分支。少一步会明着显示"没接入详情渲染器"。 -->
+    <div class="block-card" data-b="4" data-card="history" data-bgkey="card.history" data-bglabel="记录与恢复" data-bgtype="main">
+      <div class="dragbar" data-dragbar=""><span class="db-line"></span></div>
+      <button class="collapse-toggle" data-collapse-toggle="" aria-label="折叠面板" title="折叠面板" aria-expanded="true" data-collapsed="false"></button>
+      <div class="bc-inner bc-compact">
+        <!-- 列表区：由 JS 填充 -->
+        <div class="bc-fields" data-history-list=""></div>
+        <div class="bc-foot">
+          <span class="bc-foot-name">记录与恢复</span>
+          <span class="bc-foot-info" data-history-foot=""></span>
+        </div>
+      </div>
+    </div>
+    <div class="block-card" data-b="5" data-card="projects" data-bgkey="card.projects" data-bglabel="项目" data-bgtype="main">
+      <div class="dragbar" data-dragbar=""><span class="db-line"></span></div>
+      <button class="collapse-toggle" data-collapse-toggle="" aria-label="折叠面板" title="折叠面板" aria-expanded="true" data-collapsed="false"></button>
+      <div class="bc-inner bc-compact">
+        <div class="bc-fields" data-category-fields="projects"></div>
+        <div class="bc-foot"><span class="bc-foot-name">项目</span><span class="bc-foot-info">项目 · 日程 · Eagle</span></div>
+      </div>
+    </div>
+    <div class="block-card" data-b="6" data-card="assistant" data-bgkey="card.assistant" data-bglabel="助手" data-bgtype="main">
+      <div class="dragbar" data-dragbar=""><span class="db-line"></span></div>
+      <button class="collapse-toggle" data-collapse-toggle="" aria-label="折叠面板" title="折叠面板" aria-expanded="true" data-collapsed="false"></button>
+      <div class="bc-inner bc-compact">
+        <div class="bc-fields" data-category-fields="assistant"></div>
+        <div class="bc-foot"><span class="bc-foot-name">助手</span><span class="bc-foot-info">直接开工 · 快捷指令 · 对话</span></div>
+      </div>
+    </div>
+    <div class="block-card" data-b="7" data-card="debug" data-bgkey="card.debug" data-bglabel="调试" data-bgtype="main">
+      <div class="dragbar" data-dragbar=""><span class="db-line"></span></div>
+      <button class="collapse-toggle" data-collapse-toggle="" aria-label="折叠面板" title="折叠面板" aria-expanded="true" data-collapsed="false"></button>
+      <div class="bc-inner bc-compact">
+        <div class="bc-fields" data-category-fields="debug"></div>
+        <div class="bc-foot"><span class="bc-foot-name">调试</span><span class="bc-foot-info">运行状态 · 报错 · 日志</span></div>
+      </div>
+    </div>
+    <!-- ⭐ 2026-10-18 深夜：第 9 张主卡「问题反馈」（用户：「新增一个问题反馈卡片 默认打开 … 可以贴图片 … 直接到服务器」，docs/248）。
+         卡面由 feedback-card.js 画（[data-feedback-face]）；右滑 = 单张大二级 #feedbackZone（写长的、贴截图、诊断信息、发送），没有三级。 -->
+    <div class="block-card" data-b="8" data-card="feedback" data-bgkey="card.feedback" data-bglabel="问题反馈" data-bgtype="main">
+      <div class="dragbar" data-dragbar=""><span class="db-line"></span></div>
+      <button class="collapse-toggle" data-collapse-toggle="" aria-label="折叠面板" title="折叠面板" aria-expanded="true" data-collapsed="false"></button>
+      <div class="bc-inner bc-compact">
+        <div class="bc-fields" data-feedback-face=""></div>
+        <div class="bc-foot"><span class="bc-foot-name">问题反馈</span><span class="bc-foot-info">写问题 · 贴截图 · 直接发到后台</span></div>
+      </div>
+    </div>
+    <!-- ⭐ 2026-10-20：第 10 张主卡「社区」（用户：「把社区单独做一个卡片…显示今天社区有多热闹…从社区卡片进到社区网页」）。
+         卡面由 community-card.js 画（[data-community-face]）；右滑 = 单张大二级 #communityZone（排行榜 / 热门分享 / 进社区网页），没有三级。
+         ⚠ 放在最后一张：前面九张的序号不能动（有地方按序号认卡）。 -->
+    <div class="block-card" data-b="9" data-card="community" data-bgkey="card.community" data-bglabel="社区" data-bgtype="main">
+      <div class="dragbar" data-dragbar=""><span class="db-line"></span></div>
+      <button class="collapse-toggle" data-collapse-toggle="" aria-label="折叠面板" title="折叠面板" aria-expanded="true" data-collapsed="false"></button>
+      <div class="bc-inner bc-compact">
+        <div class="bc-fields" data-community-face=""></div>
+        <div class="bc-foot"><span class="bc-foot-name">社区</span><span class="bc-foot-info">谁在修图 · 排行榜 · 大家的分享</span></div>
+      </div>
+    </div>
+    <!-- ⚠⚠⚠ 2026-10-14：原「使用教程」主卡（data-card="tutorial"）在这里，【已删除】。
+         用户定：「现在在开发阶段，教程和首次启动的东西到时候都需要重做」——
+         教程整块要重做，半成品留着比删掉更坏（铁律 16）。
+         ⚠ 重做时要恢复的是这一整块卡面 + card-registry.js 的条目 + cards/card-tutorial.js，
+           清单见 docs/217。这一块原来长这样（index 8）：
+             <div class="block-card" data-b="8" data-card="tutorial"
+                  data-bgkey="card.tutorial" data-bglabel="使用教程" data-bgtype="main"> … </div> -->
+  </div>
+  <div id="collapsePill" class="collapse-pill" aria-hidden="true">
+    <!-- 初始图标跟第一张主卡保持一致(现在是"生成")。展开/切卡时由 updateCollapsePill 动态改。 -->
+    <span class="pill-icon" id="collapsePillIcon" data-icon="wand"></span>
+    <span class="pill-label" id="collapsePillLabel">修图</span>
+    <button class="pill-toggle" id="collapsePillToggle" aria-label="展开面板" title="展开面板" data-collapsed="false"></button>
+  </div>
+
+  <!-- 二级分区: 外框(.zone)不动, 内容层(.z-body)翻转换新 -->
+  <div id="zones" class="zones">
+    <div class="zone" data-z="0" data-bgkey="zone.generation.prompt" data-bglabel="分区1" data-bgtype="zone"><div class="z-body"><span class="z-ic"></span><div><div class="z-name">调色</div><div class="z-sub">色相 · 曲线</div></div></div></div>
+    <div class="zone" data-z="1" data-bgkey="zone.generation.refimage" data-bglabel="分区2" data-bgtype="zone"><div class="z-body"><span class="z-ic"></span><div><div class="z-name">裁剪</div><div class="z-sub">重构图</div></div></div></div>
+    <div class="zone" data-z="2" data-bgkey="zone.generation.results" data-bglabel="分区3" data-bgtype="zone"><div class="z-body"><span class="z-ic"></span><div><div class="z-name">抠图</div><div class="z-sub">发丝 · 边缘</div></div></div></div>
+    <div class="zone" data-z="3" data-bgkey="zone.generation.help" data-bglabel="分区4" data-bgtype="zone"><div class="z-body"><span class="z-ic"></span><div><div class="z-name">精修</div><div class="z-sub">细节·质感</div></div></div></div>
+    <!-- ⚠ 预设卡专用的二级: 一张跟主卡齐高的长卡, 不是 4 张小卡。
+         故意做成 #zones 的子元素并带 class="zone" —— 这样 .zones.show / .closing /
+         弹出光 / 收回动画【全部白嫖现成的】, 不用改交互主干(docs/28 §5.2)。
+         带 .pzone 是给所有遍历 .zone 的地方用的跳过标记。 -->
+    <div class="zone pzone" id="presetZone" data-bgkey="zone.presets.list" data-bglabel="预设列表" data-bgtype="zone"><div class="z-body pz-body"></div></div>
+    <!-- ⚠ 路线 A(2026-09-11 第三版): 从剪影卡右滑弹出的【提示词框】是一张【真正的二级卡】，
+         宽 200 跟别的二级一样, 是 #zones 的子元素 → 切主卡时跟其它二级一起联动换内容,
+         不会再出现"一级接三级"的怪样子。之前是借用 #detail 挪位置(.as-zone), 已废弃。
+         带 .pzone 同样是给遍历 .zone 的地方跳过用; 带 .qzone 区分它和列表卡。 -->
+    <div class="zone pzone qzone" id="promptZone" data-bgkey="zone.presets.prompt" data-bglabel="提示词" data-bgtype="zone"><div class="z-body qz-body"></div></div>
+    <!-- ⭐ 记录与恢复卡的二级（2026-09-30）：540×400 一张大卡，不是四小张。
+         和 #presetZone 同一个套路 —— 做成 #zones 的子元素 + class="zone"，
+         出场 / 弹出光 / 收回动画全部白嫖现成的。
+         带 .pzone = 所有遍历 .zone 的地方跳过它；再带 .rzone 区分它和预设列表卡。 -->
+    <div class="zone pzone rzone" id="recordsZone" data-bgkey="zone.records.all" data-bglabel="记录与恢复" data-bgtype="zone"></div>
+    <!-- ⭐ 设置卡的二级（2026-10-01）：540×400 一张大卡，左边内容 + 右边点阵导航。
+         和 #recordsZone 同一个套路 —— #zones 的子元素 + class="zone"，
+         出场 / 弹出光 / 收回动画全部白嫖现成的。
+         带 .pzone = 所有遍历 .zone 的地方跳过它；.szone 区分它和记录卡。
+         ⚠ 槽位名沿用 'all'（原「设置·全部」），主题包里 zone.settings.all 继续有效。 -->
+    <div class="zone pzone szone v7-big-zone" id="settingsZone" data-bgkey="zone.settings.all" data-bglabel="设置" data-bgtype="zone"></div>
+    <!-- ⭐ 外挂能力卡的二级（2026-10-01）：540×400 一张大卡，左边内容 + 右边档位梯子。
+         和 #recordsZone / #settingsZone 同一个套路 —— #zones 的子元素 + class="zone"，
+         出场 / 弹出光 / 收回动画全部白嫖现成的。
+         带 .pzone = 遍历 .zone 的地方跳过它；.ezone 区分它和另外两张单卡。
+         ⚠ 槽位名沿用 'all'（原「外挂·全部」），主题包里 zone.engines.all 继续有效。 -->
+    <div class="zone pzone ezone" id="enginesZone" data-bgkey="zone.engines.all" data-bglabel="外挂能力" data-bgtype="zone"></div>
+    <!-- ⭐ 生成卡的二级（2026-10-15 用户定「把二级目录删掉，换成和别的卡片一样的二级大卡片，三级不要了」）：
+         540×400 一张大卡，左边内容 + 右边导航，【跟设置卡用同一个组件 V7SettingsCard】，样式同一份。
+         带 .pzone = 遍历 .zone 的地方跳过它；.gzone 区分它和另外几张单卡。
+         ⚠ 槽位名 'all'（新）；原来四格的 zone/detail.generation.prompt|refimage|results|help 仍登记成「保留背景」，
+           主题包里给那几格设过的图不会丢（见 bgSlotList 的 historical）。 -->
+    <div class="zone pzone gzone v7-big-zone" id="generationZone" data-bgkey="zone.generation.all" data-bglabel="生成" data-bgtype="zone"></div>
+    <!-- ⭐ 助手卡的二级（2026-10-17 夏三六，D02「助手改成单张大二级，取消三级」）：540×400，左边内容 + 右边导航，
+         内容由 V7AgentZone 画（agent-zone.js）。带 .pzone = 遍历 .zone 的地方跳过它；.azone 区分它和另外几张单卡。
+         ⚠ 槽位名 'all'（新）；原来四格的 zone/detail.assistant.chat|connection|permissions|recovery 仍登记成「保留背景」。 -->
+    <div class="zone pzone azone" id="assistantZone" data-bgkey="zone.assistant.all" data-bglabel="助手" data-bgtype="zone"></div>
+    <!-- ⭐ 问题反馈卡的二级（2026-10-18 深夜）：540×400，左边内容（写问题 / 截图 / 诊断信息 / 发送）+ 右边导航，
+         组件同生成卡（V7SettingsCard），内容由 V7Feedback.renderPage 画。带 .pzone = 遍历 .zone 的地方跳过它；.fzone 区分它。 -->
+    <div class="zone pzone fzone v7-big-zone" id="feedbackZone" data-bgkey="zone.feedback.all" data-bglabel="问题反馈" data-bgtype="zone"></div>
+    <!-- ⭐ 2026-10-20：社区卡的单张大二级（同问题反馈卡：V7SettingsCard 组件，内容由 V7Community.renderPage 画） -->
+    <div class="zone pzone fzone v7-big-zone" id="communityZone" data-bgkey="zone.community.all" data-bglabel="社区" data-bgtype="zone"></div>
+  </div>
+
+  <div id="detail" class="detail-card has-navigation" data-bgkey="detail.generation.prompt" data-bglabel="详情卡" data-bgtype="detail">
+    <nav class="v7-detail-nav" aria-label="当前位置">
+      <button type="button" data-v7-nav-back="" aria-label="返回原入口" title="返回原入口" disabled=""><span data-icon-static="arrowLeft"></span></button>
+      <span class="v7-detail-crumb" data-v7-nav-crumb="">生成台</span>
+      <button type="button" data-v7-nav-expand="" aria-label="扩大工作区" title="扩大工作区" aria-pressed="false" hidden=""><span data-icon-static="arrowUpRight"></span></button>
+      <button type="button" data-v7-nav-close="" aria-label="收起详情" title="收起详情"><span data-icon-static="close"></span></button>
+    </nav>
+    <div class="dc-scroll">
+      <!-- ⚠ .dc-slide = 整体滑动层。切换分区时【整卡内容作为一个整体】上下滑动,
+           跟二级卡的 .z-body 同一套语言(外框不动, 内容整体滑, 靠 .dc-scroll 裁切)。
+           标题也在里面, 所以标题跟着一起滑。 -->
+      <div class="dc-slide">
+        <div class="dc-name">调色</div>
+        <!-- 内容区由 JS 动态填: 正式分区参数与动作状态 -->
+        <div id="dcBody"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ 弹窗堆叠区(统一, Popup 管理器驱动) ═══ -->
+<!-- #popupLock: 交互锁定遮罩 —— 弹窗期间盖住 anchor 下半区, 禁止点其他卡片 -->
+<div id="popupLock" class="popup-lock"></div>
+<!-- #popupStack: 弹窗卡(主卡叠压边界下, 定位由 Popup.stackEdge 算) -->
+<div id="popupStack" class="popup-stack">
+</div>
+<!-- ⚠ 报错堆: 必须放 body 下(不在 anchor 内) —— anchor 的 z-index:5 会限制内部元素,
+     导致报错卡(L4)永远盖不过 body 下的 popupLock(830)遮罩 → 主按钮点不到 → 卡死。 -->
+<div id="errors" class="errors"></div>
+<!-- 任务堆: 也放 body 下, 跟报错堆保持坐标一致(错开逻辑要跨两个堆) -->
+<div id="tasks" class="tasks"></div>
+
+<!-- L4 Blocking: 全屏冻结(必须在 body 下, position:fixed 才能真全屏) -->
+
+<!-- 大图查看已搬到独立的显示器级冻结窗口 viewer-window.html。
+     主窗口是死的 1020×1100，留在这里的 fixed 层铺不满屏幕，做不到真全屏冻结。 -->
+
+<!-- ⚠ 适配层必须在主脚本【之前】加载：它负责建立 window.uiwin。
+     ui.html 里大量代码写在 if(window.uiwin){...} 里(拖拽/点击穿透/__uiHitTest)，
+     没有它整块不执行 —— 表现就是"穿透、点按、拖拽全失灵"，且不报任何错。
+     Electron 走 preload.js 注入 uiwin，不需要这个文件，它会自己识别没有 __TAURI__ 就退出。
+     2026-09-08 踩过：新界面另起炉灶时漏了这行，只有废弃的旧 index.html 有。 -->
+<!-- tutorial-host.js 已挪到页面最前面（必须早于所有脚本） -->
+<script src="tauri-adapter.js"></script>
+<!-- 账号、积分、Provider 和任务计费控制面。令牌只保留在当前进程内存。 -->
+<script src="version.js"></script>
+<script src="backend-client.js"></script>
+<!-- ⭐ 2026-10-18 深夜：问题反馈卡（卡面 + 大二级内容 + 发送；宿主胶水在下面搜 feedbackCardMount，docs/248）。
+     ⚠ 必须在 backend-client.js 后面：一加载就订阅登录状态（换账号换草稿）。 -->
+<script src="feedback-card.js"></script>
+<!-- ⭐ 2026-10-20：社区卡（卡面 + 大二级；宿主胶水搜 communityCardMount）。⚠ 也要在 backend-client.js 后面（订阅登录状态） -->
+<script src="community-card.js"></script>
+<!-- ⭐ 2026-10-18 深夜：界面缩放（设置 → 外观 → 界面大小；真正干活的是外壳 ui_scale.rs）。⚠ 要在 tauri-adapter.js 后面（用 uiwin.uiScale） -->
+<script src="ui-scale.js"></script>
+<!-- ⭐ 2026-10-19（docs/250 第 4 条）：分清「鼠标真的移到缩略图上」和「滚轮翻卡时图从静止的鼠标底下滑过来」 -->
+<script src="hover-intent.js"></script>
+<!-- ⭐ 2026-10-18 云端外挂（docs/237）：把发给本机引擎（127.0.0.1:37894/37893）的请求改发到云端。
+     ⚠ 必须在所有调引擎的脚本（match-engine / matting-engine / tween / 文字选区 / 夏三六…）【之前】装上：
+       谁要是先把 window.fetch 存了一份，它就会绕开改道、静默地还连本机。
+     ⚠ 装上时还没读设置 ⇒ 一律放行；cloudToolsConfigure() 接好设置之后才开始改道。 -->
+<script src="cloud-tools.js"></script>
+<script>try{ if(window.V7CloudTools) V7CloudTools.install(); }catch(_){}</script>
+<!-- 遥测（2026-10-01）：必须在 backend-client.js 之后 —— 它要读 V7Backend 的地址；
+     也必须在 error-report.js 之前 —— 报错要往这里送。
+     ⚠ 用户可关（设置里给开关）。关掉后连 boot 事件都不发。
+     隐私过滤两端都做：这里先洗一遍（隐私不离开本机），服务端再洗一遍（不信客户端）。 -->
+<script src="telemetry.js"></script>
+<script src="account-center.js"></script>
+<link rel="stylesheet" href="account-center.css">
+<script src="community-presence.js"></script>
+<script src="account-recovery.js"></script>
+<script src="community-center.js"></script>
+<script src="first-run-contract.js"></script>
+<script src="workflow-scheduler.js"></script>
+<script src="runninghub-client.js"></script>
+<script src="workflow-runtime.js"></script>
+<!-- 报错管家: 全项目唯一的报错出口(错误码表 + 分级 + 联网探测 + 全局兜底)。
+     排在最前面, 因为后面任何一个脚本加载失败都要靠它的全局兜底报出来。
+     分级规矩见 docs/31_报错分级规范.md -->
+<script src="error-report.js"></script>
+<!-- 2026-10-18 在线更新（界面一半；Rust 一半在 app_update.rs，docs/244）。只用 uiwin.update 和 ERR，放在 error-report.js 后面 -->
+<script src="app-update.js"></script>
+<!-- 2026-10-18 用到的模型与许可证（关于软件里列出来） -->
+<script src="model-credits.js"></script>
+<!-- 2026-10-18 新手教程：章节表（启动器要知道有哪些章、哪章是新的）+ 启动器（首次自动弹、设置里「重新看教程」）。教程里那份界面不启用启动器 -->
+<script src="tutorial-chapters.js"></script>
+<script src="tutorial-launcher.js"></script>
+<!-- 图片管家必须最先加载：所有图片进出都过它，见 docs/21_性能开销优化守则.md -->
+<script src="image-store.js"></script>
+<script src="glow-core.js"></script>
+<script src="glow-tool.js"></script>
+<script src="glow-integration.js"></script>
+<script src="semantic-selection-ui.js"></script>
+<script src="semantic-selection.js"></script>
+<!-- 夏三六看图量坐标 + 按坐标建选区（2026-10-17）：跟上面一样走 linkQueue，所以放这里 -->
+<script src="agent-look.js"></script>
+<!-- 夏三六工具箱：PS 全套 / 引擎查修 / 上网 / 写计划 / 问用户（2026-10-17 晚，同样走 linkQueue） -->
+<script src="agent-tools.js"></script>
+<!-- 夏三六 · 软件接口：设置 / 账号 / 生图模型 / 任务栏 / 记录 / 抠像人体解析 / 痕迹检测 / 示波器（2026-10-17 夜；接线在主脚本 agentAppHost） -->
+<script src="agent-app-tools.js"></script>
+<!-- 校色/对齐算法(档 1，纯 CPU 无依赖)。纯函数、不碰 DOM，
+     可以在 Node 里直接跑数值测试 —— 校色对不对不能靠肉眼看图。 -->
+<script src="color-match.js"></script>
+<script src="color-tools-core.js"></script>
+<script src="color-tools-store.js"></script>
+<script src="color-tools.js"></script>
+<link rel="stylesheet" href="color-tools.css">
+<script src="batch-queue-core.js"></script>
+<script src="batch-queue-store.js"></script>
+<script src="batch-queue.js"></script>
+<link rel="stylesheet" href="batch-queue.css">
+<!-- 三档调度: 探活外部引擎、按真实能力选档、失败一律回落档 1。
+     ⚠ 必须排在 color-match.js 之后 —— 它回落时要用档 1 的算法。 -->
+<script src="match-engine.js"></script>
+<script src="engine-environment-ui.js"></script>
+<script src="engine-models-ui.js"></script>
+<!-- 抠像调度层。⚠ 和校色不同：它没有本机兜底，没模型就是做不了（见文件头） -->
+<script src="matting-engine.js"></script>
+<!-- ⭐ 引擎/环境/模型状态的【唯一出口】（docs/150 §4.1，Phase A）。
+     ⚠ 必须排在 matting-engine.js 之后：它读 MATTINGENGINE 的快照。
+     ⚠ 外挂卡/调试卡/错误跳转/设置卡以后【只读它】，不许自己再判一遍。 -->
+<script src="engine-status.js"></script>
+<script src="bg-manager.js"></script>
+<!-- 预设系统: 数据层 → 拼音表 → 界面层。顺序不能反(界面层启动时要用另外两个)。
+     设计文档 docs/28_预设系统设计.md -->
+<script src="v6-migration.js"></script>
+<!-- V6 Forge 预设 → 云端通用模板 + 参数（docs/220）。preset-store.js 导入/升级 V6 Forge 预设时用。 -->
+<script src="forge-preset-convert.js"></script>
+<!-- 内置 Forge→ComfyUI 目录的 file:// 兼容副本。由构建脚本从 JSON 生成，
+     预设数据层优先读取它，避免 Electron/Tauri 禁止 fetch(file://...)。 -->
+<script src="workflows/forge-comfyui-catalog.js"></script>
+<!-- ⭐ 2026-10-15 千问模式：引擎（7 条千问 2.1 流程）/ 98 个出厂提示词 / 模式本身。⚠ 要在 preset-store.js 前面 -->
+<script src="workflows/qwen-engine.js"></script>
+<script src="qwen-factory-presets.js"></script>
+<script src="qwen-mode.js"></script>
+<!-- ⭐ 2026-10-15 云端官方预设同步（登录后自动拉；报错栏出结果） -->
+<script src="cloud-presets.js"></script>
+<script src="preset-preactions-contract.js"></script>
+<script src="tool-silhouettes.js"></script>
+<script src="preset-store.js"></script>
+<!-- ⭐ 参考图闸门（融合方案-C01 §9.3）。顺序不能换：数字 → 模型能力 → 闸门 → 弹窗，且都在 preset-references.js 之前。 -->
+<script src="reference-limits.js"></script>
+<script src="reference-capability.js"></script>
+<script src="reference-gate.js"></script>
+<!-- reference-dialog.js 已删（2026-10-18） -->
+<script src="preset-references.js"></script>
+<!-- ⭐ 10-25：带参考图时图 1 / 参考图补成正方形、回图裁回（aiGenerateNow / aiRestoreTaskImage 运行时才读，放 ui-main.js 前面就行） -->
+<script src="ref-square-pad.js"></script>
+<!-- ⭐ 10-25：任务卡「分割」（新增物体抠图，docs/289）。算法 diff-mask-core.js（后台线程 diff-mask-worker.js 也 importScripts 它）；框 segment-panel.js。
+     任务卡按钮和宿主胶水在 ui-main/04-tasks.js（搜 segmentHost），运行时才读，放 ui-main.js 前面就行 -->
+<link rel="stylesheet" href="segment-panel.css">
+<script src="diff-mask-core.js"></script>
+<script src="segment-panel.js"></script>
+<!-- ⭐ 10-25：工具「眼神调整」（docs/290）。叠图核心 + 工具模块；面板外壳在 tool-workbench.js（PANELS.eyegaze），宿主在 ui-main/20（搜 V7EyeGaze.configure） -->
+<link rel="stylesheet" href="eyegaze-tool.css">
+<script src="eyegaze-core.js"></script>
+<script src="eyegaze-tool.js"></script>
+<!-- ⭐ 参考图卡（2026-10-13）：参考图从"弹窗"改成"报错栏那一片的常驻卡"。
+     ⚠ 顺序：必须【在 preset-references.js 之后】（它运行时才读 V7PresetReferences，
+       但读不到就整张卡不画 —— 放前面会静默不生效，铁律 17）。 -->
+<script src="reference-card.js"></script>
+<script src="preset-preactions.js"></script>
+<script src="account-backup-store.js"></script>
+<script src="cloud-backup.js"></script>
+<script src="settings-vault.js"></script>
+<script src="agent-preset-contract.js"></script>
+<script src="agent-presets.js"></script>
+<script src="pinyin-initials.js"></script>
+<!-- 工具工作面：原地展开成 880×400（横跨一级+二级+三级卡）。
+     ⚠ 必须排在 preset-store.js 之后 —— 它要用 PRESETS.presetById/savePreset 存参数。
+     ⚠ 排在 preset-ui.js 之前也行（它自己不依赖 preset-ui），但 configure 要等主脚本调。 -->
+<link rel="stylesheet" href="tool-workbench.css">
+<script src="tool-workbench.js"></script>
+<script src="preset-ui.js"></script>
+<!-- 标准下拉框: 自动把全页所有 <select> 增强成毛玻璃面板, 各处画界面的代码不用改 -->
+<script src="ui-select.js"></script>
+<!-- Keyboard focus follows the active work surface and visible stack state. -->
+<script src="focus-scope.js"></script>
+<script src="provider-connections.js"></script>
+<script src="provider-catalog.js"></script>
+<script src="provider-probe.js"></script>
+<!-- ⚠ 2026-10-07 新增两个模块（用户要求：查余额 + 动态拉生图模型）：
+     · provider-models.js  —— 纯函数：模型筛选/按槽缓存/变化检测（不依赖别人）
+     · provider-balance.js —— 查余额：阿吉·陌陌查美元、GRS 查积分（http 桥在 provider-settings 里注入）
+     ⚠ provider-settings.js 必须在它们【之后】加载 —— 它 configure() 时会去取这两个全局。 -->
+<script src="provider-models.js"></script>
+<!-- 2026-10-21：自定义渠道存多套方案（纯函数，界面胶水在 ui-main/10-settings-runtime.js 的 otherProfiles*） -->
+<script src="other-profiles.js"></script>
+<!-- 2026-10-21：算力槽位（渠道改名 / 露出哪些模型 / 模型显示名），纯函数；界面胶水在 ui-main/10-settings-runtime.js 的 computeSlot* -->
+<script src="compute-slots.js"></script>
+<script src="provider-balance.js"></script>
+<!-- ⭐ 2026-10-24（V7待办/02）：竞速选线（阿吉 / 墨墨多条线路里挑又快又有余额的）+ 供应商在后台配的模型目录。
+     ⚠ 要在 provider-balance.js 后面（选线拿它的 probe 查余额）、ui-main.js 前面（connection / 模型下拉 / 单价要读）。 -->
+<script src="provider-lines.js"></script>
+<script src="supplier-models.js"></script>
+<script src="provider-settings.js"></script>
+<link rel="stylesheet" href="provider-catalog.css">
+<link rel="stylesheet" href="provider-balance.css">
+<script src="layout-core.js"></script>
+<script src="layout-manager.js"></script>
+<link rel="stylesheet" href="layout-manager.css">
+<!-- ui-main:begin —— 主程序：源码在 ui-main/ 下 21 个文件，改完跑 node scripts/build-ui-main.cjs 拼成 ui-main.js（软件加载的是它）；说明 ui-main/README.md -->
+<script src="ui-main.js"></script>
+<!-- ui-main:end -->
+<script src="color-tools-integration.js"></script>
+<script src="batch-queue-integration.js"></script>
+<script src="provider-settings-integration.js"></script>
+<script src="free-mode-ui.js"></script>
+<script src="tween-preview.js"></script>
+<!-- ⭐ 预览追踪（2026-10-06）：把"谁把任务预览/大框收掉的"连同调用栈记下来。
+     ⚠ 必须排在 tween-preview.js 之后 —— 它要包住 V7Tween.hideBox / leaveTaskCard。
+     ⚠ 它只读不写，不参与任何业务判定；关掉它（删这一行）界面行为一个字都不变。 -->
+<script src="preview-trace.js"></script>
+<script>
+// ⚠⚠ 2026-10-05：预览框 ←→ 预览条 双向通知（用户实测"预览窗口活着、小图标窗口死了"）。
+//
+//   为什么单独写在这一段而不是塞进主脚本块：
+//     主脚本块（上面那个大 <script>）在 tween-preview.js 【之前】执行，
+//     那一刻 window.V7Tween 还不存在，注册会静默落空。
+//     这个坑本项目栽过 —— "脚本抛错/时机不对，后面绑定全没跑"（铁律 17）。
+//
+//   为什么要双向：
+//     · 预览条收 → 框也要收：在主脚本块里（inConnected 判定那处）
+//     · 框收   → 预览条也要收：这里（框自己收到鼠标离开时会 hideBox）
+//   两个模块各管一半 DOM，只做单向就必然留下"只死一边"的窗口期。
+//
+//   ⚠ clearPreview 是主脚本块的顶层函数（那个块没有被 IIFE 包住），
+//     这里能直接调到；用 typeof 挡一道，将来结构变了也不会把这段打崩。
+// ⭐⭐⭐ 2026-10-08（docs/170 §十四 · 用户拍板）：启动时把插帧遗留文件清掉。
+//
+//  ⚠ 为什么放在【页面加载完】才跑：清理要搬几个 G 的文件（实测 22.80 GB），
+//    在启动路径上 await 它 = 用户要多等十几秒才看到界面。
+//    这件事和"界面能不能用"完全无关。
+//  ⚠ 为什么只做一次：localStorage 打标记（见函数里的 FLAG）。
+//  ⚠ 失败静默：清垃圾清不动，不该弹一个红框吓用户。函数内部自己吞。
+(function () {
+  if (typeof purgeLegacyTweenFilesOnce !== 'function') return;
+  var run = function () {
+    try { purgeLegacyTweenFilesOnce(); } catch (_) {}
+  };
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(run, 1500);          // 先让界面动起来
+  } else {
+    window.addEventListener('load', function () { setTimeout(run, 1500); });
+  }
+})();
+
+(function () {
+  'use strict';
+  if (!window.V7Tween || typeof window.V7Tween.setBoxClosedHandler !== 'function') {
+    console.error('[预览] V7Tween 没加载好，预览框/预览条的联动收不起来');
+    return;
+  }
+  window.V7Tween.setBoxClosedHandler(function (taskId) {
+    // ⭐⭐ 2026-10-09（docs/191，用户反馈）：「我其实只希望收起展开的大图就好了」。
+    //   ⚠ 用户【自己点一下收掉大图】时，不该把右滑打开的预览条一起带走 ——
+    //     那条还要接着用（换图、传回、应用）。所以那种情况下这里直接返回。
+    //   ⚠ 只有"鼠标移开 / 切任务"这类自动收起才连条一起收（原来的行为，不动）。
+    if (window.boxCloseConsumeImageOnly && window.boxCloseConsumeImageOnly()) return;
+    // ⚠ 只收【这张任务】的预览条。用户快速划过两张卡时，
+    //   框可能已经指向别的任务了，不判归属就会把别人的条关掉。
+    var el = document.querySelector('.task[data-task="' + String(taskId).replace(/"/g, '\\"') + '"]');
+    var pv = el ? el.querySelector('.task-preview.show') : null;
+    // ⭐⭐ 2026-10-09（用户报「为什么现在还是收缩不进去呢」）——
+    //   上面那条路收不到时，做一次【保守兜底】：只收**当前栈顶那张卡**的条。
+    //   ⚠⚠ 为什么必须有兜底：这条通知是"收条"唯一的出口。只要有一次
+    //     "开条时没认下归属"（归属是上一张卡的 / 归属那张卡已经不在了），
+    //     条就永远收不掉 —— 那就是用户说的"有时候收不回去"里那个"有时候"。
+    //   ⚠ 为什么兜底只认"栈顶那张卡"而不是"随便哪条开着的"：
+    //     随便收会误伤 —— 160ms 宽限期内刚弹出的、属于别的卡的条会被收掉
+    //     （2026-10-09 实测：那样改挂了 hover-opens / boxtaskid-string 两个探针）。
+    //     而"栈顶那张卡"正是用户此刻在看的、mousemove 一直在处理的那张，
+    //     它的条确实该收。
+    if (!pv) {
+      var topTask = document.querySelector('#tasks .task');
+      if (topTask) pv = topTask.querySelector('.task-preview.show');
+    }
+    if (pv) {
+      pv.classList.remove('show');
+      if (window.__pv === pv) window.__pv = null;
+    }
+  });
+})();
+</script>
+<script src="stack-occlusion.js"></script>
+<script src="route-registry.js"></script>
+<!-- ⭐ 2026-10-06 卡片拆分：总管理员 + 9 张卡各一个文件。
+     ⚠⚠ 顺序不能换：
+       ① card-registry.js 先加载（纯数据+纯函数，零副作用）——
+          总管理员要拿它当"地图"对账；不加载的话 audit() 只能报
+          "无法跟地图对账"（2026-10-07 探针实测就是这样，已修）。
+       ② card-manager.js 排在最前 —— 9 张卡加载时（IIFE 一跑完）就调
+          register()，管理员还没在的话它们登记不上，界面会静默回落到
+          老路径（看着正常，其实没拆）。卡片里写了
+          if(!root.V7CardManager){console.error(...)} 明着报，不静默。
+     ⚠ 卡片用 mount(body,zone) 签名，只画自己那一块；规矩见 cards/_CONTRACT.md。 -->
+<script src="card-registry.js"></script>
+<script src="cards/card-manager.js"></script>
+<script src="cards/card-generation.js"></script>
+<script src="cards/card-presets.js"></script>
+<script src="cards/card-settings.js"></script>
+<script src="cards/card-engines.js"></script>
+<script src="cards/card-history.js"></script>
+<script src="cards/card-projects.js"></script>
+<script src="cards/card-assistant.js"></script>
+<script src="cards/card-debug.js"></script>
+<!-- ⚠ 2026-10-14：「使用教程」卡（cards/card-tutorial.js）整张删了，这一行跟着删。
+     重做时把文件写回来、这一行加回来，并在 card-registry.js 里恢复条目（见 docs/217）。 -->
+<!-- ⚠ 2026-10-14：announce.js 【不在这里】—— 它必须排在主脚本之前，
+     所以在文件头部（搜"平台公告模块"）。放在这一段是错的（那在主脚本之后）。 -->
+<script>
+(function(){
+  'use strict';
+  const nav=document.getElementById('v7PrimaryNav'),back=document.querySelector('[data-v7-nav-back]'),crumb=document.querySelector('[data-v7-nav-crumb]');
+  const labels={generation:'生成台',settings:'设置中心',records:'记录与恢复',tools:'工具箱'};
+  const targets={generation:['generation',0],settings:['settings',0],records:['history',0],tools:['debug',0]};
+  const entries={generation:'generation',settings:'settings',records:'records',tools:'tools'};
+  const history=[],positions=new Map();
+  let active=null,sequence=0,pending=0,restoring=false,refreshFrame=0,workspaceTitle='',workspaceExpanded=false,swallowClickUntil=0;
+  const routeKey=route=>route.card+':'+route.zone+':'+JSON.stringify(route.options||{});
+  function category(route){
+    if(route.options?.navigationCategory&&labels[route.options.navigationCategory])return route.options.navigationCategory;
+    if(route.card==='history')return 'records';
+    if(route.card==='settings'||route.card==='engines'||route.card==='assistant'&&[1,2].includes(route.zone))return 'settings';
+    return ['generation','presets'].includes(route.card)?'generation':'tools';
+  }
+  function focusIdentity(element){
+    if(!element||!detail.contains(element))return null;
+    if(element.id)return '#'+CSS.escape(element.id);
+    for(const key of ['data-setting','data-service-tab','data-card-route','data-quick-action','data-action','data-history-action','name']){
+      const value=element.getAttribute(key);if(value)return '['+key+'="'+CSS.escape(value)+'"]';
+    }
+    return null;
+  }
+  function snapshot(){
+    const id=cards[cur]?.dataset.card||'generation',same=active?.card===id&&active?.zone===zoneSel;
+    return {card:id,zone:zoneSel,options:same?{...active.options}:{},open:detail.classList.contains('show'),scroll:detail.querySelector('.dc-scroll').scrollTop,focus:document.activeElement,focusSelector:focusIdentity(document.activeElement),presetKind:presetZoneKind};
+  }
+  function remember(route){
+    if(!route)return;positions.set(routeKey(route),{scroll:route.scroll,focusSelector:route.focusSelector});
+    if(positions.size>60)positions.delete(positions.keys().next().value);
+  }
+  function push(route){
+    const previous=history[history.length-1];
+    if(!previous||routeKey(previous)!==routeKey(route)||previous.open!==route.open)history.push(route);
+    if(history.length>40)history.shift();
+  }
+  function update(){
+    refreshFrame=0;
+    const current=snapshot();
+    if(!pending&&active&&(active.card!==current.card||active.zone!==current.zone)){
+      remember(active);push(active);active=current;
+    }
+    if(!active)active=current;
+    const group=category(active),zone=ZONE_SETS[cur]?.[zoneSel]?.[1]||cards[cur]?.dataset.bglabel||'';
+    nav.querySelectorAll('button').forEach(button=>{if(button.dataset.v7Primary===group)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
+    // ⭐ 2026-10-22（docs/263 三级卡瘦身）：这行只写当前这页的名字（下面那行重复的大标题已藏），完整路径放悬停提示
+    const pageName=String(detail.querySelector('.dc-name')?.textContent||'').trim();
+    const head=workspaceTitle||pageName||zone||labels[group];
+    const text=labels[group]+((workspaceTitle||zone)?' / '+(workspaceTitle||zone):'');crumb.textContent=head;crumb.title=text+(head!==(workspaceTitle||zone)&&head!==labels[group]?' / '+head:'');
+    back.disabled=!history.length||!!pending;
+    back.title=history.length?'返回 '+labels[category(history[history.length-1]) ]:'返回原入口';
+    back.setAttribute('aria-label',back.title);
+    if(!pending){active.scroll=current.scroll;active.open=current.open;active.focus=current.focus;active.focusSelector=current.focusSelector;}
+    resizeWorkspace();
+  }
+  function schedule(){if(!refreshFrame)refreshFrame=requestAnimationFrame(update);}
+  function begin(id,index,options){
+    const before=snapshot(),next={card:id,zone:Number(index)||0,options:{...(options||{})}},token=++sequence;
+    if(!cards.some(card=>card.dataset.card===id))return null;
+    remember(before);
+    if(!restoring&&(routeKey(before)!==routeKey(next)||!before.open))push(before);
+    pending=token;active={...next,open:true,scroll:0};schedule();
+    return {token,key:routeKey(next),restore:restoring};
+  }
+  function commit(transaction,cancelled){
+    if(!transaction||transaction.token!==pending)return;
+    pending=0;
+    if(!cancelled){
+      const saved=positions.get(transaction.key);
+      if(saved)detail.querySelector('.dc-scroll').scrollTop=saved.scroll||0;
+    }
+    update();
+  }
+  async function goBack(){
+    if(pending||!history.length)return false;
+    const target=history[history.length-1],owner=sequence;
+    restoring=true;
+    try{
+      if(target.card==='presets')presetZoneKind=target.presetKind||'list';
+      const modules={'network':'V7NetworkDoctor','browser-bookmarks':'V7BrowserBookmarks','scopes':'V7ImageScopes','layout':'V7LayoutManager'};
+      const module=target.options?.workspace&&window[modules[target.options.workspace]];
+      const result=module?.open?await module.open():await navigateCard(target.card,target.zone,target.options);
+      if(!result||result.cancelled||sequence!==owner+1)return false;
+      if(history[history.length-1]===target)history.pop();
+      if(!target.open)closeAll();
+      detail.querySelector('.dc-scroll').scrollTop=target.scroll||0;
+      const focus=target.focus?.isConnected?target.focus:target.focusSelector?detail.querySelector(target.focusSelector):null;
+      if(focus?.checkVisibility()&&!focus.disabled)focus.focus({preventScroll:true});
+      else nav.querySelector('[data-v7-primary="'+category(target)+'"]')?.focus({preventScroll:true});
+      return true;
+    }catch(error){window.ERR?.report('LAYOUT_FAILED',{message:String(error.message||error)});return false;}
+    finally{restoring=false;update();}
+  }
+  nav.addEventListener('click',async event=>{
+    const button=event.target.closest('[data-v7-primary]');if(!button)return;
+    event.preventDefault();event.stopPropagation();
+    const group=button.dataset.v7Primary;
+    try{
+      const registry=window.V7RouteRegistry;
+      if(registry?.routes?.[entries[group]])await registry.open(entries[group],{navigationCategory:group});
+      else await navigateCard(...targets[group],{navigationCategory:group});
+    }catch(error){window.ERR?.report('LAYOUT_FAILED',{message:String(error.message||error)});}
+  });
+  nav.addEventListener('keydown',event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    const buttons=[...nav.querySelectorAll('[data-v7-primary]')],index=buttons.indexOf(document.activeElement);if(index<0)return;
+    event.preventDefault();event.stopPropagation();buttons[event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length].focus();
+  });
+  nav.addEventListener('wheel',event=>{event.preventDefault();event.stopPropagation();},{passive:false});
+  back.onclick=event=>{event.preventDefault();event.stopPropagation();goBack();};
+  document.querySelector('[data-v7-nav-close]').onclick=event=>{event.preventDefault();event.stopPropagation();closeAll();nav.querySelector('[aria-current="page"]')?.focus({preventScroll:true});};
+  document.querySelector('[data-v7-nav-expand]').onclick=event=>{event.preventDefault();event.stopPropagation();workspaceExpanded=!workspaceExpanded;resizeWorkspace();};
+  detail.addEventListener('scroll',()=>{if(!pending&&active){active.scroll=detail.querySelector('.dc-scroll').scrollTop;remember(active);}},{capture:true,passive:true});
+  new MutationObserver(schedule).observe(stack,{subtree:true,attributes:true,attributeFilter:['class','style']});
+  new MutationObserver(schedule).observe(detail,{attributes:true,attributeFilter:['class']});
+  new MutationObserver(schedule).observe(detail.querySelector('.dc-name'),{childList:true,characterData:true,subtree:true});
+  window.addEventListener('wheelchair:storage-context',()=>{sequence++;pending=0;history.length=0;positions.clear();active=null;workspaceTitle='';detail.classList.remove('workspace-host');document.querySelector('[data-v7-nav-expand]').hidden=true;schedule();});
+  window.addEventListener('wheelchair:free-mode-changed',schedule);
+  window.addEventListener('resize',schedule);
+  function resizeWorkspace(){
+    if(!detail.classList.contains('workspace-host'))return;
+    // ⚠ 工具工作面自己算几何（横跨三段 880×400 / 自由模式就地展开）。
+    //   这里必须让路，否则窗口一缩放/切卡，几何就被下面这套覆盖回默认工作面尺寸。
+    // ⚠ 判据用 DOM 上的 v7tw-host，不能只信模块的 active：收起动画一开始模块就把 active 清了，
+    //   这一刻被这里接手，大卡就不是缩回当前卡，而是被改成 640 宽贴在右边（2026-09-28 实测抓到）。
+    if(detail.classList.contains('v7tw-host')||window.V7ToolWorkbench?.ownsGeometry?.())return;
+    const card=cards[cur].getBoundingClientRect(),anchor=anchorEl.getBoundingClientRect(),margin=16;
+    let width=workspaceExpanded?innerWidth-margin*2:Math.min(640,innerWidth-margin*2),left=margin;
+    const rightSpace=innerWidth-card.right-24-margin,leftSpace=card.left-24-margin;
+    if(!workspaceExpanded&&rightSpace>=420){width=Math.min(width,rightSpace);left=card.right+24;}
+    else if(!workspaceExpanded&&leftSpace>=420){width=Math.min(width,leftSpace);left=card.left-width-24;}
+    const limits=window.V7FloatingBars?.workArea?.()||{top:60,bottom:innerHeight-16};
+    const height=Math.max(180,Math.min(workspaceExpanded?innerHeight:640,limits.bottom-limits.top)),top=Math.max(limits.top,Math.min(card.top,limits.bottom-height));
+    const expand=document.querySelector('[data-v7-nav-expand]');expand.hidden=false;expand.setAttribute('aria-pressed',String(workspaceExpanded));expand.title=workspaceExpanded?'还原工作区':'扩大工作区';expand.setAttribute('aria-label',expand.title);
+    for(const [key,value]of Object.entries({left:left-anchor.left,top:top-anchor.top,width,height})){
+      const name='--workspace-'+key,next=Math.round(value)+'px';if(detail.style.getPropertyValue(name)!==next)detail.style.setProperty(name,next);
+    }
+  }
+  window.addEventListener('mousedown',event=>{
+    if(!(window.V7Workspaces?.hasVisibleEmbedded?.()??window.V7Workspaces?.hasEmbedded?.()))return;
+    const card=event.target.closest?.('#stack .block-card');
+    if(!card||card===cards[cur])return;
+    event.preventDefault();event.stopImmediatePropagation();swallowClickUntil=performance.now()+800;
+    navigateCard(card.dataset.card,0).catch(error=>window.ERR?.report('LAYOUT_FAILED',{message:String(error.message||error)}));
+  },true);
+  window.addEventListener('click',event=>{if(performance.now()<swallowClickUntil&&event.target.closest?.('#stack .block-card')){event.preventDefault();event.stopImmediatePropagation();swallowClickUntil=0;}},true);
+  window.V7Workspaces?.configure?.({open:async spec=>{
+    const target=spec.id==='layout'?['settings',2]:['debug',0];
+    const result=await navigateCard(...target,{navigationCategory:spec.id==='layout'?'settings':'tools',workspace:spec.id});
+    if(result.cancelled)return null;
+    const body=result.body;window.V7CardArchitecture?.reset(body);
+    workspaceTitle=spec.title;workspaceExpanded=/(camera|creative|canvas)/.test(spec.id);detail.classList.add('workspace-host');resizeWorkspace();
+    const handle=V7Workspaces.mount(body,spec.id,spec.title,spec.description,spec.mount,{onClose:(_handle,meta)=>{
+      workspaceTitle='';detail.classList.remove('workspace-host');document.querySelector('[data-v7-nav-expand]').hidden=true;
+      for(const key of ['left','top','width','height'])detail.style.removeProperty('--workspace-'+key);
+      if(meta?.reason==='close')goBack();else schedule();
+    }});
+    detailUsed=true;schedule();return handle;
+  }});
+  window.V7NavigationShell={begin,commit,back:goBack,refresh:schedule,backOnEscape:event=>{
+    if(!detail.classList.contains('show')||!history.length||pending)return false;
+    event.preventDefault();event.stopPropagation();goBack();return true;
+  },state:()=>({category:category(active||snapshot()),historyLength:history.length,pending:!!pending})};
+  update();
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   工具工作面接线（2026-09-28）
+
+   用户定案：点「工具与功能」里的一项 → 原地展开成横条，
+   横向占满【一级卡+二级卡+三级卡】的总宽，操作位置不动。
+
+   几何（anchor 坐标系，见 ui.html 里 .block-card left:0 / #zones left:340 /
+   .detail-card left:580 三处定义）：
+     主卡 0~300 · 二级 340~540 · 三级 580~880
+     → left 0, width 880, height 400 = 用户要的 880×400
+
+   ⚠ 复用现成的 .workspace-host + --workspace-* 机制 ——
+     那条路本来就会把三级卡撑开，我只改"撑多大"和"撑完画什么"。
+   ⚠ 展开期间把一级卡和二级卡藏起来：它们被完全盖住了，留着只会
+     在动画途中从边缘透出来。
+   ═══════════════════════════════════════════════════════════════ */
+(function(){
+  if(!window.V7ToolWorkbench) return;
+  const anchorEl2=document.querySelector('.anchor');
+  const SPAN_LEFT=0, SPAN_TOP=0, SPAN_W=880, SPAN_H=400;
+
+  // 自由模式的工作区（窗口坐标）。
+  // ⚠ V7FloatingBars.workArea() 只给上下边界（它管的是导航/ Dock 让位），
+  //   左右得自己取。别写 area.left —— 那是 undefined，会算出 NaN 宽度。
+  function freeArea(){
+    const bar=window.V7FloatingBars?.workArea?.();
+    return {left:8,right:innerWidth-8,top:bar?bar.top:60,bottom:bar?bar.bottom:innerHeight-16};
+  }
+  // 把「窗口坐标下想放的位置」夹回工作区，换算成 anchor 坐标（--workspace-* 用的是 anchor 坐标系）
+  function clampFreeToAnchor(wantLeft,wantTop,w,h){
+    const a=freeArea(),rect=anchorEl2?anchorEl2.getBoundingClientRect():{left:0,top:0};
+    const left=Math.max(a.left,Math.min(wantLeft,a.right-w));
+    const top=Math.max(a.top,Math.min(wantTop,a.bottom-h));
+    return {left:left-rect.left,top:top-rect.top};
+  }
+  function applyToolGeometry(){
+    const freeMode=window.V7FreeMode?.isActive?.();
+    // 自由模式没有"三张卡排一行"这个前提，横跨三段没有意义。
+    // 改成：在当前卡原位展开（用户拖过就用拖到的位置），尺寸取 880×400 与工作区的较小值，再夹回工作区。
+    if(freeMode){
+      const a=freeArea();
+      const cardRect=cards[cur]?.getBoundingClientRect?.();
+      const w=Math.min(SPAN_W,Math.max(320,a.right-a.left)), h=Math.min(SPAN_H,Math.max(220,a.bottom-a.top));
+      const saved=settingsRuntime.toolCardFreePos;
+      const wantLeft=saved&&Number.isFinite(saved.left)?saved.left:(cardRect?cardRect.left:a.left);
+      const wantTop=saved&&Number.isFinite(saved.top)?saved.top:(cardRect?cardRect.top:a.top);
+      return {...clampFreeToAnchor(wantLeft,wantTop,w,h),width:w,height:h};
+    }
+    // 聚合模式：大卡永远从主卡左缘铺到三级卡右缘（贴着一级卡左上角）。
+    // 想换位置就拖顶栏 —— 拖的是整个窗口，一二三级卡、任务栏、报错栏一起走（见下面 setupToolCardDrag）。
+    return {left:SPAN_LEFT,top:SPAN_TOP,width:SPAN_W,height:SPAN_H};
+  }
+
+  function setToolGeometry(){
+    if(!detail?.classList.contains('v7tw-host'))return;
+    const spec=applyToolGeometry();
+    for(const [key,value]of Object.entries(spec)){
+      const next=Math.round(value)+'px';
+      if(detail.style.getPropertyValue('--workspace-'+key)!==next)detail.style.setProperty('--workspace-'+key,next);
+    }
+    // 拉幕式展开：内容按【最终宽度】排好，卡片变宽只是把它逐渐露出来 ——
+    //   否则展开途中内容会先被挤在 300 宽里、顶栏文字被截断，再被撑开（2026-09-28 截图抓到）
+    detail.style.setProperty('--v7tw-final-w',Math.round(spec.width)+'px');
+  }
+
+  let toolHandle=null, motionToken=0;
+  // 当前卡在 anchor 坐标系里的位置 —— 大卡从这里"长"出来，收起时也缩回这里
+  function rectInAnchor(el){
+    if(!el||!anchorEl2)return null;
+    const a=anchorEl2.getBoundingClientRect(),r=el.getBoundingClientRect();
+    if(!(r.width>0&&r.height>0))return null;
+    return {left:r.left-a.left,top:r.top-a.top,width:r.width,height:r.height};
+  }
+  function setGeometry(rect){
+    for(const [key,value]of Object.entries(rect))detail.style.setProperty('--workspace-'+key,Math.round(value)+'px');
+  }
+  const FALLBACK_START={left:580,top:0,width:300,height:400};   // 找不到当前卡时从三级卡原位长出来
+
+  window.V7ToolWorkbench.configure({
+    open(spec){
+      const body=document.getElementById('dcBody');
+      if(!body||typeof spec.mount!=='function')return null;
+      const token=++motionToken;
+      const TW=window.V7ToolWorkbench;
+      const card=cards[cur];
+      const start=rectInAnchor(card)||FALLBACK_START;
+
+      /* ═══ 编排 v3：【先收拢，再变身】═══════════════════════════
+         ①   0ms  大卡【无动画】落在当前卡原位、完全透明；其它元素开始朝当前卡收拢
+         ② 240ms  大卡在当前卡原位淡入，当前卡同时淡出（原地交接）
+         ③ 350ms  大卡从当前卡大小展开到目标尺寸（CSS 过渡 340ms），挂上内容
+         ⚠ v2 用户看不到任何动画：收拢和展开同时起，面板 z50 盖在上面，
+           卡片在它背后淡 —— 所以必须分拍，收拢这一拍要让人看完。 */
+      // .show 必须加：.detail-card 默认 opacity:0 / pointer-events:none（上一轮"打开不显示"就是漏了它）
+      detail.classList.remove('closing');
+      detail.style.transition='none';                // 先无动画地落到当前卡原位
+      detail.style.opacity='0';
+      detail.classList.add('show','workspace-host','v7tw-host');
+      setGeometry(start);
+      void detail.offsetWidth;                       // ⚠ 强制一次布局再恢复过渡 —— 同帧设置不会按预期触发过渡
+      detail.style.transition='';
+      const expand=document.querySelector('[data-v7-nav-expand]');
+      if(expand)expand.hidden=true;                  // 工具本来就满宽，不需要"扩大"按钮
+      const crumb=detail.querySelector('[data-v7-nav-crumb]');
+      if(crumb)crumb.textContent=spec.title||'工具';
+      body.dataset.toolWorkbench=spec.id||'';
+      body.innerHTML='';
+      document.body.classList.add('v7tw-covering');
+      document.body.dataset.v7twPhase='gathering';
+      detailUsed=true;
+      toolHandle={id:spec.id,dispose:null};          // 先占位：动画途中点关闭也能正常收起
+
+      let gathered=0;
+      try{ gathered=TW.yieldOut?TW.yieldOut(card):0; }
+      catch(error){ window.ERR?.report('TOOL_OPEN_FAILED',{message:String(error&&error.message||error)}); }
+
+      const grow=()=>{
+        if(token!==motionToken)return;
+        document.body.dataset.v7twPhase='expanding';
+        setToolGeometry();                           // ⭐ 从当前卡大小展开到目标尺寸
+        let dispose=null;
+        try{ const r=spec.mount(body); if(typeof r==='function')dispose=r; }
+        catch(error){ window.ERR?.report('TOOL_OPEN_FAILED',{message:String(error&&error.message||error)}); }
+        toolHandle={id:spec.id,dispose};
+        setTimeout(()=>{ if(token===motionToken)document.body.dataset.v7twPhase='open'; },360);
+      };
+      const morph=()=>{
+        if(token!==motionToken)return;
+        document.body.dataset.v7twPhase='morphing';
+        detail.style.opacity='';                     // 交还 .show：大卡在当前卡原位淡入
+        try{ TW.morphCurrentOut?.(card); }catch(_){}
+        setTimeout(grow,90);
+      };
+      // 有东西可收：等收拢这一拍（200ms）播完再交接；什么都没有就直接交接
+      setTimeout(morph,gathered?200:0);
+      return {close(){window.V7ToolWorkbench.close();}};
+    },
+    close(){
+      if(!detail.classList.contains('v7tw-host'))return;
+      const token=++motionToken;                     // 作废还没跑完的展开步骤（快速开关）
+      const TW=window.V7ToolWorkbench;
+      try{ toolHandle?.dispose?.(); }catch(_){}
+      toolHandle=null;
+      const body=document.getElementById('dcBody');
+      if(body){body.removeAttribute('data-tool-workbench');body.innerHTML='';}
+      document.body.dataset.v7twPhase='closing';
+      /* ═══ 收起：展开的镜像 ═══════════════════════════════════
+         ①   0ms  大卡缩回当前卡原位（CSS 过渡 340ms）
+         ② 160ms  当前卡在原位淡回，大卡同时淡出（原地交接）
+         ③ 280ms  其它元素从当前卡"放出来"，回到各自位置
+         ④ 结束   摘掉工作面的类、清内联值
+         ⚠ v2 这里只摘类、从没调 restoreYield —— 所以收起时什么都不回来。 */
+      const card=cards[cur];
+      setGeometry(rectInAnchor(card)||FALLBACK_START);
+      setTimeout(()=>{ if(token===motionToken)detail.style.opacity='0'; },160);
+      let total=0;
+      try{ total=TW.restoreYield?TW.restoreYield({currentDelay:160,othersDelay:280}):0; }catch(_){}
+      const finish=()=>{
+        if(token!==motionToken)return;
+        // ⚠ 先摘 covering 再摘 .show —— 反过来的话观察者会把这次收尾当成"× 被点了"再跑一遍
+        document.body.classList.remove('v7tw-covering');
+        detail.style.transition='none';              // 几何回到三级卡默认位时别再播一段
+        detail.classList.remove('show','workspace-host','v7tw-host');
+        for(const key of ['left','top','width','height'])detail.style.removeProperty('--workspace-'+key);
+        detail.style.removeProperty('--v7tw-final-w');
+        void detail.offsetWidth;
+        detail.style.transition='';
+        detail.style.opacity='';
+        delete document.body.dataset.v7twPhase;
+        try{ if(window.PRESETUI?.state?.().toolGroupOpen)window.PRESETUI.fillZone(); }catch(_){}
+      };
+      setTimeout(finish,Math.max(380,total+20));
+    },
+    // 工具顶栏的 × —— 复用三级卡导航条上那个 × 的现成逻辑（closeAll），不另写一套。
+    // 导航条在工具模式下是藏着的，但隐藏按钮的 click() 照样会触发它自己的处理函数。
+    closeAll(){ document.querySelector('[data-v7-nav-close]')?.click(); },
+    isOpen:()=>!!toolHandle,
+    ownsGeometry:true,
+  });
+
+  // 窗口尺寸变了 / 进出自由模式，重新算几何
+  window.addEventListener('resize',setToolGeometry);
+  window.addEventListener('wheelchair:free-mode-changed',setToolGeometry);
+
+  /* ⭐ 工具大卡拖动（2026-09-29 用户定案）
+     按住大卡顶栏（.v7tw-top，按钮/输入框除外）拖：
+     · 聚合模式：拖的是【整个程序窗口】—— 和拖主卡顶栏同一套 uiwin.dragStart/dragEnd（主进程高频跟随）。
+       大卡打开时收拢进来的一二三级卡、任务栏、报错栏都在这个窗口里，所以整组一起走；关掉大卡后它们在新位置展开。
+     · 自由模式：窗口铺满屏幕，只挪大卡自己；其它卡片的摆放一概不动（打开时它们只是暂时收拢淡出，关闭后回各自原位）。
+       松手夹回工作区并记住（settingsRuntime.toolCardFreePos，窗口坐标），下次打开就在那儿；双击顶栏回到「当前卡原位展开」。
+     ⚠ 取代 09-28 那版：那版挂在三级卡导航条上，而工具模式下导航条是藏着的 → 根本拖不了；
+       聚合模式下只挪大卡、整组不跟；松手还调了一个不存在的 saveSettings() → 真拖过一次就报错。 */
+  (function setupToolCardDrag(){
+    let mode=null, moved=false, startX=0, startY=0, startLeft=0, startTop=0;
+    const handleOf=target=>{
+      if(!detail.classList.contains('v7tw-host'))return null;
+      const bar=target&&target.closest?target.closest('.v7tw-top'):null;
+      if(!bar||!detail.contains(bar))return null;
+      if(target.closest('button,input,select,textarea,a,[role="button"],[contenteditable="true"]'))return null;
+      return bar;
+    };
+    detail.addEventListener('mousedown',event=>{
+      if(event.button!==0||mode||!handleOf(event.target))return;
+      if(document.body.dataset.v7twPhase!=='open')return;          // 展开/收起动画途中不接，免得和几何过渡打架
+      event.preventDefault();event.stopPropagation();
+      moved=false;
+      if(window.V7FreeMode?.isActive?.()){
+        mode='free';startX=event.clientX;startY=event.clientY;
+        startLeft=parseFloat(detail.style.getPropertyValue('--workspace-left'))||0;
+        startTop=parseFloat(detail.style.getPropertyValue('--workspace-top'))||0;
+        detail.style.transition='none';                            // 否则 340ms 的几何过渡会让卡片拖着拖着"追"鼠标
+      }else{
+        if(!window.uiwin||typeof window.uiwin.dragStart!=='function')return;
+        mode='window';
+        window.uiwin.dragStart();
+      }
+      document.body.classList.add('v7tw-dragging');
+    },true);
+    window.addEventListener('mousemove',event=>{
+      if(mode!=='free')return;
+      const dx=event.clientX-startX, dy=event.clientY-startY;
+      if(!moved&&Math.abs(dx)+Math.abs(dy)<3)return;              // 只是点一下标题，不算拖（不乱记位置）
+      moved=true;
+      const w=parseFloat(detail.style.getPropertyValue('--workspace-width'))||SPAN_W;
+      const h=parseFloat(detail.style.getPropertyValue('--workspace-height'))||SPAN_H;
+      const rect=anchorEl2?anchorEl2.getBoundingClientRect():{left:0,top:0};
+      const pos=clampFreeToAnchor(rect.left+startLeft+dx,rect.top+startTop+dy,w,h);
+      detail.style.setProperty('--workspace-left',Math.round(pos.left)+'px');
+      detail.style.setProperty('--workspace-top',Math.round(pos.top)+'px');
+    });
+    const finish=()=>{
+      if(!mode)return;
+      const was=mode;mode=null;
+      document.body.classList.remove('v7tw-dragging');
+      if(was==='window'){
+        try{window.uiwin.dragEnd();}catch(_){}
+        updateStackPositions();                                      // 窗口挪了，任务堆/报错堆重新算（同拖主卡）
+        return;
+      }
+      detail.style.transition='';
+      if(!moved)return;
+      const rect=anchorEl2?anchorEl2.getBoundingClientRect():{left:0,top:0};
+      settingsRuntime.toolCardFreePos={
+        left:Math.round((parseFloat(detail.style.getPropertyValue('--workspace-left'))||0)+rect.left),
+        top:Math.round((parseFloat(detail.style.getPropertyValue('--workspace-top'))||0)+rect.top)};
+      settingsSave();
+    };
+    window.addEventListener('mouseup',finish);
+    window.addEventListener('blur',finish);
+    // 双击顶栏：自由模式回到「当前卡原位展开」（拖丢了也能找回来）
+    detail.addEventListener('dblclick',event=>{
+      if(!handleOf(event.target)||!window.V7FreeMode?.isActive?.())return;
+      event.preventDefault();event.stopPropagation();
+      settingsRuntime.toolCardFreePos=null;settingsSave();setToolGeometry();
+    },true);
+  })();
+
+  // ⚠ 关闭按钮（三级卡右上角那个 ×）走的是 main IIFE 里的 closeAll()，
+  //   它只做 detail.classList.remove('show','closing') —— 【不会调我的 close()】。
+  //   不管的话：点 × 之后卡是收了，但我加的 v7tw-covering 还挂在 body 上，
+  //   一级卡和二级卡【一直藏着不回来】。用户看到的就是"关掉之后主卡没了"。
+  //   closeAll 在另一个 IIFE 里改不到，所以用观察者兜住：只要 .show 被摘掉，
+  //   就补一次清理。幂等 —— 重复调用无副作用。
+  const detailObserver=new MutationObserver(()=>{
+    if(!detail.classList.contains('show')&&document.body.classList.contains('v7tw-covering')){
+      window.V7ToolWorkbench.close();
+    }
+  });
+  detailObserver.observe(detail,{attributes:true,attributeFilter:['class']});
+})();
+</script>
+<script src="floating-bars.js"></script>
+<script src="workspace-stack-rail.js"></script>
+
+
+</body></html>

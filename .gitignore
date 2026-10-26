@@ -7,3 +7,11 @@ desktop/dist/
 desktop/dist-next/
 desktop/.stage/
 helper/config.json
+# 开发时 V7 主程序把数据写在 v7/ 下（打包后在用户数据目录）
+/v7/cache/
+/v7/exports/
+/v7/logs/
+/v7/tmp/
+/v7/agent-trace/
+/v7/cache-settings.json
+/v7/models/

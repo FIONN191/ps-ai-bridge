@@ -1,0 +1,258 @@
+/* 夏三六 · 二级大卡 / 主卡卡面 / 悬浮框（2026-10-17）
+ * 样子照用户看过的样稿 v2（tmp/agent-ui/mock.html）。颜色一律用 tokens.css 的代币，不写死色值。
+ * ⚠ 二级大卡的规则全收在 #assistantZone 里；卡面收在 .agent-face 里；悬浮框收在 .v7-agent-dock 里 —— 不漏到别的卡。
+ * ⚠ 动画时长只用规范的五档（.12s / .18s / .2s / .36s / .6s）。
+ */
+
+/* ═══ 二级大卡：540×400，左 416 内容 + 右 108 导航（同设置卡 / 生成卡）═══ */
+#assistantZone{width:540px;height:400px;border:0;box-shadow:var(--shadow-mid),inset 0 0 0 1px var(--line)}
+#assistantZone::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;
+  background-color:var(--bg-solid);
+  background-image:linear-gradient(hsl(var(--card-h, 220 28%) 8% / .6),hsl(var(--card-h, 220 28%) 8% / .6)),var(--card-bg-image, none);
+  background-size:cover;background-position:center;opacity:var(--ui-bg-opacity,1)}
+/* ⚠ overflow:clip：焦点和 scrollIntoView 推不动它（设置卡「整片空白」那个坑，docs/219 §十二） */
+#assistantZone .az-main{position:absolute;left:0;top:0;width:416px;height:400px;overflow:hidden;overflow:clip;z-index:1;color:var(--tx)}
+#assistantZone .az-pg{position:absolute;inset:0;display:none;flex-direction:column}
+#assistantZone .az-pg.on{display:flex}
+#assistantZone [hidden]{display:none!important}
+
+/* 右边导航 */
+#assistantZone .az-rail{position:absolute;left:432px;top:0;width:108px;height:400px;border-radius:0 20px 20px 0;border-left:1px solid var(--line-faint);overflow:visible;z-index:1}
+#assistantZone .az-rail::before{content:'';position:absolute;inset:0;pointer-events:none;background:rgba(255,255,255,calc(.05 * var(--ui-bg-opacity,1)))}
+#assistantZone .az-rail .z-glow{position:absolute;left:0;top:0;bottom:0;width:0;pointer-events:none;z-index:1;opacity:0;
+  background:linear-gradient(90deg,hsl(var(--glow-zone)/1) 0%,hsl(var(--glow-zone)/.6) 55%,hsl(var(--glow-zone)/0) 100%)}
+#assistantZone .az-rail .z-bright{position:absolute;left:0;top:0;bottom:0;width:3px;pointer-events:none;z-index:1;opacity:0;background:linear-gradient(180deg,transparent,hsl(var(--glow-zone)/1),transparent)}
+#assistantZone .az-rail .z-glow.glow{animation:azGlowSweep .6s var(--ease-out) forwards}
+#assistantZone .az-rail .z-bright.glow{animation:azBrightSweep .6s var(--ease-out) forwards}
+@keyframes azGlowSweep{0%{opacity:0;width:0}16%{opacity:1;width:29px}40%{opacity:1;width:29px}55%{opacity:0.5;width:12px}100%{opacity:0;width:0}}
+@keyframes azBrightSweep{0%{opacity:0}16%{opacity:0.95}40%{opacity:0.95}55%{opacity:0.3}100%{opacity:0}}
+#assistantZone .az-rail-in{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;padding:10px 5px 8px}
+#assistantZone .az-nodes{position:relative;display:flex;flex-direction:column;gap:3px;margin:auto 0}
+#assistantZone .az-nodes::before{content:"";position:absolute;left:13px;top:22px;bottom:10px;width:2px;border-radius:0px;background:hsl(var(--glow-detail)/.26)}
+#assistantZone .az-group{font-size:10px;font-weight:600;color:var(--tx2);padding:8px 4px 2px 22px}
+#assistantZone .az-group:first-child{padding-top:0}
+#assistantZone .az-node{all:unset;box-sizing:border-box;position:relative;height:24px;border-radius:8px;display:flex;align-items:center;gap:6px;padding:0 4px 0 8px;cursor:pointer;color:var(--tx2);font-size:11px;transition:background var(--m-fast),color var(--m-fast)}
+#assistantZone .az-node i{flex:none;width:10px;height:10px;box-sizing:border-box;border-radius:4px;background:var(--bg-solid);border:2px solid hsl(var(--glow-detail)/calc(.75 * var(--ui-bg-opacity,1)));transition:transform var(--m-fast) var(--ease-out),background var(--m-fast)}
+#assistantZone .az-node span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#assistantZone .az-node em{position:absolute;right:5px;top:5px;font-style:normal;font-size:10px;line-height:14px;min-width:10px;text-align:center;padding:0 3px;border-radius:999px;background:hsl(var(--sem-info)/.2);color:hsl(var(--sem-info))}
+#assistantZone .az-node em.w{background:hsl(var(--sem-warn)/.2);color:hsl(var(--sem-warn))}
+#assistantZone .az-node em.e{background:hsl(var(--sem-err)/.2);color:hsl(var(--sem-err))}
+#assistantZone .az-node:hover,#assistantZone .az-node.sel{background:rgba(255,255,255,calc(.04 * var(--ui-bg-opacity,1)));color:var(--tx)}
+#assistantZone .az-node:hover i{transform:scale(1.2);background:hsl(var(--glow-detail)/calc(.6 * var(--ui-bg-opacity,1)))}
+#assistantZone .az-node.sel i{background:hsl(var(--glow-detail));box-shadow:0 0 8px 2px hsl(var(--glow-detail)/calc(.7 * var(--ui-bg-opacity,1)))}
+#assistantZone .az-node:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+
+/* 通用小件 */
+#assistantZone .az-btn,.agent-face .az-btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:4px;height:32px;padding:0 12px;line-height:1;border-radius:var(--radius-control);background:var(--surface);border:1px solid var(--line);color:var(--tx);font-size:11px;font-weight:600;white-space:nowrap;transition:background var(--m-fast)}
+#assistantZone .az-btn:hover,.agent-face .az-btn:hover{background:var(--surface-strong)}
+#assistantZone .az-btn:active,.agent-face .az-btn:active{transform:scale(.98)}
+#assistantZone .az-btn:focus-visible,.agent-face .az-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#assistantZone .az-btn[disabled],.agent-face .az-btn[disabled]{opacity:0.3;pointer-events:none}
+#assistantZone .az-btn.pri,.agent-face .az-btn.pri{background:hsl(var(--accent-hsl)/.32);border-color:hsl(var(--accent-hsl)/.5)}
+#assistantZone .az-btn.warn,.agent-face .az-btn.warn{color:hsl(var(--sem-err))}
+#assistantZone .az-btn.sm{height:24px;padding:0 8px;line-height:1;font-size:10px;font-weight:500}
+#assistantZone .az-badge,.agent-face .az-badge{flex:none;display:inline-flex;align-items:center;padding:1px 8px;border-radius:999px;font-size:10px;white-space:nowrap;background:hsl(var(--sem-ok)/.14);color:hsl(var(--sem-ok))}
+#assistantZone .az-badge.run,.agent-face .az-badge.run{background:hsl(var(--sem-info)/.16);color:hsl(var(--sem-info))}
+#assistantZone .az-badge.wait,.agent-face .az-badge.wait{background:hsl(var(--sem-warn)/.16);color:hsl(var(--sem-warn))}
+#assistantZone .az-badge.err,.agent-face .az-badge.err{background:hsl(var(--sem-err)/.16);color:hsl(var(--sem-err))}
+#assistantZone .az-dot,.agent-face .az-dot{display:inline-block;box-sizing:border-box;width:8px;height:8px;border-radius:50%;border:2px solid hsl(var(--sem-ok));background:hsl(var(--sem-ok));margin-right:5px;vertical-align:middle}
+/* ⭐ 2026-10-22：没连上 = 空心圈（去掉颜色也分得清） */
+#assistantZone .az-dot.off,.agent-face .az-dot.off{border-color:hsl(var(--sem-warn));background:transparent}
+#assistantZone .az-select,#assistantZone .az-input{box-sizing:border-box;height:28px;min-width:0;border-radius:var(--radius-control);border:1px solid var(--line);background:var(--surface-faint);color:var(--tx);font:inherit;font-size:12px;padding:0 8px}
+#assistantZone .az-select.sm{height:22px;font-size:10px;padding:0 4px}
+/* ⚠ 软件的统一下拉框（ui-select.js）会把原生 select 藏起来、旁边另画一个 .uisel-trigger ——
+ *   尺寸要写在 trigger 上（实跑截图抓到：不写的话「怎么跑」那个下拉框把输入框那一整行撑满）。 */
+#assistantZone .az-top>.uisel-trigger{flex:1;min-width:0;height:32px;min-height:32px;padding:0 8px;font-size:12px}
+#assistantZone .az-comp-row>.uisel-trigger{flex:0 0 112px;width:112px;max-width:112px;height:24px;min-height:24px;padding:0 6px;font-size:10px}
+#assistantZone .az-rowline>.uisel-trigger{flex:0 0 112px;width:112px;max-width:112px;height:24px;min-height:24px;padding:0 6px;font-size:10px}
+#assistantZone .az-input{flex:1}
+#assistantZone .az-select:focus-visible,#assistantZone .az-input:focus-visible,#assistantZone .az-ta:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
+#assistantZone .az-seg,.agent-face .az-seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+#assistantZone .az-seg button,.agent-face .az-seg button{all:unset;cursor:pointer;box-sizing:border-box;height:24px;padding:0 8px;line-height:1;display:inline-flex;align-items:center;font-size:10px;color:var(--tx2);white-space:nowrap}
+#assistantZone .az-seg button:hover,.agent-face .az-seg button:hover{color:var(--tx);background:rgba(255,255,255,.04)}
+#assistantZone .az-seg button.on,.agent-face .az-seg button.on{background:hsl(var(--accent-hsl)/.28);color:var(--tx)}
+#assistantZone .az-seg.off{opacity:0.5}
+#assistantZone .az-seg button[disabled]{pointer-events:none}
+#assistantZone .az-note{margin-top:8px;padding:6px 8px;border-left:3px solid hsl(var(--accent-hsl)/.6);background:rgba(0,0,0,.18);font-size:10px;color:var(--tx2);line-height:1.6}
+#assistantZone .az-rowbtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#assistantZone .az-rowline{display:flex;align-items:center;gap:6px;margin-top:6px}
+#assistantZone .az-row{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;color:var(--tx2)}
+#assistantZone .az-row>span:first-child{width:62px;flex:none}
+#assistantZone .az-status{margin-top:6px;font-size:11px;color:var(--tx2)}
+
+/* 页头 / 内容区 */
+#assistantZone .az-ph{flex:none;padding:12px 16px 9px;border-bottom:1px solid var(--line-faint)}
+#assistantZone .az-ph-t{font-size:15px;font-weight:600}
+#assistantZone .az-ph-s{margin-top:2px;font-size:10px;color:var(--tx2)}
+#assistantZone .az-pb{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;padding:12px 16px 14px;overscroll-behavior:contain}
+#assistantZone .az-pb::-webkit-scrollbar{display:none}
+
+/* 对话页（10-17 晚：会话管理挪去「历史会话」页；抓画布 / 怎么跑 / 输入框 / 发送 一行；上下空间给消息） */
+#assistantZone .az-conn,.agent-face .af-conn{all:unset;cursor:pointer;flex:none;max-width:150px;font-size:10px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 4px;border-radius:4px}
+#assistantZone .az-conn:hover,.agent-face .af-conn:hover{color:var(--tx);background:rgba(255,255,255,.04)}
+#assistantZone .az-rowbtns .az-conn{margin-left:auto;align-self:center;cursor:default}
+#assistantZone .az-strip{flex:none;display:flex;align-items:center;gap:6px;min-height:26px;box-sizing:border-box;margin:8px 10px 0;padding:2px 3px 2px 8px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid var(--line-faint);font-size:10px;color:var(--tx2)}
+#assistantZone .az-strip.ask{border-color:hsl(var(--sem-warn)/.5)}
+#assistantZone .az-strip.err{border-color:hsl(var(--sem-err)/.5)}
+#assistantZone .az-strip.err .az-strip-tx{color:hsl(var(--sem-err))}
+#assistantZone .az-strip-tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)}
+#assistantZone .az-chip{all:unset;cursor:pointer;flex:none;height:24px;padding:0 9px;border-radius:var(--radius-chip);border:1px solid var(--line);background:rgba(255,255,255,.04);font-size:11px;color:var(--tx);display:inline-flex;align-items:center;transition:background var(--m-fast)}
+#assistantZone .az-chip:hover{background:hsl(var(--accent-hsl)/.22);border-color:hsl(var(--accent-hsl)/.45)}
+#assistantZone .az-chip[disabled]{opacity:0.5;pointer-events:none}
+#assistantZone .az-answers{align-self:flex-start;display:flex;flex-wrap:wrap;gap:6px;max-width:92%}
+#assistantZone .az-msgs{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding:8px 12px;display:flex;flex-direction:column;gap:6px;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 12px);mask-image:linear-gradient(to bottom,transparent 0,#000 12px)}
+#assistantZone .az-msgs::-webkit-scrollbar{display:none}
+#assistantZone .az-m{max-width:86%;padding:6px 9px;border-radius:8px;font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}
+#assistantZone .az-m small{display:block;font-size:10px;color:var(--tx2);margin-bottom:1px}
+#assistantZone .az-m.u{align-self:flex-end;background:hsl(var(--accent-hsl)/.2)}
+#assistantZone .az-m.a{align-self:flex-start;background:rgba(255,255,255,.06)}
+#assistantZone .az-m.t{align-self:stretch;max-width:none;background:transparent;border:1px dashed var(--line);color:var(--tx2);font-size:10px;padding:4px 8px}
+#assistantZone .az-attach{flex:none;display:flex;align-items:center;gap:8px;margin:0 10px 4px;padding:3px 6px;border-radius:8px;background:rgba(0,0,0,.18);font-size:10px;color:var(--tx2)}
+#assistantZone .az-attach img{width:40px;height:30px;object-fit:cover;border-radius:4px}
+#assistantZone .az-attach span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#assistantZone .az-comp{flex:none;display:flex;align-items:flex-end;gap:5px;padding:6px 10px 8px;border-top:1px solid var(--line-faint)}
+#assistantZone .az-comp .az-btn.sm{height:32px;padding:0 9px;line-height:1;font-size:11px}
+#assistantZone .az-comp .az-select.sm{flex:0 0 72px;width:72px;height:30px;font-size:11px}
+#assistantZone .az-comp>.uisel-trigger{flex:0 0 72px;width:72px;max-width:72px;height:32px;min-height:32px;padding:0 6px;font-size:11px}
+#assistantZone .az-ta{display:block;box-sizing:border-box;width:100%;height:40px;resize:none;border-radius:var(--radius-control);border:1px solid var(--line);background:var(--surface-faint);color:var(--tx);font:inherit;font-size:12px;line-height:1.45;padding:5px 8px}
+#assistantZone .az-comp .az-ta{flex:1;width:auto;min-width:0;height:30px;max-height:84px;padding:6px 8px;overflow-y:auto;scrollbar-width:none}
+#assistantZone .az-ta.sm{height:44px;margin-top:4px;font-size:11px}
+#assistantZone .az-comp-row>.uisel-trigger,#assistantZone .az-rowline>.uisel-trigger{flex:0 0 112px;width:112px;max-width:112px;height:24px;min-height:24px;padding:0 6px;font-size:10px}
+#assistantZone .az-sp{flex:1}
+
+/* 进程清单（主卡 + 二级「当前任务」页共用）：计划 / 过程 / 正在·接下来 */
+.agent-face .ap-plan,#assistantZone .ap-plan{flex:none;display:flex;flex-direction:column;gap:1px;padding:4px 7px;border-radius:8px;background:rgba(0,0,0,.18);border:1px solid var(--line-faint)}
+.agent-face .ap-step,#assistantZone .ap-step{display:flex;gap:6px;font-size:11px;line-height:1.5;color:var(--tx2);min-width:0}
+.agent-face .ap-step i,#assistantZone .ap-step i{flex:none;width:12px;font-style:normal;text-align:center}
+.agent-face .ap-step span,#assistantZone .ap-step span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-face .ap-step.doing,#assistantZone .ap-step.doing{color:var(--tx);font-weight:600}
+.agent-face .ap-step.doing i,#assistantZone .ap-step.doing i{color:hsl(var(--sem-info))}
+.agent-face .ap-step.done i,#assistantZone .ap-step.done i{color:hsl(var(--sem-ok))}
+.agent-face .ap-step.done span,#assistantZone .ap-step.done span{opacity:0.75}
+.agent-face .ap-step.skip,#assistantZone .ap-step.skip,.agent-face .ap-step.more,#assistantZone .ap-step.more{opacity:0.5;font-size:10px}
+.agent-face .ap-log,#assistantZone .ap-log{display:flex;flex-direction:column;justify-content:flex-end;gap:1px;min-height:0;overflow:hidden}
+#assistantZone .ap-log.full{justify-content:flex-start;overflow:visible;margin-top:4px}
+#assistantZone .ap-log.full .ap-l{white-space:normal}
+.agent-face .ap-log.dim{opacity:0.75;flex:none}
+.agent-face .ap-ev,#assistantZone .ap-ev{flex:none;display:flex;align-items:center;gap:6px;font-size:10px;line-height:1.55;color:var(--tx2);min-width:0}
+.agent-face .ap-ev i,#assistantZone .ap-ev i{flex:none;width:6px;height:6px;border-radius:50%;background:var(--line-strong)}
+.agent-face .ap-ev.ok i,#assistantZone .ap-ev.ok i{background:hsl(var(--sem-ok))}
+.agent-face .ap-ev.fail,#assistantZone .ap-ev.fail{color:hsl(var(--sem-err))}
+.agent-face .ap-ev.fail i,#assistantZone .ap-ev.fail i{background:hsl(var(--sem-err))}
+.agent-face .ap-ev.run,#assistantZone .ap-ev.run{color:var(--tx)}
+.agent-face .ap-ev.run i,#assistantZone .ap-ev.run i{background:hsl(var(--sem-info));animation:apPulse .6s var(--ease-soft) infinite alternate}
+.agent-face .ap-ev.say i,#assistantZone .ap-ev.say i{background:transparent;border:1px solid var(--tx2)}
+.agent-face .ap-ev.auto i,#assistantZone .ap-ev.auto i{background:hsl(var(--sem-warn))}
+.agent-face .ap-ev.user i,#assistantZone .ap-ev.user i{background:hsl(var(--accent-hsl))}
+.agent-face .ap-l,#assistantZone .ap-l{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-face .ap-l em,#assistantZone .ap-l em{font-style:normal;opacity:0.75}
+.agent-face .ap-l em.n,#assistantZone .ap-l em.n{opacity:1}
+.agent-face .ap-l b,#assistantZone .ap-l b{font-weight:600;color:var(--tx)}
+.agent-face .ap-r,#assistantZone .ap-r{flex:none;font-size:10px;opacity:0.75;font-variant-numeric:tabular-nums}
+/* 2026-10-17 夜：正在跑的工具超过 60 秒标橙（多半卡住了；agent-zone.js SLOW_SEC） */
+.agent-face .ap-r.slow,#assistantZone .ap-r.slow{color:#ffae42;opacity:1;font-weight:600}
+.agent-face .ap-next,#assistantZone .ap-next{flex:none;font-size:11px;color:hsl(var(--sem-info));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#assistantZone .ap-h{margin-top:10px;font-size:12px}
+@keyframes apPulse{from{opacity:0.3}to{opacity:1}}
+
+/* 历史 / 任务 / 设置 */
+#assistantZone .az-hs{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:12px}
+#assistantZone .az-hs:hover{background:rgba(255,255,255,.04)}
+#assistantZone .az-hs.cur{background:rgba(255,255,255,.06)}
+#assistantZone .az-hs-nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ⭐ 2026-10-22（docs/263 第 8 条）：平时 .3 压淡露着（以前是 0），移到这一条上全亮 */
+#assistantZone .az-hs-ops{display:flex;gap:4px;opacity:.3;transition:opacity var(--m-fast)}
+#assistantZone .az-hs:hover .az-hs-ops,#assistantZone .az-hs:focus-within .az-hs-ops{opacity:1}
+#assistantZone .az-tp-head{display:flex;align-items:center;gap:8px;font-size:13px}
+#assistantZone .az-kv{display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--tx2)}
+#assistantZone .az-kv b{font-weight:500;color:var(--tx)}
+#assistantZone .az-tp-body{margin-top:10px;padding:8px;border-radius:8px;background:rgba(0,0,0,.18);font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}
+#assistantZone .az-sec{padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line-faint)}
+#assistantZone .az-sec:last-child{border-bottom:0}
+#assistantZone .az-sec-t{font-size:13px;font-weight:600}
+#assistantZone .az-sec-s{font-size:10px;color:var(--tx2);margin:2px 0 8px;line-height:1.5}
+#assistantZone .az-local{margin-top:8px;font-size:11px}
+#assistantZone .az-local summary{cursor:pointer;color:var(--tx2)}
+#assistantZone .az-cap{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:11px;border-bottom:1px dashed var(--line-faint)}
+#assistantZone .az-cap b{font-weight:500;text-align:right;min-width:0;overflow-wrap:anywhere}
+#assistantZone .az-cap .ok{color:hsl(var(--sem-ok))}
+#assistantZone .az-cap .bad{color:hsl(var(--sem-err))}
+#assistantZone .az-cap .unk{color:var(--tx2)}
+#assistantZone .az-st{padding:6px 0 8px;border-bottom:1px dashed var(--line-faint)}
+#assistantZone .az-st .az-input{max-width:120px}
+#assistantZone .az-qk{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:1px dashed var(--line-faint)}
+#assistantZone .az-qk span{flex:1;min-width:0;overflow-wrap:anywhere}
+/* 旧面板挂进来的那一块：去掉它自己的外框，跟本卡一个调子 */
+#assistantZone [data-az-legacy] .settings-section{margin:0;padding:0;border:0;background:transparent;box-shadow:none}
+
+/* ═══ 主卡卡面（.bc-fields 里）：能直接开工 ═══ */
+.bc-fields.agent-face{display:flex!important;flex-direction:column;gap:8px;overflow:hidden;color:var(--tx)}
+.agent-face [hidden]{display:none!important}
+.agent-face .af-head{display:flex;align-items:center;gap:8px;font-size:13px;min-width:0}
+.agent-face .af-head b{font-weight:600;flex:none;white-space:nowrap}
+/* 头上一行挤不下时让「已连接 · 模型名」缩成省略号，名字和排队数不准折行（实跑截图抓到「夏三\n六」） */
+.agent-face .af-head .af-conn{margin-left:auto;min-width:0;flex:0 1 auto}
+.agent-face .af-head .af-q{flex:none;white-space:nowrap}
+.agent-face .af-body{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
+/* 进程清单（在干 / 回话了 / 出错 / 等你回答）：标题 → 计划 → 过程（只露最新几行，旧的从上面挤出去）→ 正在·接下来 → 按钮 */
+.agent-face .af-proc{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;padding:8px 9px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--line-faint)}
+.agent-face .af-proc .ap-log{flex:1}
+.agent-face .af-proc .af-t1{flex:none;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-face .af-proc .af-t2{flex:none;margin-top:0;font-size:11px;-webkit-line-clamp:2}   /* 2026-10-22：3 行归成摘要档 2 行（docs/263 1.9） */
+.agent-face .af-proc .af-bar{flex:none;margin-top:0}
+.agent-face .af-proc .af-btns{flex:none;margin-top:0}
+.agent-face .af-auto{margin-left:6px;font-size:10px;font-weight:500;padding:0 6px;border-radius:999px;background:hsl(var(--sem-warn)/.16);color:hsl(var(--sem-warn));vertical-align:1px}
+.agent-face .af-q{font-size:10px;color:hsl(var(--sem-info))}
+.agent-face .af-ask{flex:none;font-size:11px;line-height:1.5;color:var(--tx);padding:5px 8px;border-left:3px solid hsl(var(--sem-warn)/.7);background:rgba(0,0,0,.18);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.agent-face .af-note{padding:6px 8px;border-left:3px solid hsl(var(--sem-warn)/.7);background:rgba(0,0,0,.18);font-size:11px;color:var(--tx2);line-height:1.5}
+.agent-face .af-lbl{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--tx2)}
+.agent-face .af-link{all:unset;cursor:pointer;font-size:11px;color:var(--tx2);padding:2px 4px;border-radius:4px}
+.agent-face .af-link:hover{color:var(--tx);background:rgba(255,255,255,.06)}
+.agent-face .af-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.agent-face .af-start{all:unset;box-sizing:border-box;cursor:pointer;min-height:46px;padding:6px 8px;border-radius:var(--radius-button);background:rgba(255,255,255,.12);border:1px solid var(--line);font-size:13px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;text-align:center;transition:background var(--m-fast),transform var(--m-fast)}
+.agent-face .af-start small{font-size:10px;font-weight:400;color:var(--tx2)}
+.agent-face .af-start:hover{background:rgba(255,255,255,.2);transform:scale(1.02)}
+.agent-face .af-start:active{transform:scale(.98)}
+.agent-face .af-start:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.agent-face .af-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--tx2)}
+.agent-face .af-task{padding:10px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--line-faint)}
+.agent-face .af-t1{font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.agent-face .af-t2{margin-top:4px;font-size:12px;color:var(--tx2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}   /* 2026-10-22：5 行归成 2 行 */
+.agent-face .af-t2.err{color:hsl(var(--sem-err))}
+.agent-face .af-bar{position:relative;margin-top:10px;height:4px;border-radius:4px;background:var(--line-strong);overflow:hidden}
+/* 不确定进度（第一批没有真实百分比，不画成必然走完的进度条）*/
+.agent-face .af-bar i{position:absolute;top:0;bottom:0;width:30%;border-radius:4px;background:var(--accent);animation:afBusy 1.2s var(--ease-soft) infinite alternate}
+@keyframes afBusy{from{left:0}to{left:70%}}
+.agent-face .af-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+
+/* ═══ 悬浮框（推倒重做）：跟胶囊导航条一家 ═══ */
+.v7-agent-dock .ad-cap{display:flex;align-items:center;gap:2px;height:44px;box-sizing:border-box;padding:4px 6px 4px 4px;border-radius:999px;background:var(--bg-solid);border:1px solid var(--line-strong);box-shadow:var(--shadow-light)}
+.v7-agent-dock .ad-cap:focus-within{border-color:var(--accent)}
+.v7-agent-dock .ad-who{display:flex;align-items:center;gap:6px;flex:none;padding:0 10px 0 8px!important;color:var(--tx)!important;white-space:nowrap}
+.v7-agent-dock .ad-dot{box-sizing:border-box;width:8px;height:8px;border-radius:50%;border:2px solid hsl(var(--sem-ok));background:hsl(var(--sem-ok))}
+.v7-agent-dock .ad-dot.off{border-color:hsl(var(--sem-warn));background:transparent}
+.v7-agent-dock .ad-dot.run{border-color:hsl(var(--sem-info));background:hsl(var(--sem-info));box-shadow:0 0 6px hsl(var(--sem-info)/.7)}
+.v7-agent-dock .ad-dot.wait{border-color:hsl(var(--sem-warn));background:hsl(var(--sem-warn));box-shadow:0 0 6px hsl(var(--sem-warn)/.7)}
+.v7-agent-dock .ad-dot.err{border-color:hsl(var(--sem-err));background:hsl(var(--sem-err))}
+.v7-agent-dock .ad-in{flex:1;min-width:0;height:32px;border:0;outline:0;background:transparent;color:var(--tx);font:inherit;font-size:13px;padding:0 4px}
+.v7-agent-dock .ad-in::placeholder{color:var(--tx2);opacity:0.95}
+.v7-agent-dock .ad-send{background:var(--surface)!important;color:var(--tx)!important}
+.v7-agent-dock .ad-row{margin-top:6px;display:flex;align-items:center;gap:6px;height:32px;box-sizing:border-box;padding:0 4px 0 10px;border-radius:12px;background:var(--bg-solid);border:1px solid var(--line);box-shadow:var(--shadow-light);font-size:11px;color:var(--tx2)}
+.v7-agent-dock .ad-row[hidden]{display:none!important}
+.v7-agent-dock .ad-row.ask{border-color:hsl(var(--sem-warn)/.6)}
+.v7-agent-dock .ad-row.err{border-color:hsl(var(--sem-err)/.6)}
+.v7-agent-dock .ad-lbl{flex:none}
+.v7-agent-dock .ad-chips{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
+.v7-agent-dock .ad-chips::-webkit-scrollbar{display:none}
+.v7-agent-dock .ad-chip{flex:none;min-height:22px!important;height:22px;padding:0 8px!important;border-radius:999px!important;background:rgba(255,255,255,.06)!important;border:1px solid var(--line-faint)!important;color:var(--tx)!important;font-size:11px!important;white-space:nowrap}
+.v7-agent-dock .ad-chip:hover{background:var(--surface-strong)!important}
+.v7-agent-dock .ad-chip.save{color:hsl(var(--accent-hsl))!important;border-style:dashed!important}
+.v7-agent-dock .ad-badge{flex:none;padding:1px 8px;border-radius:999px;font-size:10px;white-space:nowrap;background:hsl(var(--sem-info)/.16);color:hsl(var(--sem-info))}
+.v7-agent-dock .ad-badge.wait{background:hsl(var(--sem-warn)/.16);color:hsl(var(--sem-warn))}
+.v7-agent-dock .ad-badge.err{background:hsl(var(--sem-err)/.16);color:hsl(var(--sem-err))}
+.v7-agent-dock .ad-st{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)}
+.v7-agent-dock .ad-btns{flex:none;display:flex;gap:4px}
+.v7-agent-dock .ad-btns button{min-height:22px!important;height:22px;padding:0 7px!important;border-radius:var(--radius-control)!important;background:var(--surface)!important;border:1px solid var(--line)!important;color:var(--tx)!important;font-size:10px!important}
+.v7-agent-dock .ad-btns button.pri{background:hsl(var(--accent-hsl)/.32)!important}
+.v7-agent-dock .ad-btns button.warn{color:hsl(var(--sem-err))!important}
