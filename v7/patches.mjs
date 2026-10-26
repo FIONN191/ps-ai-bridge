@@ -74,4 +74,22 @@ export const PATCHES = [
     find: "channels:()=>[['aji','AJI'],['grs','GRS'],['other','其他']],",
     replace: "channels:()=>[['other','免 API 模式'],['aji','AJI'],['grs','GRS']],",
   },
+  {
+    file: 'ui/ui-main.js',
+    why: '免 API 模式：生成卡先选「生图平台」再选模型（平台和模型分两行、各占整行，名字不再被截断）；不显示余额折算',
+    find: "      const 名单=配了?aiModelOptions():[];",
+    replace: "      const 免API=window.__PSAI_FREE_API__&&__PSAI_FREE_API__.active()?__PSAI_FREE_API__:null;\n      const 名单=配了?(免API?免API.filter(aiModelOptions()):aiModelOptions()):[];",
+  },
+  {
+    file: 'ui/ui-main.js',
+    why: '同上：模型行前面加平台行',
+    find: "      return '<div class=\"gcf modelrow\">模型<div class=\"modelrow-line\">'\n        +'<select data-ai-field=\"model\"'",
+    replace: "      return (免API?免API.platformRow():'')+'<div class=\"gcf modelrow\">模型<div class=\"modelrow-line\">'\n        +'<select data-ai-field=\"model\"'",
+  },
+  {
+    file: 'ui/ui-main.js',
+    why: '同上：免 API 不扣费，去掉挤占下拉框宽度的「自定连接 · 不折算」',
+    find: "        +(配了?modelQuotaHtml():'<span class=\"model-quota\" data-state=\"empty\"",
+    replace: "        +(免API?'':配了?modelQuotaHtml():'<span class=\"model-quota\" data-state=\"empty\"",
+  },
 ];

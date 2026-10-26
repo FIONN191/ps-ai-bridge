@@ -11458,13 +11458,14 @@ function renderGenerationCardFields(){
         +'</div></div>';
       const 配了=aiConnectionConfigured();
       // 2026-10-24（V7待办/04）：配了连接但一个模型都没拉到（墨墨没点过「检查连接」）⇒ 明说，不拿别家的名单凑
-      const 名单=配了?aiModelOptions():[];
+      const 免API=window.__PSAI_FREE_API__&&__PSAI_FREE_API__.active()?__PSAI_FREE_API__:null;
+      const 名单=配了?(免API?免API.filter(aiModelOptions()):aiModelOptions()):[];
       const 选项=配了&&名单.length?aiSelectOptions(名单,aiRuntime.model)
                      :配了?'<option value="">（还没有模型 · 去设置卡点「检查连接」）</option>'
                      :'<option value="">（还没有模型）</option>';
-      return '<div class="gcf modelrow">模型<div class="modelrow-line">'
+      return (免API?免API.platformRow():'')+'<div class="gcf modelrow">模型<div class="modelrow-line">'
         +'<select data-ai-field="model"'+(配了?'':' disabled aria-label="还没有模型，请先在设置里配置连接"')+'>'+选项+'</select>'
-        +(配了?modelQuotaHtml():'<span class="model-quota" data-state="empty" title="还没有模型 —— 请到设置卡「用哪家生图」里配置这个服务商的地址和 API Key，然后点「检查连接」">还没有模型 · 去设置卡配连接 API Key</span>')
+        +(免API?'':配了?modelQuotaHtml():'<span class="model-quota" data-state="empty" title="还没有模型 —— 请到设置卡「用哪家生图」里配置这个服务商的地址和 API Key，然后点「检查连接」">还没有模型 · 去设置卡配连接 API Key</span>')
         +'</div></div>';
     })()+
     '<label class="gcf"'+(qwen?' title="开源模型最高 2K"':'')+'>分辨率<select data-ai-field="size">'+aiSelectOptions(aiSizeOptionRows(),aiRuntime.size)+'</select></label>'+

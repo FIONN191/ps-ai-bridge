@@ -1,6 +1,7 @@
 ## 0.8.1 — 免 API 模式
 
 - 修图轮椅面板的服务商里新增「免 API 模式」，排在第一位：自动连好本机的 AI Studio、Google Flow、ChatGPT 网页、Codex CLI、agy，模型名直接显示成「AI Studio 网页 · nano-banana-2.1」这样；没填阿吉 / 墨墨 / GRS Key 的账号打开就默认用它。换账号后也会自动填好。
+- 生成卡里先选「生图平台」（AI Studio 网页 / Google Flow / ChatGPT 网页 / Codex CLI / Antigravity），再选这个平台的模型（Nano Banana 2.1、Pro 等）；两行各占整行，名字不再被截断，也不再显示「自定连接 · 不折算」。
 - 「免 API 模式」占用 V7 原来的 Others 槽位；以前在 Others 里配过自己中转站的不受影响（检测到别的地址就不改）。
 
 ## 0.8.0 — 整合夏三七修图轮椅 V7
