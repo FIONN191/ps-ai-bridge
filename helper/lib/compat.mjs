@@ -22,7 +22,7 @@ export function compatModels(providers, capabilities) {
     const list = cap.models?.length ? cap.models : [''];
     for (const model of list) {
       const id = model ? `web-${provider}-${model}` : `web-${provider}`;
-      models.push({ name: `models/${id}`, displayName: `免 API · ${cap.label}${model ? ` · ${model}` : ''}`, supportedGenerationMethods: ['generateContent'] });
+      models.push({ id, name: `models/${id}`, displayName: `免 API · ${cap.label}${model ? ` · ${model}` : ''}`, supportedGenerationMethods: ['generateContent'] });
     }
   }
   return { models };

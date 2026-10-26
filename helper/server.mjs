@@ -40,7 +40,7 @@ import { runninghub, runninghubRoutes } from './providers/runninghub.mjs';
 import { comfyui, comfyRoutes } from './providers/comfyui.mjs';
 import { chatgpt, CHATGPT_ASPECTS } from './providers/chatgpt.mjs';
 
-const VERSION = '0.8.0';
+const VERSION = '0.8.1';
 // 和 helper 一起分发的插件版本（桌面端里在 resources/plugin，源码版是仓库里的 plugin/）。PS 面板拿它和自己的版本比，旧了就提示更新
 const BUNDLED_PLUGIN = (() => {
   try { return JSON.parse(fs.readFileSync(path.join(ROOT, '..', 'plugin', 'manifest.json'), 'utf8')).version; } catch { return null; }

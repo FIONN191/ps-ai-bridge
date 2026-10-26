@@ -44,4 +44,34 @@ export const PATCHES = [
     find: "const engineResourceRoot = () => app.isPackaged ? process.resourcesPath : path.join(__dirname, '..');",
     replace: "const engineResourceRoot = () => path.join(__dirname, '..');",
   },
+  {
+    file: 'ui/ui-main.js',
+    why: '整合：Others 槽位固定给本机「免 API 模式」（AI Studio / Flow / ChatGPT 网页等），名字直接叫免 API 模式',
+    find: "other:'Others · 其他'};\nfunction computeSlotLabel",
+    replace: "other:'免 API 模式'};\nfunction computeSlotLabel",
+  },
+  {
+    file: 'ui/compute-slots.js',
+    why: '同上：渠道默认名',
+    find: "grs: 'GRS', other: '自定义' });",
+    replace: "grs: 'GRS', other: '免 API 模式' });",
+  },
+  {
+    file: 'ui/provider-connections.js',
+    why: '同上：连接标题',
+    find: "other:'Others · 其他'});",
+    replace: "other:'免 API 模式'});",
+  },
+  {
+    file: 'ui/ui-main.js',
+    why: '同上：设置里连接字段的标题和提示',
+    find: "['other','自定义','https://你的中转站地址','该站给你的 Key'],",
+    replace: "['other','免 API 模式','http://127.0.0.1:47811/compat（已自动填好）','随便填，比如 local'],",
+  },
+  {
+    file: 'ui/ui-main.js',
+    why: '同上：幕布生成节点的渠道列表，免 API 模式排第一',
+    find: "channels:()=>[['aji','AJI'],['grs','GRS'],['other','其他']],",
+    replace: "channels:()=>[['other','免 API 模式'],['aji','AJI'],['grs','GRS']],",
+  },
 ];

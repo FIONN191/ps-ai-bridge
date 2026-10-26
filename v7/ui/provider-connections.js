@@ -1,6 +1,6 @@
 (function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory();else root.V7ProviderConnections=factory();})(typeof self!=='undefined'?self:this,function(){
   'use strict';
-  const TITLES=Object.freeze({aji:'AJI · 阿吉',momo:'MOMO · 墨墨',other:'Others · 其他'});
+  const TITLES=Object.freeze({aji:'AJI · 阿吉',momo:'MOMO · 墨墨',other:'免 API 模式'});
   const fail=message=>Object.assign(new Error(message),{code:'PROVIDER_CATALOG_INVALID'});
   const SLOTS=['aji','momo','grs','other'],AUTH=['bearer','query','x-goog-api-key'];
   function migrate(input,legacy,now=Date.now()){

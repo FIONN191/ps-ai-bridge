@@ -19,7 +19,7 @@
 })(typeof window !== 'undefined' ? window : null, function () {
   'use strict';
   const SLOTS = ['aji', 'momo', 'grs', 'other'];
-  const DEFAULT_NAMES = Object.freeze({ aji: 'AJI · 阿吉', momo: 'MOMO · 墨墨', grs: 'GRS', other: '自定义' });
+  const DEFAULT_NAMES = Object.freeze({ aji: 'AJI · 阿吉', momo: 'MOMO · 墨墨', grs: 'GRS', other: '免 API 模式' });
   const clean = (value, max) => String(value == null ? '' : value).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, max);
 
   function customName(names, slot) { return clean(names && names[slot], 20); }

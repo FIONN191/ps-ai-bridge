@@ -1,7 +1,7 @@
 {
   "name": "ps-ai-bridge-desktop",
   "productName": "PS AI Bridge",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "AI 生图贴回桌面端：托管本机 helper，一键把插件装进 Photoshop",
   "author": "fionn",
   "license": "GPL-3.0-or-later",

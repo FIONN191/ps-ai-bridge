@@ -8685,7 +8685,7 @@ function otherProfilesBind(root){
 // ⭐ 2026-10-21（用户要求，照 V6 算力槽位）：「渠道名字和露出的模型」编辑区（设置卡「你在用哪家生图」那一节，折叠着）。
 //   逻辑在 ui-pure/compute-slots.js；这里只管画和存。编辑的是【当前在用的渠道】（换服务商下拉再编别家）。
 //   ⚠ 列的是原始名单（aiModelOptionsRaw）—— 藏掉的也得列出来，不然勾掉就再也勾不回来。
-const COMPUTE_SLOT_BASE_LABELS={aji:'AJI · 阿吉',momo:'MOMO · 墨墨',grs:'GRS（夏三七托管 / 自带官方 Key）',other:'Others · 其他'};
+const COMPUTE_SLOT_BASE_LABELS={aji:'AJI · 阿吉',momo:'MOMO · 墨墨',grs:'GRS（夏三七托管 / 自带官方 Key）',other:'免 API 模式'};
 function computeSlotLabel(slot){return window.V7ComputeSlots?V7ComputeSlots.labelWithOrigin(settingsRuntime.computeSlotNames,slot,COMPUTE_SLOT_BASE_LABELS[slot]):(COMPUTE_SLOT_BASE_LABELS[slot]||slot);}
 function aiModelDisplay(slot,id){const n=(((settingsRuntime.computeModelPrefs||{})[String(slot||'')]||{}).names)||{};const raw=String(id||'');const base=typeof aiModelBase==='function'?aiModelBase(raw):raw;return String(n[raw]||n[base]||'').trim()||raw;}
 // 任务卡底部那行：⚠ 只有改过名才换 —— 没改过的照旧显示原来那串（不改名的人看到的一点不变）
@@ -14806,7 +14806,7 @@ function legacySettingsMarkup(settingsZone){
       for(const [slot,label,urlPh,keyPh] of [
           ['aji','AJI · 阿吉','https://ai.ajiai.top','sk- 开头的一串'],
           ['momo','MOMO · 墨墨','https://api.momoapi.icu','sk- 开头的一串'],
-          ['other','自定义','https://你的中转站地址','该站给你的 Key'],
+          ['other','免 API 模式','http://127.0.0.1:47811/compat（已自动填好）','随便填，比如 local'],
           ['grs','Others · 旧 GRS','留空 = 用国内直连','自带 Key 才填']])
         html+='<div class="settings-grid" data-provider-connection-slot="'+slot+'" hidden>'
           // ⭐ 2026-10-21：自定义渠道存多套方案（下拉切换 / 改名 / 另存 / 删除）—— 内容由 otherProfilesPaint() 画
@@ -19134,7 +19134,7 @@ if(window.V7RegionWorkbench)V7RegionWorkbench.configure({
 if(window.V7CanvasWorkbench)V7CanvasWorkbench.configure({
   bridge:creativeBridge,
   presets:()=>window.PRESETS?PRESETS.presets().filter(p=>(!p.kind||p.kind==='prompt')&&!p.hidden&&(!PRESETS.visible||PRESETS.visible(p))):[],models:()=>aiModelOptions(),
-  channels:()=>[['aji','AJI'],['grs','GRS'],['other','其他']],workflowSource:()=>settingsRuntime.workflowSource,
+  channels:()=>[['other','免 API 模式'],['aji','AJI'],['grs','GRS']],workflowSource:()=>settingsRuntime.workflowSource,
   enter:async()=>{if(window.uiwin&&uiwin.browser)await uiwin.browser.workspace({open:true});},
   capture:()=>new Promise((resolve,reject)=>aiCapture(async data=>{try{const blob=await(await fetch('data:'+(data.mime||'image/png')+';base64,'+(data.imageBase64||data.inputImageBase64))).blob();resolve({blob,source:{kind:'photoshop',name:data.docName||'Photoshop'}});}catch(error){reject(error);}},0,result=>reject(new Error(linkResultMessage(result))),{allowFullCanvas:true})),
   async generate(request){
