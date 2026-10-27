@@ -1,3 +1,9 @@
+## 0.8.2 — 免 API 模式 / API 模式
+
+- 修图轮椅设置「用哪家生图」先选生图方式：「免 API 模式（用自己的账号）」或「API 模式（中转站 Key）」。
+- 免 API 模式不再显示服务商、配置方案、地址、Key 和检查连接，改成 Google、ChatGPT、Codex CLI、Antigravity（agy）四个账号的登录状态和登录按钮：Google / ChatGPT 在专用 Chrome 里登录，Codex CLI / agy 打开「终端」跑各自的登录，没装的会打开安装页。
+- API 模式下服务商列表只有阿吉、墨墨、GRS。
+
 ## 0.8.1 — 免 API 模式
 
 - 修图轮椅面板的服务商里新增「免 API 模式」，排在第一位：自动连好本机的 AI Studio、Google Flow、ChatGPT 网页、Codex CLI、agy，模型名直接显示成「AI Studio 网页 · nano-banana-2.1」这样；没填阿吉 / 墨墨 / GRS Key 的账号打开就默认用它。换账号后也会自动填好。

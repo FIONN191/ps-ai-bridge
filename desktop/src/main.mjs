@@ -327,14 +327,6 @@ function loadV7() {
     isQuitting: () => quitting,
     showSettings: () => showWindow(),
   };
-  // 面板加载完后把「Others」预填成本机免 API 生图（v7/foundation/renderer/free-api-connection.js）
-  const freeApi = path.join(V7_DIR, 'foundation', 'renderer', 'free-api-connection.js');
-  app.on('web-contents-created', (_e, contents) => {
-    contents.on('did-finish-load', () => {
-      if (!contents.getURL().endsWith('/v7/ui/ui.html') || !fs.existsSync(freeApi)) return;
-      contents.executeJavaScript(fs.readFileSync(freeApi, 'utf8')).catch(() => {});
-    });
-  });
   try {
     createRequire(import.meta.url)(entry);
   } catch (e) {

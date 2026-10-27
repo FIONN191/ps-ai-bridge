@@ -1,4 +1,4 @@
-// 由 PS AI Bridge 主进程在修图轮椅面板（ui.html）加载完后注入，不改 V7 自己的文件。
+// PS AI Bridge 的「免 API 模式」，由 ui.html 在 V7 主脚本之前加载（v7/patches.mjs 加的那一行）。
 // V7 的 other 槽位在整合版里叫「免 API 模式」（v7/patches.mjs），这里把它填成本机免 API 生图
 // （helper 的 Gemini 兼容接口），排到渠道第一位，并读进可选模型、配上好认的名字：
 //   · 槽位里已经是别的地址（以前自己配的中转站）就不动；
@@ -116,6 +116,119 @@
         + '</select></div></div>';
     },
   };
+  // ── 设置「你在用哪家生图」：先选 免 API 模式 / API 模式 ──
+  //   免 API：不显示服务商、配置方案、地址、Key、检查连接，换成四个账号的登录状态和登录按钮；
+  //   API：照原来选阿吉 / 墨墨 / GRS（列表里不再出现免 API 模式）。
+  const HELPER = 'http://127.0.0.1:47811';
+  const LAST_API = 'psai.lastApiProvider';
+  const ACCOUNTS = [
+    ['google', 'Google 账号', 'AI Studio 网页、Google Flow'],
+    ['chatgpt', 'ChatGPT 账号', 'ChatGPT 网页（GPT Image）'],
+    ['codex', 'Codex CLI', 'GPT Image（命令行）'],
+    ['agy', 'Antigravity CLI（agy）', 'Nano Banana 2（命令行）'],
+  ];
+  const isFree = () => { try { return settingsRuntime.provider === 'other' && settingsRuntime.otherConnection !== 'grs'; } catch (_) { return false; } };
+  const style = document.createElement('style');
+  style.textContent = `
+    html.psai-free .settings-field:has(> select[data-setting="provider"]),
+    html.psai-free [data-provider-other-choice],
+    html.psai-free [data-provider-connections],
+    html.psai-free .settings-actions:has([data-provider-test]),
+    html.psai-free [data-provider-test-status],
+    html.psai-free [data-provider-test-status] + .settings-note,
+    html.psai-free [data-provider-catalog-host],
+    html.psai-free [data-provider-catalog-fold],
+    html.psai-free .psai-api-only { display: none !important; }
+    html:not(.psai-free) [data-psai-accounts] { display: none !important; }
+    .psai-accounts { display: grid !important; grid-template-columns: 1fr !important; grid-column: 1 / -1; gap: 8px; width: 100%; }
+    .psai-acc { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(127,127,127,.08); }
+    .psai-acc small { display: block; opacity: .6; font-size: 11px; }
+    .psai-acc [data-state] { font-size: 12px; opacity: .8; white-space: nowrap; }
+    .psai-acc [data-state="ok"] { color: #4caf7d; opacity: 1; }
+    .psai-acc button { white-space: nowrap; }`;
+  document.head.appendChild(style);
+  const syncMode = () => {
+    document.documentElement.classList.toggle('psai-free', isFree());
+    for (const sel of document.querySelectorAll('select[data-psai-mode]')) sel.value = isFree() ? 'free' : 'api';
+    for (const o of document.querySelectorAll('select[data-setting="provider"] option[value="other"]')) o.hidden = true;
+    // 只讲中转站地址 / Key / 检查连接的说明，免 API 模式下用不上
+    for (const n of document.querySelectorAll('.settings-note:not(.psai-api-only)')) if (/^(AJI、MOMO 是中转站|「检查连接」会拉)/.test(n.textContent)) n.classList.add('psai-api-only');
+  };
+  // 面板一直在动画，合并到下一帧再处理
+  let pending = false;
+  new MutationObserver(() => {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => {
+      pending = false;
+      if (document.querySelector('[data-psai-accounts]:not([data-loaded])')) refreshAccounts();
+      syncMode();
+    });
+  }).observe(document.body, { childList: true, subtree: true });
+  window.addEventListener('wheelchair:settings-changed', syncMode);
+
+  async function refreshAccounts() {
+    for (const el of document.querySelectorAll('[data-psai-accounts]')) el.dataset.loaded = '1';
+    let status = null;
+    try { const r = await window.uiwin.http.fetch({ url: `${HELPER}/accounts`, method: 'GET', timeoutMs: 15000 }); status = r && r.ok ? JSON.parse(r.body) : null; } catch (_) {}
+    for (const [id] of ACCOUNTS) {
+      const cli = status && status.cli && status.cli[id];
+      const ok = cli ? cli.loggedIn : status && status[id] === true;
+      const text = !status ? '本机服务未连接' : cli && cli.note ? cli.note : cli && !cli.installed ? '未安装' : ok ? '已登录' : status[id] === null ? '状态未知' : '未登录';
+      for (const row of document.querySelectorAll(`[data-psai-acc="${id}"]`)) {
+        const state = row.querySelector('[data-state]');
+        state.textContent = text; state.dataset.state = ok ? 'ok' : '';
+        row.querySelector('button').textContent = cli && !cli.installed ? '去安装' : ok ? '重新登录' : '登录';
+      }
+    }
+    return status;
+  }
+
+  Object.assign(window.__PSAI_FREE_API__, {
+    settingsModeRow() {
+      return '<label class="settings-field"><span>生图方式</span><select data-psai-mode aria-label="生图方式">'
+        + `<option value="free"${isFree() ? ' selected' : ''}>免 API 模式（用自己的账号）</option>`
+        + `<option value="api"${isFree() ? '' : ' selected'}>API 模式（中转站 Key）</option></select></label>`;
+    },
+    settingsAccounts() {
+      return '<div class="psai-accounts" data-psai-accounts>'
+        + ACCOUNTS.map(([id, name, use]) => `<div class="psai-acc" data-psai-acc="${id}"><div>${esc(name)}<small>${esc(use)}</small></div><span data-state>检查中…</span><button type="button" class="settings-btn" data-psai-login="${id}">登录</button></div>`).join('')
+        + '<div class="settings-note">免 API 模式用你自己的账号出图，不扣积分、不用填地址和 Key。Google / ChatGPT 在单独的专用 Chrome 里登录一次即可；Codex CLI、agy 会打开「终端」跑它们自己的登录。使用这些服务需要自备魔法。</div></div>';
+    },
+  });
+
+  function setProvider(value) {
+    const select = document.querySelector('select[data-setting="provider"]');
+    if (select) { select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })); }
+    else { settingsRuntime.provider = value; settingsSave(); }
+  }
+  document.addEventListener('change', (event) => {
+    const mode = event.target.closest && event.target.closest('select[data-psai-mode]');
+    if (!mode) return;
+    if (mode.value === 'free') {
+      if (!isFree()) try { localStorage.setItem(LAST_API, settingsRuntime.provider); } catch (_) {}
+      settingsRuntime.otherConnection = 'custom';
+      setProvider('other');
+    } else {
+      let last = 'aji';
+      try { last = localStorage.getItem(LAST_API) || 'aji'; } catch (_) {}
+      setProvider(['aji', 'momo', 'grs'].includes(last) ? last : 'aji');
+    }
+    syncMode();
+  }, true);
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest && event.target.closest('[data-psai-login]');
+    if (!button) return;
+    button.disabled = true;
+    try {
+      const r = await window.uiwin.http.fetch({ url: `${HELPER}/accounts/login`, method: 'POST', headers: { 'x-ps-ai-bridge': '1', 'content-type': 'application/json' }, body: JSON.stringify({ site: button.dataset.psaiLogin }), timeoutMs: 30000 });
+      const reply = r && r.ok ? JSON.parse(r.body || '{}') : null;
+      if (reply && reply.needInstall && reply.install) await window.uiwin.openExternalUrl(reply.install);
+      // 登录在 Chrome / 终端里完成，回来后状态自己会变
+      for (let i = 0; i < 40; i++) { await sleep(3000); const s = await refreshAccounts(); const id = button.dataset.psaiLogin; if (s && (s.cli && s.cli[id] ? s.cli[id].loggedIn : s[id] === true)) break; }
+    } finally { button.disabled = false; }
+  });
+
   // 换平台：把模型下拉换成这个平台的，选中第一个，再交给 V7 自己的「模型变了」处理（保存、重画）
   document.addEventListener('change', (event) => {
     const select = event.target.closest && event.target.closest('select[data-psai-platform]');

@@ -14799,6 +14799,7 @@ function legacySettingsMarkup(settingsZone){
       //     见下面 data-provider-other-choice 的 hidden 逻辑（选了 GRS 时它是收起的）。
         +'<div class="settings-section"><div class="settings-section-title">你在用哪家生图</div><div class="settings-grid">';
       // 2026-10-21：渠道改过名的，这里显示「起的名（原名）」（computeSlotLabel，算力槽位）
+      html+=(window.__PSAI_FREE_API__?__PSAI_FREE_API__.settingsModeRow():'');
       html+=settingControl('provider','算图服务商','select',[['aji',computeSlotLabel('aji')],['momo',computeSlotLabel('momo')],['grs',computeSlotLabel('grs')],['other',computeSlotLabel('other')]],{});
       html+='<div data-provider-other-choice hidden>'+settingControl('otherConnection','Others 里的哪一种','select',[['custom','原自定义连接'],['grs','旧 GRS 连接']])+'</div></div>';
       html+='<div data-provider-connections>';
@@ -14834,6 +14835,7 @@ function legacySettingsMarkup(settingsZone){
           +'</div>';
       html+='</div>'
         // ⚠ 检查按钮 + 状态行 + 说明，四个东西连在一起，不夹任何字段。
+        +(window.__PSAI_FREE_API__?__PSAI_FREE_API__.settingsAccounts():'')
         +'<div class="settings-actions settings-actions-inline"><button class="settings-btn settings-btn-primary" data-provider-test>检查连接</button><button class="settings-btn" data-provider-test-cancel hidden>取消</button></div>'
         +'<div class="settings-note" data-provider-test-status role="status">还没检查过 —— 填完上面的地址和 Key，点「检查连接」。</div>'
         +'<div class="settings-note">检查会做两件事：① 拉一次这个地址的模型列表（用来填生成卡的模型下拉框）② 查一次余额。'

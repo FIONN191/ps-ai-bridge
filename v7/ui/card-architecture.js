@@ -702,7 +702,8 @@
       slotEditor.addEventListener('toggle',()=>{if(slotEditor.open&&typeof root.computeSlotEditorPaint==='function')root.computeSlotEditorPaint();});
       slotEditor.addEventListener('change',event=>{if(typeof root.computeSlotEditorChange==='function')root.computeSlotEditorChange(event);});
       slotEditor.addEventListener('click',event=>{if(typeof root.computeSlotEditorClick==='function')root.computeSlotEditorClick(event);});
-      sec('provider',row(2,provider,other),conns,check,slotEditor,
+      const psaiMode=src0.querySelector('[data-psai-mode]')?.closest('.settings-field'),psaiAccounts=src0.querySelector('[data-psai-accounts]');
+      sec('provider',...(psaiMode?[row(1,wide(psaiMode))]:[]),row(2,provider,other),conns,...(psaiAccounts?[psaiAccounts]:[]),check,slotEditor,
         note('AJI、MOMO 是中转站：地址填它给你的网址（https:// 开头），Key 一般是 sk- 开头。「图像协议」和「鉴权方式」大多数情况保持默认，服务商另有说明时才改。'),
         note('「检查连接」会拉一次模型列表（填进生成卡的模型下拉框）并查一次余额，不发生成请求、不花钱。拉到列表只说明地址和 Key 对；某个模型能不能出图以实际生成为准。'),
         catalogFold);

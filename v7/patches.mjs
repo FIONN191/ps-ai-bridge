@@ -104,4 +104,34 @@ export const PATCHES = [
     find: "({aji:'AJI',momo:'MOMO',other:'Others'})[settingsRuntime.provider]",
     replace: "({aji:'AJI',momo:'MOMO',other:'免 API 模式'})[settingsRuntime.provider]",
   },
+  {
+    file: 'ui/ui-select.js',
+    why: '下拉面板跟着原生 <option hidden> 隐藏选项（API 模式下服务商列表里不出现「免 API 模式」）',
+    find: "      it.className = 'uisel-item' + (i === sel.selectedIndex ? ' cur' : '') + (o.disabled ? ' off' : '');",
+    replace: "      it.className = 'uisel-item' + (i === sel.selectedIndex ? ' cur' : '') + (o.disabled ? ' off' : '');\n      if (o.hidden) it.hidden = true;",
+  },
+  {
+    file: 'ui/ui-main.js',
+    why: '设置「你在用哪家生图」：先选免 API 模式 / API 模式',
+    find: "      html+=settingControl('provider','算图服务商','select',",
+    replace: "      html+=(window.__PSAI_FREE_API__?__PSAI_FREE_API__.settingsModeRow():'');\n      html+=settingControl('provider','算图服务商','select',",
+  },
+  {
+    file: 'ui/ui-main.js',
+    why: '同上：免 API 模式下用账号登录代替配置方案 / 地址 / Key / 检查连接',
+    find: "        +'<div class=\"settings-actions settings-actions-inline\"><button class=\"settings-btn settings-btn-primary\" data-provider-test>检查连接</button>",
+    replace: "        +(window.__PSAI_FREE_API__?__PSAI_FREE_API__.settingsAccounts():'')\n        +'<div class=\"settings-actions settings-actions-inline\"><button class=\"settings-btn settings-btn-primary\" data-provider-test>检查连接</button>",
+  },
+  {
+    file: 'ui/card-architecture.js',
+    why: '设置卡重排时把「生图方式」和免 API 账号登录块一起搬进「用哪家生图」这一节',
+    find: "      sec('provider',row(2,provider,other),conns,check,slotEditor,",
+    replace: "      const psaiMode=src0.querySelector('[data-psai-mode]')?.closest('.settings-field'),psaiAccounts=src0.querySelector('[data-psai-accounts]');\n      sec('provider',...(psaiMode?[row(1,wide(psaiMode))]:[]),row(2,provider,other),conns,...(psaiAccounts?[psaiAccounts]:[]),check,slotEditor,",
+  },
+  {
+    file: 'ui/ui.html',
+    why: '整合：在界面主脚本之前加载 PS AI Bridge 的免 API 模式（v7/foundation/renderer），设置卡和生成卡第一次画就带上',
+    find: '<script src="tauri-adapter.js"></script>',
+    replace: '<script src="tauri-adapter.js"></script>\n<script src="../foundation/renderer/free-api-connection.js"></script>',
+  },
 ];

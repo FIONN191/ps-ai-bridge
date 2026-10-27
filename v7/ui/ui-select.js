@@ -82,6 +82,7 @@
     [...sel.options].forEach((o, i) => {
       const it = document.createElement('div');
       it.className = 'uisel-item' + (i === sel.selectedIndex ? ' cur' : '') + (o.disabled ? ' off' : '');
+      if (o.hidden) it.hidden = true;
       it.textContent = o.textContent;
       // ⚠ 2026-10-08：选项面板里也挂 title —— 面板虽然比 trigger 宽，
       //   但模型 id 动辄二三十个字符，照样会被切。悬停看全文。
