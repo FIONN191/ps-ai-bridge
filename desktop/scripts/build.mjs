@@ -70,8 +70,6 @@ const copyHelper = (helperDir) => (context) => {
 const config = (helperDir, pluginDir) => ({
   appId: 'com.fionn.psaibridge.desktop',
   productName: 'BXAS',
-  // Windows 可执行文件名保持旧的：0.8.2 及以前的自动更新装完会按这个文件名核对版本、重新打开
-  executableName: 'PS AI Bridge',
   copyright: 'Copyright (C) 2026 BAIXIAO · GPL-3.0-or-later',
   directories: { output: OUT, buildResources: 'assets' },
   files: ['src/**/*', 'assets/**/*', 'package.json'],
@@ -95,6 +93,8 @@ const config = (helperDir, pluginDir) => ({
   },
   win: {
     icon: 'assets/icon-win.png',
+    // 可执行文件名保持旧的：0.8.2 及以前的自动更新装完会按这个文件名核对版本、重新打开
+    executableName: 'PS AI Bridge',
   },
   nsis: {
     oneClick: true,
