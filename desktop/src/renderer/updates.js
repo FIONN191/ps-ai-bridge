@@ -41,7 +41,7 @@ function renderUpdate(s) {
     installing: navigator.platform.startsWith('Mac')
       ? '下载好了。App 会先退出，换成新版本后几秒内自动重新打开。'
       : '下载好了。安装程序马上打开，装完会自动重新打开 App。',
-    manual: '安装包已经打开：把 PS AI Bridge 拖到「应用程序」文件夹替换旧版（提示时选「替换」），然后重新打开。先退出旧版，替换才不会失败。',
+    manual: '安装包已经打开：把 BXAS 拖到「应用程序」文件夹替换旧版（提示时选「替换」），然后重新打开。先退出旧版，替换才不会失败。',
     error: s.error + (s.logPath ? `\n安装日志：${s.logPath}` : ''),
   }[s.status];
   $('upMsg').hidden = !msg;

@@ -19,9 +19,9 @@ const tag = `v${version}`;
 
 // 每个平台对应的安装包（App 按 process.platform-process.arch 取）
 const FILES = {
-  'darwin-arm64': `PS-AI-Bridge-${version}-mac-arm64.dmg`,
-  'darwin-x64': `PS-AI-Bridge-${version}-mac-x64.dmg`,
-  'win32-x64': `PS-AI-Bridge-${version}-win-x64-setup.exe`,
+  'darwin-arm64': `BXAS-${version}-mac-arm64.dmg`,
+  'darwin-x64': `BXAS-${version}-mac-x64.dmg`,
+  'win32-x64': `BXAS-${version}-win-x64-setup.exe`,
 };
 
 // CHANGELOG.md 里「## 版本号」到下一个「## 」之间的内容

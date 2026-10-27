@@ -21,6 +21,9 @@ const PLUGIN_DIR = path.join(RES, 'plugin');
 const V7_DIR = path.join(RES, 'v7');
 const PORT = Number(process.env.PS_AI_BRIDGE_PORT) || 47811;
 
+// 改名 BXAS 以前叫 PS AI Bridge：设置、修图轮椅的预设 / 登录状态都在原来的目录，继续用它（不然看起来像全部重置）
+app.setPath('userData', path.join(app.getPath('appData'), 'PS AI Bridge'));
+
 let DATA_DIR = '';
 let USER_CONFIG = '';
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
@@ -64,7 +67,7 @@ function createWindow() {
     height: 840,
     minWidth: 960,
     minHeight: 620,
-    title: 'AI 生图贴回',
+    title: 'BXAS',
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#161615' : '#f6f6f4',
     icon: process.platform === 'win32' ? path.join(ASSETS, 'icon-win.png') : undefined,
@@ -85,7 +88,7 @@ function createWindow() {
     win.hide();
     if (process.platform === 'win32' && !hintedTray && tray) {
       hintedTray = true;
-      tray.displayBalloon({ title: 'AI 生图贴回仍在运行', content: '本机服务在后台继续工作。右下角托盘图标可以打开主窗口或退出。', iconType: 'info' });
+      tray.displayBalloon({ title: 'BXAS 仍在运行', content: '本机服务在后台继续工作。右下角托盘图标可以打开主窗口或退出。', iconType: 'info' });
     }
   });
 }
@@ -101,7 +104,7 @@ const STATUS_TEXT = {
 
 function updateTray() {
   if (!tray) return;
-  tray.setToolTip(`AI 生图贴回 · ${STATUS_TEXT[helper.state.status] || ''}`);
+  tray.setToolTip(`BXAS · ${STATUS_TEXT[helper.state.status] || ''}`);
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: STATUS_TEXT[helper.state.status] || '本机服务', enabled: false },
     { type: 'separator' },
@@ -111,7 +114,7 @@ function updateTray() {
     { label: '打开专用 Chrome', click: () => openTarget('chrome').catch((e) => dialog.showErrorBox('打不开专用 Chrome', e.message)) },
     { label: '检查更新', click: () => { showWindow(); updater.check({ manual: true }); } },
     { type: 'separator' },
-    { label: '退出 AI 生图贴回', click: () => app.quit() },
+    { label: '退出 BXAS', click: () => app.quit() },
   ]));
 }
 
@@ -292,7 +295,26 @@ function registerIpc() {
   });
 }
 
-if (!app.requestSingleInstanceLock()) {
+// macOS：0.8.2 及以前自动更新会把新版装回「PS AI Bridge.app」这个位置。第一次启动时把自己改名成 BXAS.app 再重开；
+// 从安装包另装了 BXAS.app 的，把旧的 PS AI Bridge.app 挪进废纸篓（能找回）。
+function settleBundleName() {
+  if (!app.isPackaged || process.platform !== 'darwin') return false;
+  const current = path.resolve(app.getPath('exe'), '..', '..', '..');
+  const dir = path.dirname(current), legacy = path.join(dir, 'PS AI Bridge.app'), target = path.join(dir, 'BXAS.app');
+  const sameApp = (bundle) => { try { return fs.readFileSync(path.join(bundle, 'Contents', 'Info.plist'), 'utf8').includes('com.fionn.psaibridge.desktop'); } catch { return false; } };
+  if (current === legacy && !fs.existsSync(target)) {
+    try { fs.renameSync(current, target); } catch { return false; }
+    app.relaunch({ execPath: path.join(target, 'Contents', 'MacOS', path.basename(app.getPath('exe'))) });
+    app.exit(0);
+    return true;
+  }
+  if (current === target && fs.existsSync(legacy) && sameApp(legacy)) shell.trashItem(legacy).catch(() => {});
+  return false;
+}
+
+if (settleBundleName()) {
+  // 已经换成 BXAS.app 重新打开了
+} else if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', showPanel);
@@ -311,7 +333,7 @@ if (!app.requestSingleInstanceLock()) {
   loadV7();
   // 不能在顶层 await app.whenReady()：ESM 入口没执行完之前 Electron 不发 ready，会一直卡住
   app.whenReady().then(start).catch((e) => {
-    dialog.showErrorBox('AI 生图贴回启动失败', e?.stack || String(e));
+    dialog.showErrorBox('BXAS 启动失败', e?.stack || String(e));
     app.exit(1);
   });
 }

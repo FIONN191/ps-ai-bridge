@@ -12,7 +12,7 @@ import { promisify } from 'node:util';
 
 const run = promisify(execFile);
 export const FOLDER = 'PS-AI-Bridge';
-const PROMPT = 'AI 生图贴回要把插件装进 Photoshop 的 Plug-ins 文件夹。';
+const PROMPT = 'BXAS 要把插件装进 Photoshop 的 Plug-ins 文件夹。';
 
 // Creative Cloud 装的 UXP 插件放在这里，文件夹名是「插件ID_版本」
 const CC_DIR = process.platform === 'darwin'

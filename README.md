@@ -1,4 +1,6 @@
-# PS AI Bridge：AI 生图贴回
+# BXAS（BAIXIAO AI STUDIO）
+
+桌面端原名 PS AI Bridge（AI 生图贴回）。主界面整合了夏三七的修图轮椅 V7 悬浮面板，另带免 API 生图（AI Studio / Google Flow / ChatGPT 网页 / Codex CLI / agy）。
 
 在 Photoshop 里画个选区（或选中一个图层），写提示词，点一下：插件把这块画面送到 AI Studio / Google Flow（Nano Banana）或 ChatGPT（GPT Image）生成，出图后自动作为**智能对象**贴回原位置，并用原选区做蒙版。中间不用导出、开浏览器、下载、再拖回 PS。
 

@@ -1,8 +1,8 @@
 {
   "name": "ps-ai-bridge-desktop",
-  "productName": "PS AI Bridge",
-  "version": "0.8.2",
-  "description": "AI 生图贴回桌面端：托管本机 helper，一键把插件装进 Photoshop",
+  "productName": "BXAS",
+  "version": "0.8.3",
+  "description": "BXAS（BAIXIAO AI STUDIO）桌面端：托管本机 helper，一键把插件装进 Photoshop",
   "author": "fionn",
   "license": "GPL-3.0-or-later",
   "private": true,

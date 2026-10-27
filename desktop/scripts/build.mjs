@@ -69,8 +69,10 @@ const copyHelper = (helperDir) => (context) => {
 
 const config = (helperDir, pluginDir) => ({
   appId: 'com.fionn.psaibridge.desktop',
-  productName: 'PS AI Bridge',
-  copyright: 'Copyright (C) 2026 fionn · GPL-3.0-or-later',
+  productName: 'BXAS',
+  // Windows 可执行文件名保持旧的：0.8.2 及以前的自动更新装完会按这个文件名核对版本、重新打开
+  executableName: 'PS AI Bridge',
+  copyright: 'Copyright (C) 2026 BAIXIAO · GPL-3.0-or-later',
   directories: { output: OUT, buildResources: 'assets' },
   files: ['src/**/*', 'assets/**/*', 'package.json'],
   extraResources: [
@@ -88,8 +90,8 @@ const config = (helperDir, pluginDir) => ({
     gatekeeperAssess: false,
   },
   dmg: {
-    title: 'PS AI Bridge ${version}',
-    artifactName: 'PS-AI-Bridge-${version}-mac-${arch}.${ext}',
+    title: 'BXAS ${version}',
+    artifactName: 'BXAS-${version}-mac-${arch}.${ext}',
   },
   win: {
     icon: 'assets/icon-win.png',
@@ -98,8 +100,8 @@ const config = (helperDir, pluginDir) => ({
     oneClick: true,
     perMachine: false,
     runAfterFinish: true,
-    shortcutName: 'AI 生图贴回',
-    artifactName: 'PS-AI-Bridge-${version}-win-${arch}-setup.${ext}',
+    shortcutName: 'BXAS',
+    artifactName: 'BXAS-${version}-win-${arch}-setup.${ext}',
     deleteAppDataOnUninstall: false,
   },
 });
